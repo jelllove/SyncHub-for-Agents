@@ -1,0 +1,5 @@
+/acsync
+/acsync.exe
+/dist/
+*.test
+*.out
