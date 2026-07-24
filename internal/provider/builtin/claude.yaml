@@ -1,0 +1,17 @@
+name: claude
+config:
+  paths:
+    windows: "%USERPROFILE%\\.claude"
+    darwin: "~/.claude"
+    linux: "~/.claude"
+  include:
+    - "settings.json"
+    - "CLAUDE.md"
+  sessions:
+    - "projects/**/*.jsonl"
+  exclude:
+    - "**/.credentials.json"
+    - "**/*token*"
+    - "**/shell-snapshots/**"
+secrets:
+  key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

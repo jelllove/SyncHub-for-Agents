@@ -1,0 +1,14 @@
+name: cursor
+config:
+  paths:
+    windows: "%USERPROFILE%\\.cursor"
+    darwin: "~/.cursor"
+    linux: "~/.cursor"
+  include:
+    - "settings.json"
+  sessions:
+    - "chats/**/*.json"
+  exclude:
+    - "**/*token*"
+secrets:
+  key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

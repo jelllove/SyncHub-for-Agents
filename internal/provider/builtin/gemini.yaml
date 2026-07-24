@@ -1,0 +1,15 @@
+name: gemini
+config:
+  paths:
+    windows: "%USERPROFILE%\\.gemini"
+    darwin: "~/.gemini"
+    linux: "~/.gemini"
+  include:
+    - "settings.json"
+  sessions:
+    - "sessions/**/*.json"
+  exclude:
+    - "**/*token*"
+    - "**/oauth_creds.json"
+secrets:
+  key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]
