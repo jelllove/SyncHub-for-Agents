@@ -29,7 +29,7 @@ func TestNewUnsupportedOS(t *testing.T) {
 }
 
 func TestContentGenerators(t *testing.T) {
-	if got := windowsCmd(`C:\acsync.exe`); !strings.Contains(got, `start "" "C:\acsync.exe" daemon`) {
+	if got := windowsCmd(`C:\acsync.exe`); !strings.Contains(got, `start "" "C:\acsync.exe" tray`) {
 		t.Errorf("windows cmd = %q", got)
 	}
 	plist := launchAgentPlist("/usr/local/bin/acsync")
@@ -37,7 +37,7 @@ func TestContentGenerators(t *testing.T) {
 		t.Errorf("plist = %q", plist)
 	}
 	unit := systemdUnit("/usr/local/bin/acsync")
-	if !strings.Contains(unit, "ExecStart=/usr/local/bin/acsync daemon") {
+	if !strings.Contains(unit, "ExecStart=/usr/local/bin/acsync tray") {
 		t.Errorf("unit = %q", unit)
 	}
 }
@@ -61,7 +61,7 @@ func TestEnableDisableLinux(t *testing.T) {
 		t.Error("should be enabled")
 	}
 	data, _ := os.ReadFile(m.Path())
-	if !strings.Contains(string(data), "ExecStart=/opt/acsync daemon") {
+	if !strings.Contains(string(data), "ExecStart=/opt/acsync tray") {
 		t.Errorf("unit body = %q", string(data))
 	}
 	if len(calls) != 1 || calls[0][0] != "systemctl" {
@@ -87,7 +87,7 @@ func TestEnableWindowsWritesCmd(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(m.Path())
-	if !strings.Contains(string(data), `"C:\acsync.exe" daemon`) {
+	if !strings.Contains(string(data), `"C:\acsync.exe" tray`) {
 		t.Errorf("cmd body = %q", string(data))
 	}
 }

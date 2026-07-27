@@ -19,7 +19,7 @@ func TestRunInstallUninstallWindows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("entry not written: %v", err)
 	}
-	if !strings.Contains(string(data), `"C:\Program Files\acsync\acsync.exe" daemon`) {
+	if !strings.Contains(string(data), `"C:\Program Files\acsync\acsync.exe" tray`) {
 		t.Errorf("entry body = %q", string(data))
 	}
 

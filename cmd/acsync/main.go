@@ -9,6 +9,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/daemon"
 	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/acsync/internal/tray"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,7 @@ func main() {
 		Use:   "acsync",
 		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
 	}
-	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), installCmd(), uninstallCmd())
+	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
@@ -102,6 +103,20 @@ func daemonCmd() *cobra.Command {
 					return err
 				}
 				return daemon.RunWithSignals(home, runtime.GOOS)
+			},
+	}
+}
+
+func trayCmd() *cobra.Command {
+	return &cobra.Command{
+			Use:   "tray",
+			Short: "Run acsync with a system-tray icon (daemon + UI)",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				home, err := cli.Home()
+				if err != nil {
+					return err
+				}
+				return tray.Run(home, runtime.GOOS)
 			},
 	}
 }

@@ -118,7 +118,7 @@ func execRunner(name string, args ...string) error {
 }
 
 func windowsCmd(execPath string) string {
-	return "@echo off\r\nstart \"\" \"" + execPath + "\" daemon\r\n"
+	return "@echo off\r\nstart \"\" \"" + execPath + "\" tray\r\n"
 }
 
 func launchAgentPlist(execPath string) string {
@@ -131,7 +131,7 @@ func launchAgentPlist(execPath string) string {
 	<key>ProgramArguments</key>
 	<array>
 		<string>` + xmlEscape(execPath) + `</string>
-		<string>daemon</string>
+		<string>tray</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
@@ -148,7 +148,7 @@ Description=AgentConfigSync daemon
 After=network-online.target
 
 [Service]
-ExecStart=` + execPath + ` daemon
+ExecStart=` + execPath + ` tray
 Restart=on-failure
 
 [Install]
