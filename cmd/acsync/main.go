@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/cli"
+	"github.com/qinqingxu/acsync/internal/daemon"
 	"github.com/qinqingxu/acsync/internal/gitclient"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +17,7 @@ func main() {
 		Use:   "acsync",
 		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
 	}
-	root.AddCommand(initCmd(), syncCmd(), statusCmd())
+	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), installCmd(), uninstallCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
@@ -88,5 +89,60 @@ func statusCmd() *cobra.Command {
 			fmt.Printf("Pending actions: %d\n", st.PendingActions)
 			return nil
 		},
+	}
+}
+
+func daemonCmd() *cobra.Command {
+	return &cobra.Command{
+			Use:   "daemon",
+			Short: "Run the sync daemon (periodic sync + trash cleanup) until stopped",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				home, err := cli.Home()
+				if err != nil {
+					return err
+				}
+				return daemon.RunWithSignals(home, runtime.GOOS)
+			},
+	}
+}
+
+func installCmd() *cobra.Command {
+	return &cobra.Command{
+			Use:   "install",
+			Short: "Enable acsync to start automatically at login",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				exe, err := os.Executable()
+				if err != nil {
+					return err
+				}
+				userHome, err := os.UserHomeDir()
+				if err != nil {
+					return err
+				}
+				path, err := cli.RunInstall(runtime.GOOS, userHome, exe)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Autostart enabled: %s\n", path)
+				return nil
+			},
+	}
+}
+
+func uninstallCmd() *cobra.Command {
+	return &cobra.Command{
+			Use:   "uninstall",
+			Short: "Disable acsync autostart",
+			RunE: func(cmd *cobra.Command, args []string) error {
+				userHome, err := os.UserHomeDir()
+				if err != nil {
+					return err
+				}
+				if err := cli.RunUninstall(runtime.GOOS, userHome); err != nil {
+					return err
+				}
+				fmt.Println("Autostart disabled")
+				return nil
+			},
 	}
 }
