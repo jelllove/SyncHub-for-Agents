@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -52,5 +53,24 @@ func TestEnabledAgents(t *testing.T) {
 	got := c.EnabledAgents()
 	if len(got) != 2 {
 		t.Fatalf("expected 2 enabled, got %v", got)
+	}
+}
+
+func TestLoadMigratesVSCodeProviderIntoOlderConfig(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "config.yaml")
+	data := []byte("agents:\n  claude: false\n")
+	if err := os.WriteFile(filename, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Load(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Agents["vscode-copilot"] {
+		t.Fatal("new VS Code provider should default to enabled during config migration")
+	}
+	if got.Agents["claude"] {
+		t.Fatal("migration must preserve explicit agent settings")
 	}
 }

@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
 func writeConfig(t *testing.T, home string, cfg config.Config) {
@@ -18,9 +20,65 @@ func writeConfig(t *testing.T, home string, cfg config.Config) {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := config.Save(cli.ConfigPath(home), cfg); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestDaemonPublishesCompleteOnlyAfterCleanup(t *testing.T) {
+	home := filepath.Join(t.TempDir(), ".acsync")
+	writeConfig(t, home, config.Config{SyncIntervalMinutes: 60, Agents: map[string]bool{}})
+	d, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	d.sync = func(_ string, _ string, publish func(syncengine.Progress)) (syncengine.Result, error) {
+		publish(syncengine.Progress{Stage: syncengine.StageUploading, Percentage: 85})
+		return syncengine.Result{
+			Actions: []syncengine.Action{{Type: syncengine.PushToRemote, RepoRel: "agents/demo/config/settings.json"}},
+			Pushed:  true,
+		}, nil
+	}
+
+	t.Run("cleanup failure", func(t *testing.T) {
+		d.cleanup = func(string, time.Time) ([]string, error) {
+			return nil, errors.New("cleanup failed")
+		}
+		var updates []syncengine.Progress
+		d.OnProgress = func(update syncengine.Progress) {
+			updates = append(updates, update)
+		}
+		if err := d.syncJob(); err == nil {
+			t.Fatal("expected cleanup error")
+		}
+		for _, update := range updates {
+			if update.Stage == syncengine.StageComplete {
+				t.Fatalf("complete published before failed cleanup: %#v", updates)
+			}
+		}
+	})
+
+	t.Run("cleanup success", func(t *testing.T) {
+		d.cleanup = func(string, time.Time) ([]string, error) {
+			return nil, nil
+		}
+		var updates []syncengine.Progress
+		d.OnProgress = func(update syncengine.Progress) {
+			updates = append(updates, update)
+		}
+		if err := d.syncJob(); err != nil {
+			t.Fatal(err)
+		}
+		last := updates[len(updates)-1]
+		if last.Stage != syncengine.StageComplete ||
+			last.Percentage != 100 ||
+			last.TotalActions != 1 ||
+			!last.Pushed {
+			t.Fatalf("completion = %#v", last)
+		}
+	})
 }
 
 func TestNewUsesConfiguredInterval(t *testing.T) {

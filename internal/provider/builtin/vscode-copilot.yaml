@@ -1,0 +1,18 @@
+name: vscode-copilot
+config:
+  paths:
+    windows: "%USERPROFILE%\\AppData\\Roaming\\Code\\User\\workspaceStorage"
+    darwin: "~/Library/Application Support/Code/User/workspaceStorage"
+    linux: "~/.config/Code/User/workspaceStorage"
+  include: []
+  sessions:
+    - "*/workspace.json"
+    - "*/chatSessions/*.json"
+    - "*/chatSessions/*.jsonl"
+  exclude:
+    - "**/*token*"
+    - "**/state.vscdb*"
+    - "**/*.db"
+    - "**/*.sqlite"
+secrets:
+  key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

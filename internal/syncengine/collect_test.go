@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/qinqingxu/acsync/internal/secret"
+	"github.com/qinqingxu/acsync/internal/state"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -56,5 +57,59 @@ func TestCollectMapsAndFilters(t *testing.T) {
 	}
 	if src := c.Sources["agents/claude/config/settings.json"]; src == "" {
 		t.Error("expected a source path for settings.json")
+	}
+}
+
+func TestScanRemoteBlockedFindsRemoteOnlySecret(t *testing.T) {
+	repoDir := t.TempDir()
+	repoRel := "agents/demo/sessions/session.json"
+	writeFile(t, filepath.Join(repoDir, filepath.FromSlash(repoRel)), `{"accessToken":"secret"}`)
+	specs := map[string]AgentSpec{"demo": {
+		Name:    "demo",
+		Scanner: secret.NewScanner(nil, []string{"token"}),
+	}}
+
+	blocked, err := ScanRemoteBlocked(repoDir, specs, state.Snapshot{
+		repoRel: {},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 1 || blocked[0] != repoRel {
+		t.Fatalf("blocked = %#v, want %q", blocked, repoRel)
+	}
+}
+
+func TestScanRemoteBlockedFindsDisallowedRemotePath(t *testing.T) {
+	repoDir := t.TempDir()
+	repoRel := "agents/vscode-copilot/sessions/workspace/chatEditingSessions/id/state.json"
+	writeFile(t, filepath.Join(repoDir, filepath.FromSlash(repoRel)), `{"safe":true}`)
+	specs := map[string]AgentSpec{"vscode-copilot": {
+		Name:     "vscode-copilot",
+		Sessions: []string{"*/chatSessions/*.jsonl"},
+	}}
+
+	blocked, err := ScanRemoteBlocked(repoDir, specs, state.Snapshot{repoRel: {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 1 || blocked[0] != repoRel {
+		t.Fatalf("blocked = %#v, want disallowed remote path", blocked)
+	}
+}
+
+func TestFilterSnapshotForSpecsIgnoresDisabledProvider(t *testing.T) {
+	snapshot := state.Snapshot{
+		"agents/enabled/config/settings.json":  {},
+		"agents/disabled/config/settings.json": {},
+	}
+	filtered := FilterSnapshotForSpecs(snapshot, map[string]AgentSpec{
+		"enabled": {Name: "enabled"},
+	})
+	if len(filtered) != 1 {
+		t.Fatalf("filtered = %#v", filtered)
+	}
+	if _, ok := filtered["agents/enabled/config/settings.json"]; !ok {
+		t.Fatal("enabled provider path missing")
 	}
 }

@@ -213,3 +213,16 @@ func (c *Client) HasChanges() (bool, error) {
 	}
 	return strings.TrimSpace(out) != "", nil
 }
+
+// AheadOfUpstream reports whether HEAD contains commits not present upstream.
+func (c *Client) AheadOfUpstream() (bool, error) {
+	out, err := c.run("rev-list", "--count", "@{upstream}..HEAD")
+	if err != nil {
+		return false, err
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return false, fmt.Errorf("parse ahead count: %w", err)
+	}
+	return count > 0, nil
+}

@@ -9,8 +9,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const currentVersion = 1
+
 // Config is the user-editable settings model.
 type Config struct {
+	Version             int             `yaml:"version,omitempty"`
 	RepoURL             string          `yaml:"repo_url"`
 	SyncIntervalMinutes int             `yaml:"sync_interval_minutes"`
 	TrashGraceDays      int             `yaml:"trash_grace_days"`
@@ -24,6 +27,7 @@ func Default(agentNames []string) Config {
 		agents[n] = true
 	}
 	return Config{
+		Version:             currentVersion,
 		SyncIntervalMinutes: 10,
 		TrashGraceDays:      30,
 		Agents:              agents,
@@ -55,6 +59,12 @@ func Load(path string) (Config, error) {
 	if c.Agents == nil {
 		c.Agents = map[string]bool{}
 	}
+	if c.Version < 1 {
+		if _, configured := c.Agents["vscode-copilot"]; !configured {
+			c.Agents["vscode-copilot"] = true
+		}
+		c.Version = 1
+	}
 	return c, nil
 }
 
@@ -63,6 +73,7 @@ func Save(path string, c Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+	c.Version = currentVersion
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		return err

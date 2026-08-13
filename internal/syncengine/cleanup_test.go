@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/qinqingxu/acsync/internal/secret"
 )
 
 func TestCleanupTrashRemovesExpired(t *testing.T) {
@@ -55,5 +57,74 @@ func TestCleanupTrashNoIndex(t *testing.T) {
 	}
 	if purged != nil {
 		t.Errorf("purged = %v, want nil when no trash index", purged)
+	}
+}
+
+func TestPurgeBlockedTrashRemovesSecretAndIndexEntry(t *testing.T) {
+	repo := t.TempDir()
+	repoRel := "agents/demo/sessions/secret.json"
+	writeFile(t, filepath.Join(repo, ".trash", "files", filepath.FromSlash(repoRel)), `{"accessToken":"secret"}`)
+	data, _ := json.Marshal(map[string]int64{repoRel: time.Now().Unix()})
+	writeFile(t, filepath.Join(repo, ".trash", "index.json"), string(data))
+	specs := map[string]AgentSpec{"demo": {
+		Name:     "demo",
+		Sessions: []string{"*.json"},
+		Scanner:  secret.NewScanner(nil, []string{"token"}),
+	}}
+
+	purged, err := PurgeBlockedTrash(repo, specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(purged) != 1 || purged[0] != repoRel {
+		t.Fatalf("purged = %#v", purged)
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".trash", "files", filepath.FromSlash(repoRel))); !os.IsNotExist(err) {
+		t.Fatal("blocked trash file still exists")
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, ".trash", "index.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var index map[string]int64
+	if err := json.Unmarshal(raw, &index); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := index[repoRel]; exists {
+		t.Fatal("blocked trash entry still exists in index")
+	}
+}
+
+func TestCleanupTrashRejectsTraversalIndexPath(t *testing.T) {
+	repo := t.TempDir()
+	victim := filepath.Join(repo, "victim.txt")
+	writeFile(t, victim, "keep")
+	repoRel := "agents/demo/config/../../../../victim.txt"
+	data, _ := json.Marshal(map[string]int64{repoRel: 0})
+	writeFile(t, filepath.Join(repo, ".trash", "index.json"), string(data))
+
+	if _, err := CleanupTrash(repo, time.Now(), 0); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(victim); err != nil || string(got) != "keep" {
+		t.Fatalf("victim was changed: %q, %v", got, err)
+	}
+}
+
+func TestPurgeBlockedTrashRemovesUnindexedFile(t *testing.T) {
+	repo := t.TempDir()
+	orphan := filepath.Join(repo, ".trash", "files", "agents", "demo", "sessions", "orphan.json")
+	writeFile(t, orphan, `{"accessToken":"secret"}`)
+	writeFile(t, filepath.Join(repo, ".trash", "index.json"), "{}")
+
+	purged, err := PurgeBlockedTrash(repo, map[string]AgentSpec{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(purged) != 1 || purged[0] != "agents/demo/sessions/orphan.json" {
+		t.Fatalf("purged = %#v", purged)
+	}
+	if _, err := os.Stat(orphan); !os.IsNotExist(err) {
+		t.Fatal("unindexed trash file still exists")
 	}
 }

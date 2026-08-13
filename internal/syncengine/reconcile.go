@@ -18,6 +18,8 @@ const (
 	DeleteRemote
 	// DeleteLocal removes the local agent file.
 	DeleteLocal
+	// RemoveRemote deletes a blocked file from the repo without retaining it in trash.
+	RemoveRemote
 )
 
 func (t ActionType) String() string {
@@ -30,6 +32,8 @@ func (t ActionType) String() string {
 		return "delete-remote"
 	case DeleteLocal:
 		return "delete-local"
+	case RemoveRemote:
+		return "remove-remote"
 	default:
 		return "unknown"
 	}
@@ -46,13 +50,29 @@ type Action struct {
 // sync; local is the current agent-dir snapshot; remote is the pulled repo
 // snapshot.
 func Reconcile(base, local, remote state.Snapshot) []Action {
+	return ReconcileWithBlocked(base, local, remote, nil)
+}
+
+// ReconcileWithBlocked protects locally blocked files from remote writes and
+// removes any current remote copy without retaining it in trash.
+func ReconcileWithBlocked(base, local, remote state.Snapshot, blocked []string) []Action {
 	keys := unionKeys(base, local, remote)
 	var actions []Action
+	protected := make(map[string]struct{}, len(blocked))
+	for _, p := range blocked {
+		protected[p] = struct{}{}
+	}
 
 	for _, p := range keys {
 		b, inB := base[p]
 		l, inL := local[p]
 		r, inR := remote[p]
+		if _, blocked := protected[p]; blocked {
+			if inR {
+				actions = append(actions, Action{RemoveRemote, p})
+			}
+			continue
+		}
 
 		localChanged := sideChanged(inB, b, inL, l)
 		remoteChanged := sideChanged(inB, b, inR, r)

@@ -53,12 +53,22 @@ func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	remoteBlocked, err := syncengine.ScanRemoteBlocked(RepoDir(home), specs, remote)
+	if err != nil {
+		return Status{}, err
+	}
 	base, err := state.Load(StatePath(home))
 	if err != nil {
 		return Status{}, err
 	}
 
-	actions := syncengine.Reconcile(base, collected.Snapshot, remote)
+	blocked := append(append([]string{}, collected.Blocked...), remoteBlocked...)
+	actions := syncengine.ReconcileWithBlocked(
+		syncengine.FilterSnapshotForSpecs(base, specs),
+		collected.Snapshot,
+		syncengine.FilterSnapshotForSpecs(remote, specs),
+		blocked,
+	)
 
 	var last time.Time
 	if info, err := os.Stat(StatePath(home)); err == nil {

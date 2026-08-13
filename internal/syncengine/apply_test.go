@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/qinqingxu/acsync/internal/secret"
 )
 
 func TestApplyPushPullDelete(t *testing.T) {
@@ -27,6 +29,9 @@ func TestApplyPushPullDelete(t *testing.T) {
 	// Prepare a local file to delete.
 	writeFile(t, filepath.Join(localRoot, "e.json"), `{"v":4}`)
 
+	// Prepare a blocked repo file to remove without retaining it in trash.
+	writeFile(t, filepath.Join(repoDir, "agents", "c", "config", "blocked.json"), `{"token":"old"}`)
+
 	ap := &Applier{
 		RepoDir: repoDir,
 		Specs:   specs,
@@ -38,6 +43,7 @@ func TestApplyPushPullDelete(t *testing.T) {
 		{PullToLocal, "agents/c/config/b.json"},
 		{DeleteRemote, "agents/c/config/d.json"},
 		{DeleteLocal, "agents/c/config/e.json"},
+		{RemoveRemote, "agents/c/config/blocked.json"},
 	}
 	if err := ap.Apply(actions); err != nil {
 		t.Fatalf("Apply error: %v", err)
@@ -73,6 +79,45 @@ func TestApplyPushPullDelete(t *testing.T) {
 	// Delete-local removed the local file.
 	if _, err := os.Stat(filepath.Join(localRoot, "e.json")); !os.IsNotExist(err) {
 		t.Errorf("deleted local file should be gone, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, "agents", "c", "config", "blocked.json")); !os.IsNotExist(err) {
+		t.Errorf("blocked repo file should be removed, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, ".trash", "files", "agents", "c", "config", "blocked.json")); !os.IsNotExist(err) {
+		t.Errorf("blocked repo file must not be retained in trash, err=%v", err)
+	}
+}
+
+func TestApplyPushRescansExactBytesBeforeReplacingRepoFile(t *testing.T) {
+	repoDir := t.TempDir()
+	localRoot := t.TempDir()
+	repoRel := "agents/c/config/settings.json"
+	localSrc := filepath.Join(localRoot, "settings.json")
+	repoPath := filepath.Join(repoDir, filepath.FromSlash(repoRel))
+	writeFile(t, localSrc, `{"accessToken":"new-secret"}`)
+	writeFile(t, repoPath, `{"theme":"safe"}`)
+
+	ap := &Applier{
+		RepoDir: repoDir,
+		Specs: map[string]AgentSpec{"c": {
+			Name:    "c",
+			Root:    localRoot,
+			Scanner: secret.NewScanner(nil, []string{"token"}),
+		}},
+		Sources: map[string]string{repoRel: localSrc},
+	}
+	if err := ap.Apply([]Action{{PushToRemote, repoRel}}); err == nil {
+		t.Fatal("expected exact push bytes to be blocked")
+	}
+	got, err := os.ReadFile(repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"theme":"safe"}` {
+		t.Fatalf("repo file changed despite blocked push: %s", got)
+	}
+	if matches, err := filepath.Glob(filepath.Join(repoDir, "agents", "**", "*.acsync-stage*")); err != nil || len(matches) != 0 {
+		t.Fatalf("staging files must not be created under agents: matches=%v err=%v", matches, err)
 	}
 }
 

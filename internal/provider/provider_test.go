@@ -11,7 +11,7 @@ func TestBuiltinsLoaded(t *testing.T) {
 	for _, p := range ps {
 		byName[p.Name] = p
 	}
-	for _, want := range []string{"claude", "copilot", "gemini", "cursor"} {
+	for _, want := range []string{"claude", "copilot", "gemini", "cursor", "vscode-copilot"} {
 		if _, ok := byName[want]; !ok {
 			t.Errorf("missing builtin provider %q", want)
 		}
@@ -26,10 +26,50 @@ func TestBuiltinsLoaded(t *testing.T) {
 	if len(claude.Secrets.KeyPatterns) == 0 {
 		t.Error("claude should declare secret key patterns")
 	}
+	for _, session := range []string{
+		"history.jsonl",
+		"sessions/**/*.json",
+		"projects/**/sessions-index.json",
+	} {
+		if !contains(claude.Config.Sessions, session) {
+			t.Errorf("claude sessions = %#v, missing %q", claude.Config.Sessions, session)
+		}
+	}
+
+	copilot := byName["copilot"]
+	for _, session := range []string{
+		"session-state/*/events.jsonl",
+		"session-state/*/workspace.yaml",
+		"session-state/*/checkpoints/**/*.md",
+	} {
+		if !contains(copilot.Config.Sessions, session) {
+			t.Errorf("copilot sessions = %#v, missing %q", copilot.Config.Sessions, session)
+		}
+	}
 
 	gemini := byName["gemini"]
-	if !contains(gemini.Config.Sessions, "tmp/**/chats/*.jsonl") {
+	if !contains(gemini.Config.Sessions, "tmp/**/chats/**/*.jsonl") {
 		t.Fatalf("gemini sessions = %#v, want current Gemini CLI chat path", gemini.Config.Sessions)
+	}
+
+	vscode := byName["vscode-copilot"]
+	if len(vscode.Secrets.KeyPatterns) == 0 {
+		t.Error("VS Code provider must declare top-level secret key patterns")
+	}
+	if vscode.Config.Paths["windows"] != "%USERPROFILE%\\AppData\\Roaming\\Code\\User\\workspaceStorage" {
+		t.Errorf("VS Code Windows path = %q", vscode.Config.Paths["windows"])
+	}
+	for _, session := range []string{
+		"*/workspace.json",
+		"*/chatSessions/*.json",
+		"*/chatSessions/*.jsonl",
+	} {
+		if !contains(vscode.Config.Sessions, session) {
+			t.Errorf("VS Code sessions = %#v, missing %q", vscode.Config.Sessions, session)
+		}
+	}
+	if contains(vscode.Config.Sessions, "*/chatEditingSessions/*/state.json") {
+		t.Error("VS Code editing state contains raw source snapshots and must not be synced")
 	}
 }
 

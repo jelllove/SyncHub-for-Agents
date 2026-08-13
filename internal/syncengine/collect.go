@@ -2,6 +2,9 @@
 package syncengine
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -44,6 +47,71 @@ func Collect(specs []AgentSpec) (Collected, error) {
 	return out, nil
 }
 
+// ScanRemoteBlocked scans pulled repo files with the owning provider's scanner.
+// Malformed JSONL fails closed and is removed from the remote repository.
+func ScanRemoteBlocked(repoDir string, specs map[string]AgentSpec, remote state.Snapshot) ([]string, error) {
+	var blocked []string
+	for repoRel := range remote {
+		parts := strings.Split(repoRel, "/")
+		if len(parts) < 4 || parts[0] != "agents" {
+			blocked = append(blocked, repoRel)
+			continue
+		}
+		spec, ok := specs[parts[1]]
+		if !ok {
+			continue
+		}
+		rel := strings.Join(parts[3:], "/")
+		sub, allowed := classify(rel, spec.Include, spec.Sessions)
+		if !allowed || sub != parts[2] {
+			blocked = append(blocked, repoRel)
+			continue
+		}
+		if spec.Scanner == nil {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(repoDir, filepath.FromSlash(repoRel)))
+		if err != nil {
+			return nil, err
+		}
+		isBlocked, scanErr := spec.Scanner.Scan(rel, data)
+		if isBlocked || scanErr != nil {
+			blocked = append(blocked, repoRel)
+		}
+	}
+	return blocked, nil
+}
+
+// FilterSnapshotForSpecs removes paths owned by disabled or unknown providers
+// so they remain untouched in the remote repository.
+func FilterSnapshotForSpecs(snapshot state.Snapshot, specs map[string]AgentSpec) state.Snapshot {
+	filtered := state.Snapshot{}
+	for repoRel, metadata := range snapshot {
+		parts := strings.Split(repoRel, "/")
+		if len(parts) < 4 || parts[0] != "agents" {
+			continue
+		}
+		if _, enabled := specs[parts[1]]; enabled {
+			filtered[repoRel] = metadata
+		}
+	}
+	return filtered
+}
+
+func mergeBlocked(groups ...[]string) []string {
+	set := map[string]struct{}{}
+	for _, group := range groups {
+		for _, repoRel := range group {
+			set[repoRel] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(set))
+	for repoRel := range set {
+		out = append(out, repoRel)
+	}
+	return out
+}
+
 func collectOne(spec AgentSpec, out *Collected) error {
 	info, err := os.Stat(spec.Root)
 	if err != nil || !info.IsDir() {
@@ -69,27 +137,30 @@ func collectOne(spec AgentSpec, out *Collected) error {
 		}
 		repoRel := path.Join("agents", spec.Name, sub, rel)
 
-		data, err := os.ReadFile(abs)
-		if err != nil {
-			return err
-		}
-		if spec.Scanner != nil && spec.Scanner.ShouldBlock(rel, data) {
-			out.Blocked = append(out.Blocked, repoRel)
-			return nil
-		}
-
-		hash, err := state.HashFile(abs)
-		if err != nil {
-			return err
-		}
 		fi, err := d.Info()
 		if err != nil {
 			return err
 		}
+		data, err := os.ReadFile(abs)
+		if err != nil {
+			return err
+		}
+		if spec.Scanner != nil {
+			blocked, err := spec.Scanner.Scan(rel, data)
+			if err != nil {
+				return fmt.Errorf("scan %s: %w", repoRel, err)
+			}
+			if blocked {
+				out.Blocked = append(out.Blocked, repoRel)
+				return nil
+			}
+		}
+
+		sum := sha256.Sum256(data)
 		out.Snapshot[repoRel] = state.FileMeta{
-			Hash:    hash,
+			Hash:    hex.EncodeToString(sum[:]),
 			ModTime: fi.ModTime().Unix(),
-			Size:    fi.Size(),
+			Size:    int64(len(data)),
 		}
 		out.Sources[repoRel] = abs
 		return nil

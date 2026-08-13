@@ -42,8 +42,8 @@ func TestReconcileRemoteNewPulls(t *testing.T) {
 
 func TestReconcileLocalDeletePropagates(t *testing.T) {
 	base := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)}
-	local := state.Snapshot{}                                             // locally deleted
-	remote := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)}    // unchanged remote
+	local := state.Snapshot{}                                          // locally deleted
+	remote := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)} // unchanged remote
 	a := find(Reconcile(base, local, remote), "agents/c/config/a.json")
 	if a == nil || a.Type != DeleteRemote {
 		t.Fatalf("expected DeleteRemote, got %+v", a)
@@ -52,8 +52,8 @@ func TestReconcileLocalDeletePropagates(t *testing.T) {
 
 func TestReconcileRemoteDeletePropagates(t *testing.T) {
 	base := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)}
-	local := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)}     // unchanged local
-	remote := state.Snapshot{}                                            // deleted remote
+	local := state.Snapshot{"agents/c/config/a.json": meta("h1", 10)} // unchanged local
+	remote := state.Snapshot{}                                        // deleted remote
 	a := find(Reconcile(base, local, remote), "agents/c/config/a.json")
 	if a == nil || a.Type != DeleteLocal {
 		t.Fatalf("expected DeleteLocal, got %+v", a)
@@ -95,5 +95,19 @@ func TestReconcileDeleteModifyResurrects(t *testing.T) {
 	a := find(Reconcile(base, local, remote), "p")
 	if a == nil || a.Type != PullToLocal {
 		t.Fatalf("expected PullToLocal (resurrect), got %+v", a)
+	}
+}
+
+func TestReconcileBlockedLocalNeverPullsRemote(t *testing.T) {
+	remote := state.Snapshot{"agents/c/config/secret.json": meta("remote", 10)}
+	actions := ReconcileWithBlocked(
+		state.Snapshot{},
+		state.Snapshot{},
+		remote,
+		[]string{"agents/c/config/secret.json"},
+	)
+	a := find(actions, "agents/c/config/secret.json")
+	if a == nil || a.Type != RemoveRemote {
+		t.Fatalf("blocked path should be removed remotely, got %+v", a)
 	}
 }

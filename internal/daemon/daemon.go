@@ -34,6 +34,8 @@ type Daemon struct {
 	OnProgress func(syncengine.Progress)
 
 	closeLog func() error
+	sync     func(string, string, func(syncengine.Progress)) (syncengine.Result, error)
+	cleanup  func(string, time.Time) ([]string, error)
 }
 
 // New builds a Daemon: it loads config for the interval and wires a scheduler
@@ -53,7 +55,14 @@ func New(home, goos string) (*Daemon, error) {
 		return nil, err
 	}
 
-	d := &Daemon{Home: home, GOOS: goos, Logger: logger, closeLog: closeLog}
+	d := &Daemon{
+		Home:     home,
+		GOOS:     goos,
+		Logger:   logger,
+		closeLog: closeLog,
+		sync:     cli.RunSyncWithProgress,
+		cleanup:  cli.RunCleanup,
+	}
 	d.Scheduler = scheduler.New(interval, d.syncJob)
 	d.Scheduler.Subscribe(d.logState)
 	return d, nil
@@ -69,7 +78,7 @@ func (d *Daemon) syncJob() error {
 		}
 	}()
 
-	res, err := cli.RunSyncWithProgress(d.Home, d.GOOS, d.OnProgress)
+	res, err := d.sync(d.Home, d.GOOS, d.OnProgress)
 	if err != nil {
 		result.Error = err.Error()
 		d.Logger.Printf("sync error: %v", err)
@@ -81,7 +90,7 @@ func (d *Daemon) syncJob() error {
 	d.Logger.Printf("sync ok: %d actions, %d blocked, pushed=%v",
 		result.Actions, result.Blocked, result.Pushed)
 
-	purged, err := cli.RunCleanup(d.Home, time.Now())
+	purged, err := d.cleanup(d.Home, time.Now())
 	if err != nil {
 		result.Error = err.Error()
 		d.Logger.Printf("cleanup error: %v", err)
@@ -90,6 +99,17 @@ func (d *Daemon) syncJob() error {
 	result.Purged = len(purged)
 	if result.Purged > 0 {
 		d.Logger.Printf("purged %d expired trash entries", result.Purged)
+	}
+	if d.OnProgress != nil {
+		d.OnProgress(syncengine.Progress{
+			Stage:            syncengine.StageComplete,
+			Label:            "Synchronization complete",
+			Percentage:       100,
+			CompletedActions: result.Actions,
+			TotalActions:     result.Actions,
+			BlockedFiles:     result.Blocked,
+			Pushed:           result.Pushed,
+		})
 	}
 	return nil
 }

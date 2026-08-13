@@ -3,7 +3,9 @@
 package secret
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"path"
 	"strings"
 
@@ -48,6 +50,23 @@ func (s *Scanner) HasSecretContent(data []byte) bool {
 	return s.walk(v)
 }
 
+func (s *Scanner) hasSecretJSONL(data []byte) (bool, error) {
+	for _, line := range bytes.Split(data, []byte{'\n'}) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var v any
+		if err := json.Unmarshal(line, &v); err != nil {
+			return false, fmt.Errorf("invalid JSONL record: %w", err)
+		}
+		if s.walk(v) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *Scanner) walk(v any) bool {
 	switch t := v.(type) {
 	case map[string]any:
@@ -70,8 +89,18 @@ func (s *Scanner) walk(v any) bool {
 }
 
 func (s *Scanner) keyMatches(key string) bool {
+	if strings.ContainsAny(key, `/\`) {
+		return false
+	}
 	lk := strings.ToLower(key)
 	for _, p := range s.keyPatterns {
+		if p == "token" {
+			normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(lk)
+			if strings.Contains(normalized, "token") && !isTokenMetric(normalized) {
+				return true
+			}
+			continue
+		}
 		if strings.Contains(lk, p) {
 			return true
 		}
@@ -79,10 +108,53 @@ func (s *Scanner) keyMatches(key string) bool {
 	return false
 }
 
-// ShouldBlock returns true if the file must not be uploaded.
-func (s *Scanner) ShouldBlock(rel string, data []byte) bool {
-	if s.IsExcluded(rel) {
+func isTokenMetric(key string) bool {
+	switch key {
+	case "cachedtokens",
+		"cachereadtokens",
+		"cachewritetokens",
+		"compactiontokensused",
+		"completiontokens",
+		"conversationtokens",
+		"currenttokens",
+		"inputtokens",
+		"maxinputtokens",
+		"maxoutputtokens",
+		"outputtokens",
+		"precompactiontokens",
+		"prompttokens",
+		"prompttokensdetails",
+		"reasoningtokens",
+		"responsetokenlimit",
+		"systemtokens",
+		"tokencount",
+		"tokendetails",
+		"tokentype",
+		"tokenusage",
+		"tooldefinitionstokens",
+		"totaltokens":
 		return true
 	}
-	return s.HasSecretContent(data)
+	return false
+}
+
+// Scan reports whether a file is blocked. Malformed JSONL returns an error so
+// callers retry later rather than treating an active partial record as a secret.
+func (s *Scanner) Scan(rel string, data []byte) (bool, error) {
+	if s.IsExcluded(rel) {
+		return true, nil
+	}
+	if s.HasSecretContent(data) {
+		return true, nil
+	}
+	if strings.EqualFold(path.Ext(rel), ".jsonl") {
+		return s.hasSecretJSONL(data)
+	}
+	return false, nil
+}
+
+// ShouldBlock returns true if the file must not be uploaded. Scanner errors fail closed.
+func (s *Scanner) ShouldBlock(rel string, data []byte) bool {
+	blocked, err := s.Scan(rel, data)
+	return blocked || err != nil
 }

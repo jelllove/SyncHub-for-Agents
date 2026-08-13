@@ -144,7 +144,6 @@ func TestEnginePublishesProgress(t *testing.T) {
 		StageComparing,
 		StageApplying,
 		StageUploading,
-		StageComplete,
 	}
 	if len(progress) != len(wantStages) {
 		t.Fatalf("progress stages = %#v", progress)
@@ -158,7 +157,7 @@ func TestEnginePublishesProgress(t *testing.T) {
 		}
 	}
 	last := progress[len(progress)-1]
-	if last.Percentage != 100 ||
+	if last.Percentage != 85 ||
 		last.CompletedActions != len(result.Actions) ||
 		last.TotalActions != len(result.Actions) ||
 		last.BlockedFiles != len(result.Blocked) {

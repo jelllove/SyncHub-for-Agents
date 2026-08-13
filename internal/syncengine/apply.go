@@ -39,7 +39,7 @@ func (a *Applier) applyOne(act Action) error {
 		if src == "" {
 			return fmt.Errorf("no local source for push")
 		}
-		return copyFile(src, filepath.Join(a.RepoDir, filepath.FromSlash(act.RepoRel)))
+		return a.pushToRemote(src, act.RepoRel)
 	case PullToLocal:
 		dst, err := a.localPathFor(act.RepoRel)
 		if err != nil {
@@ -57,9 +57,63 @@ func (a *Applier) applyOne(act Action) error {
 			return err
 		}
 		return nil
+	case RemoveRemote:
+		err := os.Remove(filepath.Join(a.RepoDir, filepath.FromSlash(act.RepoRel)))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown action type %v", act.Type)
 	}
+}
+
+func (a *Applier) pushToRemote(src, repoRel string) (retErr error) {
+	dst := filepath.Join(a.RepoDir, filepath.FromSlash(repoRel))
+	stageDir := filepath.Join(a.RepoDir, ".git", "acsync-stage")
+	if err := os.MkdirAll(stageDir, 0o700); err != nil {
+		return err
+	}
+	stageFile, err := os.CreateTemp(stageDir, "source-*")
+	if err != nil {
+		return err
+	}
+	staged := stageFile.Name()
+	if err := stageFile.Close(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := os.Remove(staged); err != nil && !os.IsNotExist(err) && retErr == nil {
+			retErr = fmt.Errorf("remove staged source: %w", err)
+		}
+	}()
+
+	if err := copyFile(src, staged); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(staged)
+	if err != nil {
+		return err
+	}
+	parts := strings.Split(repoRel, "/")
+	if len(parts) < 4 || parts[0] != "agents" {
+		return fmt.Errorf("cannot map repo path %q", repoRel)
+	}
+	spec, ok := a.Specs[parts[1]]
+	if !ok {
+		return fmt.Errorf("no spec for agent %q", parts[1])
+	}
+	rel := strings.Join(parts[3:], "/")
+	if spec.Scanner != nil {
+		blocked, err := spec.Scanner.Scan(rel, data)
+		if err != nil {
+			return fmt.Errorf("scan staged source: %w", err)
+		}
+		if blocked {
+			return fmt.Errorf("staged source was blocked by secret scanner")
+		}
+	}
+	return copyFile(staged, dst)
 }
 
 // localPathFor maps a repo-relative path back to the local agent file path.
@@ -117,7 +171,7 @@ func (a *Applier) recordTrash(repoRel string) error {
 	return os.WriteFile(idxPath, data, 0o644)
 }
 
-func copyFile(src, dst string) error {
+func copyFile(src, dst string) (retErr error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
@@ -128,6 +182,11 @@ func copyFile(src, dst string) error {
 	defer in.Close()
 
 	tmp := dst + ".tmp"
+	defer func() {
+		if err := os.Remove(tmp); err != nil && !os.IsNotExist(err) && retErr == nil {
+			retErr = fmt.Errorf("remove temporary file: %w", err)
+		}
+	}()
 	out, err := os.Create(tmp)
 	if err != nil {
 		return err

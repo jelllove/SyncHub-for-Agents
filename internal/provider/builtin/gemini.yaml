@@ -11,7 +11,7 @@ config:
     - "trustedFolders.json"
   sessions:
     - "sessions/**/*.json"
-    - "tmp/**/chats/*.jsonl"
+    - "tmp/**/chats/**/*.jsonl"
   exclude:
     - "**/*token*"
     - "**/oauth_creds.json"

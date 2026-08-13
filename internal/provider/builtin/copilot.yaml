@@ -8,8 +8,16 @@ config:
     - "config.json"
   sessions:
     - "history/**/*.json"
+    - "session-state/*/events.jsonl"
+    - "session-state/*/workspace.yaml"
+    - "session-state/*/vscode.metadata.json"
+    - "session-state/*/vscode.requests.metadata.json"
+    - "session-state/*/plan.md"
+    - "session-state/*/checkpoints/**/*.md"
   exclude:
     - "**/*token*"
     - "**/hosts.json"
+    - "**/inuse.*.lock"
+    - "**/session.db*"
 secrets:
   key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

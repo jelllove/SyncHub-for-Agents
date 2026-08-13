@@ -128,8 +128,22 @@ func TestCommitPushPullRoundTrip(t *testing.T) {
 	if err := a.Commit("add fromA"); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
+	ahead, err := a.AheadOfUpstream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ahead {
+		t.Fatal("local commit should be ahead before push")
+	}
 	if err := a.Push(); err != nil {
 		t.Fatalf("Push: %v", err)
+	}
+	ahead, err = a.AheadOfUpstream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ahead {
+		t.Fatal("branch should not be ahead after push")
 	}
 
 	// Machine B clones and should see A's file after pull.

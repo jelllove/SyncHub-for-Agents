@@ -37,6 +37,10 @@ func (e *Engine) SyncOnce() (Result, error) {
 	if err := e.Git.PullRebase(); err != nil {
 		return Result{}, fmt.Errorf("pull: %w", err)
 	}
+	trashBlocked, err := PurgeBlockedTrash(e.RepoDir, e.Specs)
+	if err != nil {
+		return Result{}, fmt.Errorf("purge blocked trash: %w", err)
+	}
 
 	e.progress(Progress{Stage: StageScanning, Label: "Scanning local files", Percentage: 30})
 	remote, err := SnapshotRepo(e.RepoDir)
@@ -52,25 +56,35 @@ func (e *Engine) SyncOnce() (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("collect: %w", err)
 	}
+	remoteBlocked, err := ScanRemoteBlocked(e.RepoDir, e.Specs, remote)
+	if err != nil {
+		return Result{}, fmt.Errorf("scan remote: %w", err)
+	}
+	blocked := mergeBlocked(collected.Blocked, remoteBlocked, trashBlocked)
 
 	e.progress(Progress{
 		Stage:        StageComparing,
 		Label:        "Comparing changes",
 		Percentage:   50,
-		BlockedFiles: len(collected.Blocked),
+		BlockedFiles: len(blocked),
 	})
 	base, err := state.Load(e.StatePath)
 	if err != nil {
 		return Result{}, fmt.Errorf("load state: %w", err)
 	}
 
-	actions := Reconcile(base, collected.Snapshot, remote)
+	actions := ReconcileWithBlocked(
+		FilterSnapshotForSpecs(base, e.Specs),
+		collected.Snapshot,
+		FilterSnapshotForSpecs(remote, e.Specs),
+		blocked,
+	)
 	e.progress(Progress{
 		Stage:        StageApplying,
 		Label:        "Applying changes",
 		Percentage:   65,
 		TotalActions: len(actions),
-		BlockedFiles: len(collected.Blocked),
+		BlockedFiles: len(blocked),
 	})
 
 	ap := &Applier{
@@ -89,7 +103,7 @@ func (e *Engine) SyncOnce() (Result, error) {
 		Percentage:       85,
 		CompletedActions: len(actions),
 		TotalActions:     len(actions),
-		BlockedFiles:     len(collected.Blocked),
+		BlockedFiles:     len(blocked),
 	})
 	pushed := false
 	if err := e.Git.AddAll(); err != nil {
@@ -104,6 +118,12 @@ func (e *Engine) SyncOnce() (Result, error) {
 		if err := e.Git.Commit(msg); err != nil {
 			return Result{}, fmt.Errorf("commit: %w", err)
 		}
+	}
+	ahead, err := e.Git.AheadOfUpstream()
+	if err != nil {
+		return Result{}, fmt.Errorf("check upstream: %w", err)
+	}
+	if ahead {
 		if err := e.pushWithRetry(); err != nil {
 			return Result{}, fmt.Errorf("push: %w", err)
 		}
@@ -118,16 +138,7 @@ func (e *Engine) SyncOnce() (Result, error) {
 		return Result{}, fmt.Errorf("save state: %w", err)
 	}
 
-	e.progress(Progress{
-		Stage:            StageComplete,
-		Label:            "Synchronization complete",
-		Percentage:       100,
-		CompletedActions: len(actions),
-		TotalActions:     len(actions),
-		BlockedFiles:     len(collected.Blocked),
-		Pushed:           pushed,
-	})
-	return Result{Actions: actions, Blocked: collected.Blocked, Pushed: pushed}, nil
+	return Result{Actions: actions, Blocked: blocked, Pushed: pushed}, nil
 }
 
 func (e *Engine) progress(update Progress) {
@@ -145,9 +156,6 @@ func (e *Engine) pushWithRetry() error {
 	for i := 0; i < retries; i++ {
 		if err = e.Git.Push(); err == nil {
 			return nil
-		}
-		if perr := e.Git.PullRebase(); perr != nil {
-			return perr
 		}
 	}
 	return err
