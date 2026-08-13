@@ -1,5 +1,6 @@
 /acsync
 /acsync.exe
 /dist/
+/.superpowers/
 *.test
 *.out
