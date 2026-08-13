@@ -10,6 +10,16 @@ type Agent struct {
 	Exclude []string `json:"exclude"`
 }
 
+type Progress struct {
+	Stage            string `json:"stage"`
+	Label            string `json:"label"`
+	Percentage       int    `json:"percentage"`
+	CompletedActions int    `json:"completedActions"`
+	TotalActions     int    `json:"totalActions"`
+	BlockedFiles     int    `json:"blockedFiles"`
+	Pushed           bool   `json:"pushed"`
+}
+
 // Snapshot is the current desktop-visible sync state.
 type Snapshot struct {
 	Configured      bool      `json:"configured"`
@@ -23,6 +33,7 @@ type Snapshot struct {
 	PendingActions  int       `json:"pendingActions"`
 	BlockedFiles    int       `json:"blockedFiles"`
 	LastError       string    `json:"lastError"`
+	Progress        Progress  `json:"progress"`
 }
 
 // SettingsInput contains editable desktop settings.

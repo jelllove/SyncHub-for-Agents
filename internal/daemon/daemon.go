@@ -11,6 +11,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
 // CycleResult describes one completed sync and cleanup cycle.
@@ -25,11 +26,12 @@ type CycleResult struct {
 
 // Daemon runs the sync scheduler for a given acsync home.
 type Daemon struct {
-	Home      string
-	GOOS      string
-	Scheduler *scheduler.Scheduler
-	Logger    *log.Logger
-	OnCycle   func(CycleResult)
+	Home       string
+	GOOS       string
+	Scheduler  *scheduler.Scheduler
+	Logger     *log.Logger
+	OnCycle    func(CycleResult)
+	OnProgress func(syncengine.Progress)
 
 	closeLog func() error
 }
@@ -67,7 +69,7 @@ func (d *Daemon) syncJob() error {
 		}
 	}()
 
-	res, err := cli.RunSync(d.Home, d.GOOS)
+	res, err := cli.RunSyncWithProgress(d.Home, d.GOOS, d.OnProgress)
 	if err != nil {
 		result.Error = err.Error()
 		d.Logger.Printf("sync error: %v", err)

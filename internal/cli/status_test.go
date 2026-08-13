@@ -54,3 +54,32 @@ func TestRunStatusCountsPending(t *testing.T) {
 		t.Errorf("last sync should be zero when no state file")
 	}
 }
+
+func TestRunStatusUsesUserHomeForProviderPaths(t *testing.T) {
+	userHome := t.TempDir()
+	dataHome := filepath.Join(userHome, ".acsync")
+	if err := os.MkdirAll(RepoDir(dataHome), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claudeRoot := filepath.Join(userHome, ".claude")
+	if err := os.MkdirAll(claudeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeRoot, "settings.json"), []byte(`{"theme":"dark"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Save(ConfigPath(dataHome), config.Config{
+		RepoURL: "https://example.com/data.git",
+		Agents:  map[string]bool{"claude": true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := runStatusWithUserHome(dataHome, runtime.GOOS, userHome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.PendingActions != 1 {
+		t.Fatalf("pending actions = %d, want 1", status.PendingActions)
+	}
+}

@@ -10,14 +10,24 @@ import (
 
 // RunSync loads settings from home and performs one sync pass for goos.
 func RunSync(home, goos string) (syncengine.Result, error) {
+	return RunSyncWithProgress(home, goos, nil)
+}
+
+func RunSyncWithProgress(
+	home, goos string,
+	onProgress func(syncengine.Progress),
+) (syncengine.Result, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return syncengine.Result{}, err
 	}
-	return runSyncWithUserHome(home, goos, userHome)
+	return runSyncWithUserHome(home, goos, userHome, onProgress)
 }
 
-func runSyncWithUserHome(home, goos, userHome string) (syncengine.Result, error) {
+func runSyncWithUserHome(
+	home, goos, userHome string,
+	onProgress ...func(syncengine.Progress),
+) (syncengine.Result, error) {
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
 		return syncengine.Result{}, err
@@ -42,6 +52,9 @@ func runSyncWithUserHome(home, goos, userHome string) (syncengine.Result, error)
 		Specs:       specs,
 		PushRetries: 5,
 		Now:         time.Now,
+	}
+	if len(onProgress) > 0 {
+		eng.OnProgress = onProgress[0]
 	}
 	return eng.SyncOnce()
 }

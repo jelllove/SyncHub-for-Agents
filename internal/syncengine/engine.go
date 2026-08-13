@@ -16,6 +16,7 @@ type Engine struct {
 	Specs       map[string]AgentSpec
 	PushRetries int
 	Now         func() time.Time
+	OnProgress  func(Progress)
 }
 
 // Result summarizes what a sync pass did.
@@ -32,10 +33,12 @@ func (e *Engine) SyncOnce() (Result, error) {
 		now = e.Now
 	}
 
+	e.progress(Progress{Stage: StagePulling, Label: "Pulling remote changes", Percentage: 10})
 	if err := e.Git.PullRebase(); err != nil {
 		return Result{}, fmt.Errorf("pull: %w", err)
 	}
 
+	e.progress(Progress{Stage: StageScanning, Label: "Scanning local files", Percentage: 30})
 	remote, err := SnapshotRepo(e.RepoDir)
 	if err != nil {
 		return Result{}, fmt.Errorf("snapshot remote: %w", err)
@@ -50,12 +53,25 @@ func (e *Engine) SyncOnce() (Result, error) {
 		return Result{}, fmt.Errorf("collect: %w", err)
 	}
 
+	e.progress(Progress{
+		Stage:        StageComparing,
+		Label:        "Comparing changes",
+		Percentage:   50,
+		BlockedFiles: len(collected.Blocked),
+	})
 	base, err := state.Load(e.StatePath)
 	if err != nil {
 		return Result{}, fmt.Errorf("load state: %w", err)
 	}
 
 	actions := Reconcile(base, collected.Snapshot, remote)
+	e.progress(Progress{
+		Stage:        StageApplying,
+		Label:        "Applying changes",
+		Percentage:   65,
+		TotalActions: len(actions),
+		BlockedFiles: len(collected.Blocked),
+	})
 
 	ap := &Applier{
 		RepoDir: e.RepoDir,
@@ -67,6 +83,14 @@ func (e *Engine) SyncOnce() (Result, error) {
 		return Result{}, fmt.Errorf("apply: %w", err)
 	}
 
+	e.progress(Progress{
+		Stage:            StageUploading,
+		Label:            "Uploading changes",
+		Percentage:       85,
+		CompletedActions: len(actions),
+		TotalActions:     len(actions),
+		BlockedFiles:     len(collected.Blocked),
+	})
 	pushed := false
 	if err := e.Git.AddAll(); err != nil {
 		return Result{}, fmt.Errorf("git add: %w", err)
@@ -94,7 +118,22 @@ func (e *Engine) SyncOnce() (Result, error) {
 		return Result{}, fmt.Errorf("save state: %w", err)
 	}
 
+	e.progress(Progress{
+		Stage:            StageComplete,
+		Label:            "Synchronization complete",
+		Percentage:       100,
+		CompletedActions: len(actions),
+		TotalActions:     len(actions),
+		BlockedFiles:     len(collected.Blocked),
+		Pushed:           pushed,
+	})
 	return Result{Actions: actions, Blocked: collected.Blocked, Pushed: pushed}, nil
+}
+
+func (e *Engine) progress(update Progress) {
+	if e.OnProgress != nil {
+		e.OnProgress(update)
+	}
 }
 
 func (e *Engine) pushWithRetry() error {

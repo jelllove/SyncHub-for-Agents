@@ -14,16 +14,18 @@ import (
 
 const (
 	SnapshotEvent   = "desktop:snapshot"
+	ProgressEvent   = "desktop:progress"
 	OnboardingEvent = "onboarding:state"
 )
 
 // WailsService exposes the UI-safe desktop API to generated Wails bindings.
 type WailsService struct {
-	app        *application.App
-	core       *Service
-	onboarding *onboarding.Service
-	startup    *startup.Manager
-	done       chan error
+	app                 *application.App
+	core                *Service
+	onboarding          *onboarding.Service
+	startup             *startup.Manager
+	done                chan error
+	unsubscribeProgress func()
 }
 
 func NewWailsService(
@@ -42,6 +44,11 @@ func NewWailsService(
 
 func (s *WailsService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	s.done = make(chan error, 1)
+	s.unsubscribeProgress = s.core.SubscribeProgress(func(progress Progress) {
+		if s.app != nil {
+			s.app.Event.Emit(ProgressEvent, progress)
+		}
+	})
 	go func() {
 		s.done <- s.core.Run(ctx, func(snapshot Snapshot) {
 			if s.app != nil {
@@ -53,6 +60,10 @@ func (s *WailsService) ServiceStartup(ctx context.Context, _ application.Service
 }
 
 func (s *WailsService) ServiceShutdown() error {
+	if s.unsubscribeProgress != nil {
+		s.unsubscribeProgress()
+		s.unsubscribeProgress = nil
+	}
 	if s.done != nil {
 		if err := waitForDesktopRun(s.done, 5*time.Second); err != nil {
 			return err

@@ -19,6 +19,14 @@ type Status struct {
 
 // RunStatus computes status for home without contacting the remote.
 func RunStatus(home, goos string) (Status, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return Status{}, err
+	}
+	return runStatusWithUserHome(home, goos, userHome)
+}
+
+func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
 		return Status{}, err
@@ -27,7 +35,7 @@ func RunStatus(home, goos string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	specs, err := BuildSpecs(cfg, providers, goos, home)
+	specs, err := BuildSpecs(cfg, providers, goos, userHome)
 	if err != nil {
 		return Status{}, err
 	}

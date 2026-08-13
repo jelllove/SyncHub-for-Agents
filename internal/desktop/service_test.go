@@ -11,6 +11,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
 func configuredHome(t *testing.T) string {
@@ -19,6 +20,7 @@ func configuredHome(t *testing.T) string {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := config.Save(cli.ConfigPath(home), config.Config{
 		RepoURL:             "git@github.com:owner/repo.git",
 		SyncIntervalMinutes: 10,
@@ -28,6 +30,33 @@ func configuredHome(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return home
+}
+
+func TestSnapshotIncludesCurrentProgress(t *testing.T) {
+	service, err := New(configuredHome(t), runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	service.recordProgress(syncengine.Progress{
+		Stage:            syncengine.StageApplying,
+		Label:            "Applying changes",
+		Percentage:       65,
+		CompletedActions: 2,
+		TotalActions:     4,
+		BlockedFiles:     1,
+	})
+
+	got, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Progress.Stage != "applying" ||
+		got.Progress.Percentage != 65 ||
+		got.Progress.TotalActions != 4 {
+		t.Fatalf("progress = %#v", got.Progress)
+	}
 }
 
 func TestSnapshotMapsConfiguredStatus(t *testing.T) {

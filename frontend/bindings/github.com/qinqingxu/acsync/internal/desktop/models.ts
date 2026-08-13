@@ -10,6 +10,16 @@ export interface Agent {
     "exclude": string[] | null;
 }
 
+export interface Progress {
+    "stage": string;
+    "label": string;
+    "percentage": number;
+    "completedActions": number;
+    "totalActions": number;
+    "blockedFiles": number;
+    "pushed": boolean;
+}
+
 /**
  * SettingsInput contains editable desktop settings.
  */
@@ -35,4 +45,5 @@ export interface Snapshot {
     "pendingActions": number;
     "blockedFiles": number;
     "lastError": string;
+    "progress": Progress;
 }

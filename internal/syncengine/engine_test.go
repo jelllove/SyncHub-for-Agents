@@ -63,6 +63,7 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+
 	bare := newBareRemote(t)
 
 	// Machine A.
@@ -84,6 +85,7 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 	if _, err := engA.SyncOnce(); err != nil {
 		t.Fatalf("A first sync: %v", err)
 	}
+
 	if _, err := os.Stat(filepath.Join(repoA, "agents", "demo", "config", "settings.json")); err != nil {
 		t.Fatalf("A repo should contain settings.json: %v", err)
 	}
@@ -113,5 +115,53 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(rootB, "settings.json")); !os.IsNotExist(err) {
 		t.Fatalf("B local settings.json should be deleted, err=%v", err)
+	}
+}
+
+func TestEnginePublishesProgress(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bare := newBareRemote(t)
+	repo := filepath.Join(t.TempDir(), "repo")
+	client := cloneWorkspace(t, bare, repo)
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "settings.json"), `{"theme":"dark"}`)
+	engine := engineFor(client, repo, filepath.Join(t.TempDir(), "state.json"), root)
+
+	var progress []Progress
+	engine.OnProgress = func(update Progress) {
+		progress = append(progress, update)
+	}
+
+	result, err := engine.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantStages := []ProgressStage{
+		StagePulling,
+		StageScanning,
+		StageComparing,
+		StageApplying,
+		StageUploading,
+		StageComplete,
+	}
+	if len(progress) != len(wantStages) {
+		t.Fatalf("progress stages = %#v", progress)
+	}
+	for index, want := range wantStages {
+		if progress[index].Stage != want {
+			t.Fatalf("progress[%d].Stage = %q, want %q", index, progress[index].Stage, want)
+		}
+		if index > 0 && progress[index].Percentage < progress[index-1].Percentage {
+			t.Fatalf("progress percentage decreased: %#v", progress)
+		}
+	}
+	last := progress[len(progress)-1]
+	if last.Percentage != 100 ||
+		last.CompletedActions != len(result.Actions) ||
+		last.TotalActions != len(result.Actions) ||
+		last.BlockedFiles != len(result.Blocked) {
+		t.Fatalf("complete progress = %#v, result = %#v", last, result)
 	}
 }

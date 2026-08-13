@@ -8,6 +8,7 @@ export {
 
 export type {
     Agent,
+    Progress,
     SettingsInput,
     Snapshot
 } from "./models.js";

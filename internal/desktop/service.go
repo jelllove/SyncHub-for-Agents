@@ -13,6 +13,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/daemon"
 	"github.com/qinqingxu/acsync/internal/provider"
 	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
 type stateObserver struct {
@@ -29,13 +30,16 @@ type Service struct {
 	home string
 	goos string
 
-	mu     sync.RWMutex
-	daemon *daemon.Daemon
-	start  chan *daemon.Daemon
-	last   daemon.CycleResult
+	mu       sync.RWMutex
+	daemon   *daemon.Daemon
+	start    chan *daemon.Daemon
+	last     daemon.CycleResult
+	progress Progress
 
-	nextObserverID uint64
-	stateObservers map[uint64]*stateObserver
+	nextObserverID         uint64
+	stateObservers         map[uint64]*stateObserver
+	nextProgressObserverID uint64
+	progressObservers      map[uint64]func(Progress)
 }
 
 // New creates a desktop service. A missing config is a valid first-run state.
@@ -44,10 +48,11 @@ func New(home, goos string) (*Service, error) {
 		goos = runtime.GOOS
 	}
 	service := &Service{
-		home:           home,
-		goos:           goos,
-		start:          make(chan *daemon.Daemon, 1),
-		stateObservers: make(map[uint64]*stateObserver),
+		home:              home,
+		goos:              goos,
+		start:             make(chan *daemon.Daemon, 1),
+		stateObservers:    make(map[uint64]*stateObserver),
+		progressObservers: make(map[uint64]func(Progress)),
 	}
 	if _, err := os.Stat(cli.ConfigPath(home)); err != nil {
 		if os.IsNotExist(err) {
@@ -74,12 +79,48 @@ func (s *Service) StartConfigured() error {
 		return err
 	}
 	d.OnCycle = s.recordCycle
+	d.OnProgress = s.recordProgress
 	s.daemon = d
 	for _, observer := range s.stateObservers {
 		observer.unsubscribe = d.Scheduler.Subscribe(observer.callback)
 	}
 	s.start <- d
 	return nil
+}
+
+func (s *Service) recordProgress(update syncengine.Progress) {
+	progress := Progress{
+		Stage:            string(update.Stage),
+		Label:            update.Label,
+		Percentage:       update.Percentage,
+		CompletedActions: update.CompletedActions,
+		TotalActions:     update.TotalActions,
+		BlockedFiles:     update.BlockedFiles,
+		Pushed:           update.Pushed,
+	}
+	s.mu.Lock()
+	s.progress = progress
+	observers := make([]func(Progress), 0, len(s.progressObservers))
+	for _, observer := range s.progressObservers {
+		observers = append(observers, observer)
+	}
+	s.mu.Unlock()
+	for _, observer := range observers {
+		observer(progress)
+	}
+}
+
+func (s *Service) SubscribeProgress(callback func(Progress)) func() {
+	s.mu.Lock()
+	id := s.nextProgressObserverID
+	s.nextProgressObserverID++
+	s.progressObservers[id] = callback
+	s.mu.Unlock()
+	return func() {
+		s.mu.Lock()
+		delete(s.progressObservers, id)
+		s.mu.Unlock()
+	}
 }
 
 func (s *Service) recordCycle(result daemon.CycleResult) {
@@ -154,6 +195,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	s.mu.RLock()
 	d := s.daemon
 	last := s.last
+	progress := s.progress
 	s.mu.RUnlock()
 	if d == nil {
 		return Snapshot{}, ErrNotConfigured
@@ -174,6 +216,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		PendingActions:  status.PendingActions,
 		BlockedFiles:    last.Blocked,
 		LastError:       last.Error,
+		Progress:        progress,
 	}, nil
 }
 

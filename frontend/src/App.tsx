@@ -12,6 +12,7 @@ import {
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
 import {
   type Agent,
+  type Progress,
   type SettingsInput,
   type Snapshot,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
@@ -27,6 +28,8 @@ const stateLabels: Record<string, string> = {
   paused: 'Paused',
   error: 'Needs attention',
 }
+
+const progressStages = ['pulling', 'scanning', 'comparing', 'applying', 'uploading']
 
 function formatTime(value: string) {
   const date = new Date(value)
@@ -49,6 +52,12 @@ function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
       exclude: agent.exclude ?? [],
     })),
   }
+}
+
+function completionMessage(progress: Progress) {
+  if (progress.pushed) return `Uploaded ${progress.totalActions} change${progress.totalActions === 1 ? '' : 's'}`
+  if (progress.totalActions > 0) return `Synchronized ${progress.totalActions} change${progress.totalActions === 1 ? '' : 's'}`
+  return 'Synchronization complete; no changes needed'
 }
 
 function App() {
@@ -75,9 +84,22 @@ function App() {
         if (!needed) void refresh()
       })
       .catch((cause) => setError(errorMessage(cause)))
-    return Events.On('desktop:snapshot', (event) => {
+    const unsubscribeSnapshot = Events.On('desktop:snapshot', (event) => {
       setSnapshot(normalizeSnapshot(event.data as Snapshot))
     })
+    const unsubscribeProgress = Events.On('desktop:progress', (event) => {
+      const progress = event.data as Progress
+      setSnapshot((current) => current ? {
+        ...current,
+        progress,
+        state: progress.stage === 'complete' ? current.state : 'updating',
+      } : current)
+      if (progress.stage === 'complete') setNotice(completionMessage(progress))
+    })
+    return () => {
+      unsubscribeSnapshot()
+      unsubscribeProgress()
+    }
   }, [])
 
   const enabledAgents = useMemo(
@@ -118,6 +140,12 @@ function App() {
 
   const state = snapshot.state || 'idle'
   const paused = state === 'paused'
+  const progress = snapshot.progress
+  const statusMessage = state === 'updating'
+    ? `${progress.label || 'Preparing synchronization'}${progress.totalActions > 0 ? ` · ${progress.completedActions} of ${progress.totalActions} changes` : ''}`
+    : progress.stage === 'complete'
+      ? completionMessage(progress)
+      : `${enabledAgents} agents are protected across your connected computers.`
 
   return (
     <div className="app-shell">
@@ -158,17 +186,16 @@ function App() {
                 <span className="eyebrow">SYNC STATUS</span>
                 <h1>{stateLabels[state] ?? state}</h1>
                 <p>
-                  {snapshot.lastError ||
-                    `${enabledAgents} agents are protected across your connected computers.`}
+                  {snapshot.lastError || statusMessage}
                 </p>
               </div>
               <div className="hero-actions">
                 <button
                   className="primary"
                   disabled={busy || state === 'updating'}
-                  onClick={() => void perform(TriggerSync, 'Synchronization started')}
+                  onClick={() => void perform(TriggerSync, 'Synchronization queued')}
                 >
-                  <SyncIcon /> Sync now
+                  <SyncIcon /> {state === 'updating' ? 'Syncing…' : 'Sync now'}
                 </button>
                 <button
                   className="secondary"
@@ -178,6 +205,7 @@ function App() {
                   {paused ? 'Resume' : 'Pause'}
                 </button>
               </div>
+              {state === 'updating' && <SyncProgress progress={progress} />}
             </section>
 
             <section className="metrics" aria-label="Synchronization details">
@@ -226,6 +254,26 @@ function App() {
           save={(input) => perform(() => SaveSettings(input), 'Settings saved')}
         />
       )}
+    </div>
+  )
+}
+
+function SyncProgress({ progress }: { progress: Progress }) {
+  const activeIndex = progressStages.indexOf(progress.stage)
+  return (
+    <div className="sync-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percentage}>
+      <div className="sync-progress-heading">
+        <strong>{progress.label || 'Preparing synchronization'}</strong>
+        <span>{progress.percentage}%</span>
+      </div>
+      <div className="sync-progress-track"><span style={{ width: `${progress.percentage}%` }} /></div>
+      <div className="sync-progress-stages">
+        {progressStages.map((stage, index) => (
+          <span className={index < activeIndex ? 'done' : index === activeIndex ? 'active' : ''} key={stage}>
+            {stage}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
