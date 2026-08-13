@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/qinqingxu/acsync/internal/processattr"
 )
 
 type AuthMode string
@@ -68,6 +70,7 @@ func (c *Client) command(args ...string) (*exec.Cmd, error) {
 		factory = exec.Command
 	}
 	command := factory("git", gitArgs...)
+	processattr.HideWindow(command)
 	if oauthNetwork {
 		command.Env = sanitizedGitEnvironment(os.Environ())
 		command.Env = append(command.Env, "GIT_TERMINAL_PROMPT=0")

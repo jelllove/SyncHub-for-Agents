@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/qinqingxu/acsync/internal/processattr"
 )
 
 type Runner interface {
@@ -20,6 +22,7 @@ type SystemRunner struct{}
 
 func (SystemRunner) Run(ctx context.Context, name string, args ...string) (string, string, error) {
 	command := exec.CommandContext(ctx, name, args...)
+	processattr.HideWindow(command)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	command.Stdout = &stdout
