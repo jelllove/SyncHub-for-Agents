@@ -12,7 +12,13 @@ import (
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/daemon"
 	"github.com/qinqingxu/acsync/internal/provider"
+	"github.com/qinqingxu/acsync/internal/scheduler"
 )
+
+type stateObserver struct {
+	callback    func(scheduler.State)
+	unsubscribe func()
+}
 
 // ErrNotConfigured indicates that onboarding must finish before sync controls
 // can be used.
@@ -27,6 +33,9 @@ type Service struct {
 	daemon *daemon.Daemon
 	start  chan *daemon.Daemon
 	last   daemon.CycleResult
+
+	nextObserverID uint64
+	stateObservers map[uint64]*stateObserver
 }
 
 // New creates a desktop service. A missing config is a valid first-run state.
@@ -35,9 +44,10 @@ func New(home, goos string) (*Service, error) {
 		goos = runtime.GOOS
 	}
 	service := &Service{
-		home:  home,
-		goos:  goos,
-		start: make(chan *daemon.Daemon, 1),
+		home:           home,
+		goos:           goos,
+		start:          make(chan *daemon.Daemon, 1),
+		stateObservers: make(map[uint64]*stateObserver),
 	}
 	if _, err := os.Stat(cli.ConfigPath(home)); err != nil {
 		if os.IsNotExist(err) {
@@ -65,6 +75,9 @@ func (s *Service) StartConfigured() error {
 	}
 	d.OnCycle = s.recordCycle
 	s.daemon = d
+	for _, observer := range s.stateObservers {
+		observer.unsubscribe = d.Scheduler.Subscribe(observer.callback)
+	}
 	s.start <- d
 	return nil
 }
@@ -80,6 +93,33 @@ func (s *Service) Daemon() *daemon.Daemon {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.daemon
+}
+
+// SubscribeState observes scheduler state even when registered before
+// first-run configuration creates the daemon.
+func (s *Service) SubscribeState(callback func(scheduler.State)) func() {
+	s.mu.Lock()
+	id := s.nextObserverID
+	s.nextObserverID++
+	observer := &stateObserver{callback: callback}
+	if s.daemon != nil {
+		observer.unsubscribe = s.daemon.Scheduler.Subscribe(callback)
+	}
+	s.stateObservers[id] = observer
+	s.mu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			observer := s.stateObservers[id]
+			delete(s.stateObservers, id)
+			s.mu.Unlock()
+			if observer != nil && observer.unsubscribe != nil {
+				observer.unsubscribe()
+			}
+		})
+	}
 }
 
 // Close releases daemon resources.

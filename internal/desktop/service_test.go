@@ -10,6 +10,7 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/scheduler"
 )
 
 func configuredHome(t *testing.T) string {
@@ -99,5 +100,38 @@ func TestSaveSettingsUpdatesConfigAndLiveInterval(t *testing.T) {
 	}
 	if got := service.Daemon().Scheduler.IntervalDuration(); got != 3*time.Minute {
 		t.Fatalf("interval = %v, want 3m", got)
+	}
+}
+
+func TestSubscribeStateAttachesWhenFirstRunConfigurationStartsDaemon(t *testing.T) {
+	service, err := New(filepath.Join(t.TempDir(), ".acsync"), runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	states := make(chan scheduler.State, 1)
+	unsubscribe := service.SubscribeState(func(state scheduler.State) {
+		states <- state
+	})
+	defer unsubscribe()
+
+	if err := service.SaveSettings(SettingsInput{
+		RepositoryURL:   "git@github.com:owner/repo.git",
+		IntervalMinutes: 10,
+		TrashGraceDays:  30,
+		Agents:          map[string]bool{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service.Daemon().Scheduler.Pause()
+
+	select {
+	case got := <-states:
+		if got != scheduler.StatePaused {
+			t.Fatalf("state = %v, want paused", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("state observer was not attached to newly configured daemon")
 	}
 }
