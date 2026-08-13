@@ -8,18 +8,18 @@ import (
 	"github.com/qinqingxu/acsync/internal/config"
 )
 
-type fakeCloner struct{ called bool }
+type fakeInitializer struct{ called bool }
 
-func (f *fakeCloner) Clone(url, dir string) error {
+func (f *fakeInitializer) Initialize(url, dir string) error {
 	f.called = true
 	return os.MkdirAll(dir, 0o755)
 }
 
 func TestRunInitScaffolds(t *testing.T) {
 	home := filepath.Join(t.TempDir(), ".acsync")
-	fc := &fakeCloner{}
+	fc := &fakeInitializer{}
 
-	if err := RunInit(home, "https://example.com/me/data.git", fc); err != nil {
+	if err := RunInit(home, "https://github.com/me/data", fc); err != nil {
 		t.Fatalf("RunInit error: %v", err)
 	}
 	if !fc.called {
@@ -29,7 +29,7 @@ func TestRunInitScaffolds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config not written: %v", err)
 	}
-	if cfg.RepoURL != "https://example.com/me/data.git" {
+	if cfg.RepoURL != "https://github.com/me/data.git" {
 		t.Errorf("repo url = %q", cfg.RepoURL)
 	}
 	for _, name := range []string{"claude", "copilot", "gemini", "cursor"} {
@@ -46,5 +46,17 @@ func TestRunInitScaffolds(t *testing.T) {
 	}
 	if string(attr) != "* -text\n" {
 		t.Errorf(".gitattributes = %q, want %q", string(attr), "* -text\n")
+	}
+}
+
+func TestRunInitRejectsRepositoryURLWithEmbeddedCredential(t *testing.T) {
+	home := filepath.Join(t.TempDir(), ".acsync")
+	initializer := &fakeInitializer{}
+	err := RunInit(home, "https://secret@github.com/me/data.git", initializer)
+	if err == nil {
+		t.Fatal("embedded credential unexpectedly accepted")
+	}
+	if initializer.called {
+		t.Fatal("repository initializer called for unsafe URL")
 	}
 }

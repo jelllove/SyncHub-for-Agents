@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import {
   Pause,
+  NeedsOnboarding,
   Resume,
   SaveSettings,
   Snapshot as loadSnapshot,
@@ -13,6 +14,7 @@ import {
   type Snapshot,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
 import './style.css'
+import Onboarding from './onboarding/Onboarding'
 
 type AppAgent = Omit<Agent, 'exclude'> & { exclude: string[] }
 type AppSnapshot = Omit<Snapshot, 'agents'> & { agents: AppAgent[] }
@@ -49,6 +51,7 @@ function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
 
 function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot>()
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -64,7 +67,12 @@ function App() {
   }
 
   useEffect(() => {
-    void refresh()
+    void NeedsOnboarding()
+      .then((needed) => {
+        setNeedsOnboarding(needed)
+        if (!needed) void refresh()
+      })
+      .catch((cause) => setError(errorMessage(cause)))
     return Events.On('desktop:snapshot', (event) => {
       setSnapshot(normalizeSnapshot(event.data as Snapshot))
     })
@@ -90,7 +98,14 @@ function App() {
     }
   }
 
-  if (!snapshot) {
+  if (needsOnboarding) {
+    return <Onboarding complete={() => {
+      setNeedsOnboarding(false)
+      void refresh()
+    }} />
+  }
+
+  if (needsOnboarding === undefined || !snapshot) {
     return (
       <main className="loading">
         <div className="brand-mark">A</div>

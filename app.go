@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/qinqingxu/acsync/internal/desktop"
+	"github.com/qinqingxu/acsync/internal/onboarding"
 	"github.com/qinqingxu/acsync/internal/scheduler"
 	"github.com/qinqingxu/acsync/internal/tray"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -18,7 +19,7 @@ type guiApplication struct {
 	service *desktop.Service
 }
 
-func newGUIApplication(core *desktop.Service) *guiApplication {
+func newGUIApplication(core *desktop.Service, onboardingService *onboarding.Service) *guiApplication {
 	gui := &guiApplication{service: core}
 	gui.app = application.New(application.Options{
 		Name:        "AgentConfigSync",
@@ -44,7 +45,7 @@ func newGUIApplication(core *desktop.Service) *guiApplication {
 		},
 	})
 
-	gui.app.RegisterService(application.NewService(desktop.NewWailsService(gui.app, core)))
+	gui.app.RegisterService(application.NewService(desktop.NewWailsService(gui.app, core, onboardingService)))
 	gui.window = gui.app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      "main",
 		Title:     "AgentConfigSync",

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/gitclient"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
@@ -23,7 +22,10 @@ func RunSync(home, goos string) (syncengine.Result, error) {
 		return syncengine.Result{}, err
 	}
 
-	client := &gitclient.Client{Dir: RepoDir(home)}
+	client, err := NewGitClient(home, cfg.RepoURL, RepoDir(home))
+	if err != nil {
+		return syncengine.Result{}, err
+	}
 	eng := &syncengine.Engine{
 		Git:         client,
 		RepoDir:     RepoDir(home),

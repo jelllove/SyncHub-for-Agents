@@ -3,22 +3,29 @@ package desktop
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/qinqingxu/acsync/internal/onboarding"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const SnapshotEvent = "desktop:snapshot"
+const (
+	SnapshotEvent   = "desktop:snapshot"
+	OnboardingEvent = "onboarding:state"
+)
 
 // WailsService exposes the UI-safe desktop API to generated Wails bindings.
 type WailsService struct {
-	app  *application.App
-	core *Service
-	done chan error
+	app        *application.App
+	core       *Service
+	onboarding *onboarding.Service
+	done       chan error
 }
 
-func NewWailsService(app *application.App, core *Service) *WailsService {
-	return &WailsService{app: app, core: core}
+func NewWailsService(app *application.App, core *Service, onboardingService *onboarding.Service) *WailsService {
+	return &WailsService{app: app, core: core, onboarding: onboardingService}
 }
 
 func (s *WailsService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
@@ -71,4 +78,64 @@ func (s *WailsService) Resume() error {
 
 func (s *WailsService) SaveSettings(input SettingsInput) error {
 	return s.core.SaveSettings(input)
+}
+
+func (s *WailsService) NeedsOnboarding() bool {
+	daemon := s.core.Daemon()
+	if daemon == nil {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(daemon.Home, "repo", ".git"))
+	return err != nil || !info.IsDir()
+}
+
+func (s *WailsService) OnboardingState() onboarding.State {
+	return s.onboarding.State()
+}
+
+func (s *WailsService) SetRepository(raw string) error {
+	if err := s.onboarding.SetRepository(raw); err != nil {
+		return err
+	}
+	s.emitOnboarding()
+	return nil
+}
+
+func (s *WailsService) StartGitHubLogin(ctx context.Context) (onboarding.State, error) {
+	state, err := s.onboarding.StartGitHubLogin(ctx)
+	if err == nil {
+		s.emitOnboarding()
+	}
+	return state, err
+}
+
+func (s *WailsService) WaitGitHubLogin(ctx context.Context) (onboarding.State, error) {
+	state, err := s.onboarding.WaitGitHubLogin(ctx)
+	s.emitOnboarding()
+	return state, err
+}
+
+func (s *WailsService) VerifySSH(ctx context.Context) (onboarding.State, error) {
+	state, err := s.onboarding.VerifySSH(ctx)
+	s.emitOnboarding()
+	return state, err
+}
+
+func (s *WailsService) CompleteOnboarding(ctx context.Context, enabled map[string]bool) error {
+	if err := s.onboarding.Complete(ctx, enabled); err != nil {
+		return err
+	}
+	s.emitOnboarding()
+	return nil
+}
+
+func (s *WailsService) CancelOnboarding() {
+	s.onboarding.Cancel()
+	s.emitOnboarding()
+}
+
+func (s *WailsService) emitOnboarding() {
+	if s.app != nil {
+		s.app.Event.Emit(OnboardingEvent, s.onboarding.State())
+	}
 }

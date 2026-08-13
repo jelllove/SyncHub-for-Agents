@@ -1,21 +1,26 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/repository"
 )
 
-// Cloner clones a git URL into a directory.
-type Cloner interface {
-	Clone(url, dir string) error
+// RepositoryInitializer prepares a local sync repository from a remote.
+type RepositoryInitializer interface {
+	Initialize(remote, dir string) error
 }
 
 // RunInit scaffolds the acsync home, clones the data repo, detects agents, and
 // writes a default config.
-func RunInit(home, repoURL string, cloner Cloner) error {
+func RunInit(home, repoURL string, initializer RepositoryInitializer) error {
+	parsed, err := repository.ParseGitHubURL(repoURL)
+	if err != nil {
+		return err
+	}
+	repoURL = parsed.CloneURL
 	for _, dir := range []string{home, ProvidersDir(home), LogsDir(home)} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
@@ -23,17 +28,8 @@ func RunInit(home, repoURL string, cloner Cloner) error {
 	}
 
 	repo := RepoDir(home)
-	empty, err := isEmptyOrMissing(repo)
-	if err != nil {
+	if err := initializer.Initialize(repoURL, repo); err != nil {
 		return err
-	}
-	if empty {
-		if err := os.RemoveAll(repo); err != nil {
-			return err
-		}
-		if err := cloner.Clone(repoURL, repo); err != nil {
-			return fmt.Errorf("clone %s: %w", repoURL, err)
-		}
 	}
 
 	// Store agent files byte-for-byte: never let git rewrite line endings.
@@ -53,17 +49,6 @@ func RunInit(home, repoURL string, cloner Cloner) error {
 	cfg := config.Default(names)
 	cfg.RepoURL = repoURL
 	return config.Save(ConfigPath(home), cfg)
-}
-
-func isEmptyOrMissing(dir string) (bool, error) {
-	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return true, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return len(entries) == 0, nil
 }
 
 // ensureGitAttributes writes a `.gitattributes` into the data repo (if the repo

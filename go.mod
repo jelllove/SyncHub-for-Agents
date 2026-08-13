@@ -7,12 +7,14 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/spf13/cobra v1.8.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.8
+	github.com/zalando/go-keyring v0.2.8
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

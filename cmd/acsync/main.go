@@ -9,6 +9,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/daemon"
 	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/acsync/internal/repository"
 	"github.com/qinqingxu/acsync/internal/tray"
 	"github.com/spf13/cobra"
 )
@@ -18,10 +19,21 @@ func main() {
 		Use:   "acsync",
 		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
 	}
-	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd())
+	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd(), credentialCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
+	}
+}
+
+func credentialCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "git-credential [get|store|erase]",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.RunCredential(args[0], os.Stdin, os.Stdout)
+		},
 	}
 }
 
@@ -35,7 +47,8 @@ func initCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := cli.RunInit(home, repo, &gitclient.Client{}); err != nil {
+			setup := &repository.Setup{Client: &gitclient.Client{}}
+			if err := cli.RunInit(home, repo, setup); err != nil {
 				return err
 			}
 			fmt.Printf("Initialized acsync at %s (repo: %s)\n", home, repo)
@@ -95,69 +108,69 @@ func statusCmd() *cobra.Command {
 
 func daemonCmd() *cobra.Command {
 	return &cobra.Command{
-			Use:   "daemon",
-			Short: "Run the sync daemon (periodic sync + trash cleanup) until stopped",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				home, err := cli.Home()
-				if err != nil {
-					return err
-				}
-				return daemon.RunWithSignals(home, runtime.GOOS)
-			},
+		Use:   "daemon",
+		Short: "Run the sync daemon (periodic sync + trash cleanup) until stopped",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			home, err := cli.Home()
+			if err != nil {
+				return err
+			}
+			return daemon.RunWithSignals(home, runtime.GOOS)
+		},
 	}
 }
 
 func trayCmd() *cobra.Command {
 	return &cobra.Command{
-			Use:   "tray",
-			Short: "Run acsync with a system-tray icon (daemon + UI)",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				home, err := cli.Home()
-				if err != nil {
-					return err
-				}
-				return tray.Run(home, runtime.GOOS)
-			},
+		Use:   "tray",
+		Short: "Run acsync with a system-tray icon (daemon + UI)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			home, err := cli.Home()
+			if err != nil {
+				return err
+			}
+			return tray.Run(home, runtime.GOOS)
+		},
 	}
 }
 
 func installCmd() *cobra.Command {
 	return &cobra.Command{
-			Use:   "install",
-			Short: "Enable acsync to start automatically at login",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				exe, err := os.Executable()
-				if err != nil {
-					return err
-				}
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					return err
-				}
-				path, err := cli.RunInstall(runtime.GOOS, userHome, exe)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("Autostart enabled: %s\n", path)
-				return nil
-			},
+		Use:   "install",
+		Short: "Enable acsync to start automatically at login",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			exe, err := os.Executable()
+			if err != nil {
+				return err
+			}
+			userHome, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			path, err := cli.RunInstall(runtime.GOOS, userHome, exe)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Autostart enabled: %s\n", path)
+			return nil
+		},
 	}
 }
 
 func uninstallCmd() *cobra.Command {
 	return &cobra.Command{
-			Use:   "uninstall",
-			Short: "Disable acsync autostart",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				userHome, err := os.UserHomeDir()
-				if err != nil {
-					return err
-				}
-				if err := cli.RunUninstall(runtime.GOOS, userHome); err != nil {
-					return err
-				}
-				fmt.Println("Autostart disabled")
-				return nil
-			},
+		Use:   "uninstall",
+		Short: "Disable acsync autostart",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			userHome, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			if err := cli.RunUninstall(runtime.GOOS, userHome); err != nil {
+				return err
+			}
+			fmt.Println("Autostart disabled")
+			return nil
+		},
 	}
 }

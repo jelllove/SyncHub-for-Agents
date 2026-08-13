@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -13,6 +14,39 @@ func mustGit(t *testing.T, dir string, args ...string) {
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+}
+
+func TestOAuthNetworkCommandUsesScopedNoninteractiveCredentialHelper(t *testing.T) {
+	t.Setenv("GIT_TRACE", "1")
+	t.Setenv("GIT_CURL_VERBOSE", "1")
+	executable := filepath.Join(t.TempDir(), "AgentConfigSync.exe")
+	client := &Client{
+		AuthMode:   AuthOAuth,
+		Executable: executable,
+	}
+
+	command, err := client.command("clone", "https://github.com/acme/sync.git", "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := strings.Join(command.Args, "\n")
+	for _, wanted := range []string{
+		"credential.helper=",
+		"credential.https://github.com.helper=",
+		"--git-credential",
+		"credential.interactive=false",
+	} {
+		if !strings.Contains(arguments, wanted) {
+			t.Fatalf("command arguments missing %q:\n%s", wanted, arguments)
+		}
+	}
+	environment := strings.Join(command.Env, "\n")
+	if !strings.Contains(environment, "GIT_TERMINAL_PROMPT=0") {
+		t.Fatalf("environment missing GIT_TERMINAL_PROMPT=0:\n%s", environment)
+	}
+	if strings.Contains(environment, "GIT_TRACE=") || strings.Contains(environment, "GIT_CURL_VERBOSE=") {
+		t.Fatalf("trace environment leaked to Git:\n%s", environment)
 	}
 }
 

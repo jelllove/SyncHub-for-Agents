@@ -12,7 +12,27 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as onboarding$0 from "../onboarding/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
+
+export function CancelOnboarding(): $CancellablePromise<void> {
+    return $Call.ByID(1199327865);
+}
+
+export function CompleteOnboarding(enabled: { [_ in string]?: boolean } | null): $CancellablePromise<void> {
+    return $Call.ByID(2279454804, enabled);
+}
+
+export function NeedsOnboarding(): $CancellablePromise<boolean> {
+    return $Call.ByID(1611883858);
+}
+
+export function OnboardingState(): $CancellablePromise<onboarding$0.State> {
+    return $Call.ByID(1129236984);
+}
 
 export function Pause(): $CancellablePromise<void> {
     return $Call.ByID(3233963532);
@@ -26,10 +46,26 @@ export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<
     return $Call.ByID(3861930266, input);
 }
 
+export function SetRepository(raw: string): $CancellablePromise<void> {
+    return $Call.ByID(4273126394, raw);
+}
+
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(2631033270);
 }
 
+export function StartGitHubLogin(): $CancellablePromise<onboarding$0.State> {
+    return $Call.ByID(3880308558);
+}
+
 export function TriggerSync(): $CancellablePromise<void> {
     return $Call.ByID(2713968177);
+}
+
+export function VerifySSH(): $CancellablePromise<onboarding$0.State> {
+    return $Call.ByID(3405933299);
+}
+
+export function WaitGitHubLogin(): $CancellablePromise<onboarding$0.State> {
+    return $Call.ByID(3070431217);
 }

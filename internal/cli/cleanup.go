@@ -30,7 +30,10 @@ func RunCleanup(home string, now time.Time) ([]string, error) {
 		return nil, nil
 	}
 
-	client := &gitclient.Client{Dir: repo}
+	client, err := NewGitClient(home, cfg.RepoURL, repo)
+	if err != nil {
+		return purged, err
+	}
 	if err := client.AddAll(); err != nil {
 		return purged, err
 	}
