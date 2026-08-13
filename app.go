@@ -2,11 +2,14 @@ package main
 
 import (
 	"log"
+	"os"
+	"os/exec"
 	"runtime"
 
 	"github.com/qinqingxu/acsync/internal/desktop"
 	"github.com/qinqingxu/acsync/internal/onboarding"
 	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/acsync/internal/startup"
 	"github.com/qinqingxu/acsync/internal/tray"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -17,9 +20,14 @@ type guiApplication struct {
 	window  *application.WebviewWindow
 	tray    *application.SystemTray
 	service *desktop.Service
+	startup *startup.Manager
 }
 
-func newGUIApplication(core *desktop.Service, onboardingService *onboarding.Service) *guiApplication {
+func newGUIApplication(
+	core *desktop.Service,
+	onboardingService *onboarding.Service,
+	hidden bool,
+) (*guiApplication, error) {
 	gui := &guiApplication{service: core}
 	gui.app = application.New(application.Options{
 		Name:        "AgentConfigSync",
@@ -45,7 +53,18 @@ func newGUIApplication(core *desktop.Service, onboardingService *onboarding.Serv
 		},
 	})
 
-	gui.app.RegisterService(application.NewService(desktop.NewWailsService(gui.app, core, onboardingService)))
+	gui.startup = &startup.Manager{
+		Backend:    gui.app.Autostart,
+		Identifier: "io.github.qinqingxu.agentconfigsync",
+		Arguments:  []string{"--hidden"},
+		GOOS:       runtime.GOOS,
+	}
+	if err := gui.migrateLegacyStartup(); err != nil {
+		return nil, err
+	}
+	gui.app.RegisterService(application.NewService(
+		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
+	))
 	gui.window = gui.app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      "main",
 		Title:     "AgentConfigSync",
@@ -54,6 +73,7 @@ func newGUIApplication(core *desktop.Service, onboardingService *onboarding.Serv
 		Height:    720,
 		MinWidth:  820,
 		MinHeight: 560,
+		Hidden:    hidden,
 	})
 	gui.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		gui.window.Hide()
@@ -63,7 +83,25 @@ func newGUIApplication(core *desktop.Service, onboardingService *onboarding.Serv
 		gui.show()
 	})
 	gui.configureTray()
-	return gui
+	return gui, nil
+}
+
+func (g *guiApplication) migrateLegacyStartup() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	removed, err := startup.RemoveLegacy(runtime.GOOS, home, func(name string, args ...string) error {
+		return exec.Command(name, args...).Run()
+	})
+	if err != nil {
+		return err
+	}
+	if len(removed) == 0 {
+		return nil
+	}
+	log.Printf("migrated legacy startup entry: %v", removed)
+	return g.startup.Enable()
 }
 
 func (g *guiApplication) configureTray() {

@@ -12,6 +12,10 @@ vars:
 
   # Docker image for cross-compilation (used when building on non-Linux or no CC available)
   CROSS_IMAGE: wails-cross
+  LINUXDEPLOY_VERSION: "1-alpha-20251107-1"
+  LINUXDEPLOY_SHA256: "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+  APPRUN_ASSET_ID: "98605518"
+  APPRUN_SHA256: "f30140a43a0a59e46db21bdefdf749b9e9f2c6946e92afabbacf98b8ae73fb4f"
 
 tasks:
   build:
@@ -59,7 +63,7 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o {{.OUTPUT}}'
     vars:
-      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
+      BUILD_FLAGS: '{{if eq .DEV "true"}}{{if or .EXTRA_TAGS (eq .OBFUSCATED "true")}}-tags {{if eq .OBFUSCATED "true"}}wails_obfuscated{{if .EXTRA_TAGS}},{{end}}{{end}}{{.EXTRA_TAGS}} {{end}}-buildvcs=false -gcflags=all="-l"{{else}}-tags production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s{{if .GITHUB_OAUTH_CLIENT_ID}} -X main.githubOAuthClientID={{.GITHUB_OAUTH_CLIENT_ID}}{{end}}"{{end}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
@@ -106,8 +110,6 @@ tasks:
     cmds:
       - task: create:appimage
       - task: create:deb
-      - task: create:rpm
-      - task: create:aur
 
   create:appimage:
     summary: Creates an AppImage
@@ -115,16 +117,48 @@ tasks:
     deps:
       - task: build
       - task: generate:dotdesktop
+      - task: download:appimage-tools
     cmds:
       - cp "{{.APP_BINARY}}" "{{.APP_NAME}}"
       - cp ../../appicon.png "{{.APP_NAME}}.png"
       - wails3 generate appimage -binary "{{.APP_NAME}}" -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
+      - |
+        if ! cmp --silent \
+          "{{.ROOT_DIR}}/build/linux/appimage/build/AppRun-x86_64" \
+          "{{.ROOT_DIR}}/build/linux/appimage/build/{{.APP_NAME}}-x86_64.AppDir/AppRun"; then
+          rm -f "{{.ROOT_DIR}}/bin/{{.APP_NAME}}-x86_64.AppImage"
+          echo "Generated AppImage used an unverified AppRun helper" >&2
+          exit 1
+        fi
     vars:
       APP_NAME: '{{.APP_NAME}}'
       APP_BINARY: '../../../bin/{{.APP_NAME}}'
       ICON: '{{.APP_NAME}}.png'
       DESKTOP_FILE: '../{{.APP_NAME}}.desktop'
       OUTPUT_DIR: '../../../bin'
+
+  download:appimage-tools:
+    summary: Downloads checksum-pinned AppImage packaging helpers
+    internal: true
+    platforms: [linux]
+    preconditions:
+      - sh: '[ "{{.ARCH | default ARCH}}" = "amd64" ]'
+        msg: "AppImage packaging currently supports amd64 only"
+    cmds:
+      - mkdir -p "{{.ROOT_DIR}}/build/linux/appimage/build"
+      - |
+        curl --fail --location --retry 3 \
+          "https://github.com/linuxdeploy/linuxdeploy/releases/download/{{.LINUXDEPLOY_VERSION}}/linuxdeploy-x86_64.AppImage" \
+          --output "{{.ROOT_DIR}}/build/linux/appimage/build/linuxdeploy-x86_64.AppImage"
+        echo "{{.LINUXDEPLOY_SHA256}}  {{.ROOT_DIR}}/build/linux/appimage/build/linuxdeploy-x86_64.AppImage" | sha256sum --check -
+      - |
+        curl --fail --location --retry 3 \
+          --header "Accept: application/octet-stream" \
+          --header "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/AppImage/AppImageKit/releases/assets/{{.APPRUN_ASSET_ID}}" \
+          --output "{{.ROOT_DIR}}/build/linux/appimage/build/AppRun-x86_64"
+        echo "{{.APPRUN_SHA256}}  {{.ROOT_DIR}}/build/linux/appimage/build/AppRun-x86_64" | sha256sum --check -
+      - chmod +x "{{.ROOT_DIR}}/build/linux/appimage/build/linuxdeploy-x86_64.AppImage" "{{.ROOT_DIR}}/build/linux/appimage/build/AppRun-x86_64"
 
   create:deb:
     summary: Creates a deb package
@@ -154,6 +188,8 @@ tasks:
     summary: Creates a deb package
     cmds:
       - wails3 tool package -name "{{.APP_NAME}}" -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+    env:
+      VERSION: '{{.VERSION | default "0.1.0"}}'
 
   generate:rpm:
     summary: Creates a rpm package

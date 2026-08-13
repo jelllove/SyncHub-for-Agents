@@ -50,8 +50,16 @@ export function SetRepository(raw: string): $CancellablePromise<void> {
     return $Call.ByID(4273126394, raw);
 }
 
+export function SetStartAtLogin(enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3527389948, enabled);
+}
+
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(2631033270);
+}
+
+export function StartAtLogin(): $CancellablePromise<boolean> {
+    return $Call.ByID(861169660);
 }
 
 export function StartGitHubLogin(): $CancellablePromise<onboarding$0.State> {

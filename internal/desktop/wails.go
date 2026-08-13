@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/onboarding"
+	"github.com/qinqingxu/acsync/internal/startup"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -21,11 +22,22 @@ type WailsService struct {
 	app        *application.App
 	core       *Service
 	onboarding *onboarding.Service
+	startup    *startup.Manager
 	done       chan error
 }
 
-func NewWailsService(app *application.App, core *Service, onboardingService *onboarding.Service) *WailsService {
-	return &WailsService{app: app, core: core, onboarding: onboardingService}
+func NewWailsService(
+	app *application.App,
+	core *Service,
+	onboardingService *onboarding.Service,
+	startupManager *startup.Manager,
+) *WailsService {
+	return &WailsService{
+		app:        app,
+		core:       core,
+		onboarding: onboardingService,
+		startup:    startupManager,
+	}
 }
 
 func (s *WailsService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
@@ -78,6 +90,17 @@ func (s *WailsService) Resume() error {
 
 func (s *WailsService) SaveSettings(input SettingsInput) error {
 	return s.core.SaveSettings(input)
+}
+
+func (s *WailsService) SetStartAtLogin(enabled bool) error {
+	if enabled {
+		return s.startup.Enable()
+	}
+	return s.startup.Disable()
+}
+
+func (s *WailsService) StartAtLogin() (bool, error) {
+	return s.startup.IsEnabled()
 }
 
 func (s *WailsService) NeedsOnboarding() bool {

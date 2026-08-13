@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev
+      - run: go test -race ./...
+      - run: go vet ./...
+
+  package:
+    name: Package (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2025
+            arch: amd64
+          - name: macOS
+            os: macos-15
+            arch: arm64
+          - name: Linux
+            os: ubuntu-24.04
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Wails
+        shell: bash
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Windows packaging dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install nsis --yes --no-progress
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: wails3 package GOOS=windows ARCH=${{ matrix.arch }} INSTALL_SCOPE=user
+      - name: Smoke test Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/smoke/windows.ps1 -Installer ./bin/AgentConfigSync-amd64-installer.exe
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: wails3 task darwin:package:dmg ARCH=${{ matrix.arch }}
+      - name: Smoke test macOS
+        if: runner.os == 'macOS'
+        run: ./scripts/smoke/macos.sh
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: wails3 package GOOS=linux ARCH=${{ matrix.arch }}
+      - name: Smoke test Linux
+        if: runner.os == 'Linux'
+        run: ./scripts/smoke/linux.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: AgentConfigSync-${{ matrix.name }}
+          path: |
+            bin/*.exe
+            bin/*.dmg
+            bin/*.AppImage
+            bin/*.deb
+          if-no-files-found: error

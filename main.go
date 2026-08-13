@@ -23,6 +23,7 @@ func main() {
 		}
 		return
 	}
+	hidden := len(os.Args) == 2 && os.Args[1] == "--hidden"
 	home, err := defaultDesktopHome()
 	if err != nil {
 		log.Printf("resolve AgentConfigSync home: %v", err)
@@ -38,7 +39,12 @@ func main() {
 		log.Printf("initialize onboarding: %v", err)
 		os.Exit(1)
 	}
-	if err := newGUIApplication(core, onboardingService).run(); err != nil {
+	gui, err := newGUIApplication(core, onboardingService, hidden)
+	if err != nil {
+		log.Printf("initialize desktop application: %v", err)
+		os.Exit(1)
+	}
+	if err := gui.run(); err != nil {
 		log.Printf("run AgentConfigSync: %v", err)
 		os.Exit(1)
 	}

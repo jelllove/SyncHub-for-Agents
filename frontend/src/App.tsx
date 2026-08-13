@@ -5,7 +5,9 @@ import {
   NeedsOnboarding,
   Resume,
   SaveSettings,
+  SetStartAtLogin,
   Snapshot as loadSnapshot,
+  StartAtLogin,
   TriggerSync,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
 import {
@@ -254,10 +256,22 @@ function SettingsPanel({
   const [agents, setAgents] = useState<Record<string, boolean>>(
     Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
   )
+  const [startAtLogin, setStartAtLogin] = useState(false)
+  const [initialStartAtLogin, setInitialStartAtLogin] = useState(false)
+
+  useEffect(() => {
+    void StartAtLogin().then((enabled) => {
+      setStartAtLogin(enabled)
+      setInitialStartAtLogin(enabled)
+    })
+  }, [])
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     await save({ repositoryUrl, intervalMinutes, trashGraceDays, agents })
+    if (startAtLogin !== initialStartAtLogin) {
+      await SetStartAtLogin(startAtLogin)
+    }
     close()
   }
 
@@ -315,6 +329,20 @@ function SettingsPanel({
                 />
               </label>
             ))}
+          </fieldset>
+          <fieldset>
+            <legend>Desktop application</legend>
+            <label className="toggle-row">
+              <span>
+                <strong>Start at login</strong>
+                <small>Starts AgentConfigSync the next time you sign in. It does not restart the app now.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={startAtLogin}
+                onChange={(event) => setStartAtLogin(event.target.checked)}
+              />
+            </label>
           </fieldset>
           <div className="form-actions">
             <button type="button" className="secondary" onClick={close}>Cancel</button>

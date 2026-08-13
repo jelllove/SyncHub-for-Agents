@@ -1,0 +1,175 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    environment: release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install tools
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
+          choco install nsis --yes --no-progress
+          npm ci --prefix frontend
+      - name: Restore signing certificate
+        shell: pwsh
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        run: |
+          if (-not $env:CERTIFICATE_BASE64) { throw "WINDOWS_CERTIFICATE_BASE64 is required" }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+      - name: Build, sign, and package
+        shell: pwsh
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
+        run: |
+          if (-not $env:OAUTH_CLIENT_ID) { throw "GITHUB_OAUTH_CLIENT_ID is required" }
+          wails3 task windows:build ARCH=amd64 GITHUB_OAUTH_CLIENT_ID=$env:OAUTH_CLIENT_ID
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\AgentConfigSync.exe
+          wails3 generate webview2bootstrapper -dir build\windows\nsis
+          Push-Location build\windows\nsis
+          makensis -DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user "-DARG_WAILS_AMD64_BINARY=$env:GITHUB_WORKSPACE\bin\AgentConfigSync.exe" project.nsi
+          Pop-Location
+          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\AgentConfigSync-amd64-installer.exe
+          & $signTool verify /pa /all bin\AgentConfigSync.exe
+          & $signTool verify /pa /all bin\AgentConfigSync-amd64-installer.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-windows
+          path: bin/AgentConfigSync-amd64-installer.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-15
+    environment: release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install tools
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
+          npm ci --prefix frontend
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          test -n "$CERTIFICATE_BASE64"
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          echo "$CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/codesign.p12"
+          security create-keychain -p runner "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p runner "$keychain"
+          security import "$RUNNER_TEMP/codesign.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k runner "$keychain"
+      - name: Build, sign, notarize, and package
+        env:
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
+        run: |
+          test -n "$SIGNING_IDENTITY"
+          test -n "$OAUTH_CLIENT_ID"
+          wails3 task darwin:package:universal GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+          codesign --force --deep --options runtime --timestamp \
+            --entitlements build/darwin/entitlements.plist \
+            --sign "$SIGNING_IDENTITY" bin/AgentConfigSync.app
+          codesign --verify --deep --strict --verbose=2 bin/AgentConfigSync.app
+          wails3 task darwin:create:dmg
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" bin/AgentConfigSync.dmg
+          xcrun notarytool submit bin/AgentConfigSync.dmg --wait \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+          xcrun stapler staple bin/AgentConfigSync.dmg
+          xcrun stapler validate bin/AgentConfigSync.dmg
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-macos
+          path: bin/AgentConfigSync.dmg
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
+          npm ci --prefix frontend
+      - name: Package
+        env:
+          OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
+        run: |
+          test -n "$OAUTH_CLIENT_ID"
+          version="${GITHUB_REF_NAME#v}"
+          wails3 package GOOS=linux ARCH=amd64 VERSION="$version" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-linux
+          path: |
+            bin/*.AppImage
+            bin/*.deb
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes

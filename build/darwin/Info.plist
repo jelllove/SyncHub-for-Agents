@@ -6,13 +6,13 @@
         <key>CFBundleName</key>
             <string>AgentConfigSync</string>
         <key>CFBundleExecutable</key>
-            <string>agentconfigsync.exe</string>
+            <string>AgentConfigSync</string>
         <key>CFBundleIdentifier</key>
             <string>io.github.qinqingxu.agentconfigsync</string>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
-            <string>This is a comment</string>
+            <string>Synchronize AI agent configuration and sessions</string>
         <key>CFBundleShortVersionString</key>
             <string>0.1.0</string>
         <key>CFBundleIconFile</key>
@@ -24,6 +24,6 @@
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
-            <string>© 2026, My Company</string>
+            <string>Copyright © 2026 AgentConfigSync</string>
     </dict>
 </plist>

@@ -14,7 +14,7 @@ func TestWailsServiceDelegatesToDesktopCore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := NewWailsService(nil, core, nil)
+	service := NewWailsService(nil, core, nil, nil)
 
 	snapshot, err := service.Snapshot()
 	if err != nil {
