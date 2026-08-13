@@ -25,6 +25,7 @@ type Service struct {
 
 	mu     sync.RWMutex
 	daemon *daemon.Daemon
+	start  chan *daemon.Daemon
 	last   daemon.CycleResult
 }
 
@@ -33,7 +34,11 @@ func New(home, goos string) (*Service, error) {
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	service := &Service{home: home, goos: goos}
+	service := &Service{
+		home:  home,
+		goos:  goos,
+		start: make(chan *daemon.Daemon, 1),
+	}
 	if _, err := os.Stat(cli.ConfigPath(home)); err != nil {
 		if os.IsNotExist(err) {
 			return service, nil
@@ -60,6 +65,7 @@ func (s *Service) StartConfigured() error {
 	}
 	d.OnCycle = s.recordCycle
 	s.daemon = d
+	s.start <- d
 	return nil
 }
 
