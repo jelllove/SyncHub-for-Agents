@@ -32,8 +32,8 @@ func TestNewUsesConfiguredInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	if d.Scheduler.Interval != 3*time.Minute {
-		t.Errorf("interval = %v, want 3m", d.Scheduler.Interval)
+	if d.Scheduler.IntervalDuration() != 3*time.Minute {
+		t.Errorf("interval = %v, want 3m", d.Scheduler.IntervalDuration())
 	}
 }
 
@@ -46,8 +46,8 @@ func TestNewDefaultsIntervalTo10m(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	if d.Scheduler.Interval != 10*time.Minute {
-		t.Errorf("interval = %v, want 10m", d.Scheduler.Interval)
+	if d.Scheduler.IntervalDuration() != 10*time.Minute {
+		t.Errorf("interval = %v, want 10m", d.Scheduler.IntervalDuration())
 	}
 }
 

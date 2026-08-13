@@ -42,7 +42,7 @@ func New(home, goos string) (*Daemon, error) {
 
 	d := &Daemon{Home: home, GOOS: goos, Logger: logger, closeLog: closeLog}
 	d.Scheduler = scheduler.New(interval, d.syncJob)
-	d.Scheduler.OnState = d.logState
+	d.Scheduler.Subscribe(d.logState)
 	return d, nil
 }
 
@@ -73,7 +73,7 @@ func (d *Daemon) logState(s scheduler.State) {
 
 // Run triggers an initial sync then runs the scheduler until ctx is cancelled.
 func (d *Daemon) Run(ctx context.Context) error {
-	d.Logger.Printf("daemon started (home=%s, interval=%s)", d.Home, d.Scheduler.Interval)
+	d.Logger.Printf("daemon started (home=%s, interval=%s)", d.Home, d.Scheduler.IntervalDuration())
 	d.Scheduler.Trigger() // sync promptly on startup
 	d.Scheduler.Run(ctx)
 	d.Logger.Printf("daemon stopped")

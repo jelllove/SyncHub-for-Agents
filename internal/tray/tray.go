@@ -46,10 +46,10 @@ func (a *App) onReady() {
 	systray.SetIcon(Icon(scheduler.StateIdle, a.GOOS))
 
 	// Repaint the icon (and keep logging) on every state change.
-	a.d.Scheduler.OnState = func(s scheduler.State) {
+	a.d.Scheduler.Subscribe(func(s scheduler.State) {
 		a.d.Logger.Printf("state: %s", s)
 		systray.SetIcon(Icon(s, a.GOOS))
-	}
+	})
 
 	if addr, shutdown, err := settings.Serve(a.Home); err == nil {
 		a.settingsURL = "http://" + addr + "/"

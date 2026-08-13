@@ -40,24 +40,67 @@ type Job func() error
 // OnState (if set) is called on every state transition. All methods are safe
 // for concurrent use.
 type Scheduler struct {
-	Interval time.Duration
-	Job      Job
-	OnState  func(State)
+	Job Job
 
-	mu     sync.Mutex
-	paused bool
-	state  State
+	mu          sync.Mutex
+	interval    time.Duration
+	paused      bool
+	state       State
+	nextSubID   uint64
+	subscribers map[uint64]func(State)
 
-	trigger chan struct{}
+	trigger        chan struct{}
+	intervalChange chan struct{}
 }
 
 // New returns a Scheduler that runs job every interval.
 func New(interval time.Duration, job Job) *Scheduler {
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
 	return &Scheduler{
-		Interval: interval,
-		Job:      job,
-		state:    StateIdle,
-		trigger:  make(chan struct{}, 1),
+		Job:            job,
+		interval:       interval,
+		state:          StateIdle,
+		subscribers:    map[uint64]func(State){},
+		trigger:        make(chan struct{}, 1),
+		intervalChange: make(chan struct{}, 1),
+	}
+}
+
+// IntervalDuration returns the current interval.
+func (s *Scheduler) IntervalDuration() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.interval
+}
+
+// SetInterval updates the running schedule. Non-positive values restore the
+// default interval.
+func (s *Scheduler) SetInterval(interval time.Duration) {
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
+	s.mu.Lock()
+	s.interval = interval
+	s.mu.Unlock()
+	select {
+	case s.intervalChange <- struct{}{}:
+	default:
+	}
+}
+
+// Subscribe registers a state observer and returns an unsubscribe function.
+func (s *Scheduler) Subscribe(observer func(State)) func() {
+	s.mu.Lock()
+	id := s.nextSubID
+	s.nextSubID++
+	s.subscribers[id] = observer
+	s.mu.Unlock()
+	return func() {
+		s.mu.Lock()
+		delete(s.subscribers, id)
+		s.mu.Unlock()
 	}
 }
 
@@ -101,10 +144,13 @@ func (s *Scheduler) isPaused() bool {
 func (s *Scheduler) setState(st State) {
 	s.mu.Lock()
 	s.state = st
-	cb := s.OnState
+	observers := make([]func(State), 0, len(s.subscribers))
+	for _, observer := range s.subscribers {
+		observers = append(observers, observer)
+	}
 	s.mu.Unlock()
-	if cb != nil {
-		cb(st)
+	for _, observer := range observers {
+		observer(st)
 	}
 }
 
@@ -127,12 +173,14 @@ func (s *Scheduler) runCycle() {
 
 // Run blocks executing the schedule until ctx is cancelled.
 func (s *Scheduler) Run(ctx context.Context) {
-	ticker := time.NewTicker(s.Interval)
+	ticker := time.NewTicker(s.IntervalDuration())
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-s.intervalChange:
+			ticker.Reset(s.IntervalDuration())
 		case <-ticker.C:
 			s.runCycle()
 		case <-s.trigger:

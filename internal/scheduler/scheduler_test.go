@@ -47,7 +47,7 @@ func TestRunCycleReportsUpdatingThenIdle(t *testing.T) {
 		atomic.AddInt64(&runs, 1)
 		return nil
 	})
-	s.OnState = rec.add
+	s.Subscribe(rec.add)
 
 	s.runCycle()
 
@@ -63,7 +63,7 @@ func TestRunCycleReportsUpdatingThenIdle(t *testing.T) {
 func TestRunCycleReportsErrorOnJobFailure(t *testing.T) {
 	rec := &recorder{}
 	s := New(time.Hour, func() error { return errors.New("boom") })
-	s.OnState = rec.add
+	s.Subscribe(rec.add)
 
 	s.runCycle()
 
@@ -124,4 +124,46 @@ func TestPauseBlocksTriggerThenResume(t *testing.T) {
 	s.Resume()
 	s.Trigger()
 	waitFor(t, func() bool { return atomic.LoadInt64(&runs) == 1 }, time.Second, "run after resume")
+}
+
+func TestSetIntervalReplacesTickerWithoutRestart(t *testing.T) {
+	var runs atomic.Int32
+	s := New(time.Hour, func() error {
+		runs.Add(1)
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Run(ctx)
+
+	s.SetInterval(10 * time.Millisecond)
+	waitFor(t, func() bool { return runs.Load() > 0 }, time.Second, "run at updated interval")
+
+	if got := s.IntervalDuration(); got != 10*time.Millisecond {
+		t.Fatalf("interval = %v, want 10ms", got)
+	}
+}
+
+func TestSubscribeReceivesStateAndUnsubscribeStopsIt(t *testing.T) {
+	s := New(time.Hour, func() error { return nil })
+	states := make(chan State, 4)
+	unsubscribe := s.Subscribe(func(state State) {
+		states <- state
+	})
+
+	s.runCycle()
+	if got := <-states; got != StateUpdating {
+		t.Fatalf("first state = %v, want updating", got)
+	}
+	if got := <-states; got != StateIdle {
+		t.Fatalf("second state = %v, want idle", got)
+	}
+
+	unsubscribe()
+	s.Pause()
+	select {
+	case got := <-states:
+		t.Fatalf("received state after unsubscribe: %v", got)
+	case <-time.After(20 * time.Millisecond):
+	}
 }
