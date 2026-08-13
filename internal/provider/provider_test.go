@@ -26,6 +26,20 @@ func TestBuiltinsLoaded(t *testing.T) {
 	if len(claude.Secrets.KeyPatterns) == 0 {
 		t.Error("claude should declare secret key patterns")
 	}
+
+	gemini := byName["gemini"]
+	if !contains(gemini.Config.Sessions, "tmp/**/chats/*.jsonl") {
+		t.Fatalf("gemini sessions = %#v, want current Gemini CLI chat path", gemini.Config.Sessions)
+	}
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestLoadFromBytes(t *testing.T) {

@@ -6,8 +6,12 @@ config:
     linux: "~/.gemini"
   include:
     - "settings.json"
+    - "projects.json"
+    - "state.json"
+    - "trustedFolders.json"
   sessions:
     - "sessions/**/*.json"
+    - "tmp/**/chats/*.jsonl"
   exclude:
     - "**/*token*"
     - "**/oauth_creds.json"
