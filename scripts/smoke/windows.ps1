@@ -11,6 +11,9 @@ $shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\AgentC
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $runName = "io.github.qinqingxu.agentconfigsync"
 $appProcess = $null
+$smokeProfile = Join-Path $env:TEMP "AgentConfigSync-Smoke-Profile-$PID"
+$originalUserProfile = $env:USERPROFILE
+$originalHome = $env:HOME
 
 try {
     $install = Start-Process -FilePath (Resolve-Path $Installer) -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
@@ -24,6 +27,9 @@ try {
         throw "Start menu shortcut is missing: $shortcut"
     }
 
+    New-Item -ItemType Directory -Path $smokeProfile -Force | Out-Null
+    $env:USERPROFILE = $smokeProfile
+    $env:HOME = $smokeProfile
     $appProcess = Start-Process -FilePath $exe -ArgumentList "--hidden" -PassThru
     Start-Sleep -Seconds 5
     $appProcess.Refresh()
@@ -42,6 +48,8 @@ try {
         throw "Expected one installed application process, found $($matching.Count)"
     }
 } finally {
+    $env:USERPROFILE = $originalUserProfile
+    $env:HOME = $originalHome
     if ($null -ne $appProcess) {
         $appProcess.Refresh()
         if (!$appProcess.HasExited) {
@@ -53,6 +61,9 @@ try {
         $uninstall = Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -PassThru
         if ($uninstall.ExitCode -ne 0) {
             throw "Uninstaller exited with code $($uninstall.ExitCode)"
+        }
+        if (Test-Path $smokeProfile) {
+            Remove-Item -LiteralPath $smokeProfile -Recurse -Force
         }
     }
 }
