@@ -42,6 +42,7 @@ func TestRunSyncPushesConfig(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+
 	home := filepath.Join(t.TempDir(), ".acsync")
 	if err := os.MkdirAll(ProvidersDir(home), 0o755); err != nil {
 		t.Fatal(err)
@@ -91,5 +92,52 @@ func TestRunSyncPushesConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(RepoDir(home), "agents", "demo", "config", "settings.json")); err != nil {
 		t.Errorf("repo should contain the pushed file: %v", err)
+	}
+}
+
+func TestRunSyncUsesUserHomeForProviderPaths(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	userHome := t.TempDir()
+	dataHome := filepath.Join(userHome, ".acsync")
+	if err := os.MkdirAll(ProvidersDir(dataHome), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bare := bareRemote(t)
+	client := &gitclient.Client{Dir: RepoDir(dataHome)}
+	if err := client.Clone(bare, RepoDir(dataHome)); err != nil {
+		t.Fatalf("clone: %v", err)
+	}
+	gitCmd(t, RepoDir(dataHome), "config", "user.email", "m@e.com")
+	gitCmd(t, RepoDir(dataHome), "config", "user.name", "machine")
+
+	claudeRoot := filepath.Join(userHome, ".claude")
+	if err := os.MkdirAll(claudeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeRoot, "settings.json"), []byte(`{"theme":"dark"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{
+		RepoURL:             bare,
+		SyncIntervalMinutes: 10,
+		TrashGraceDays:      30,
+		Agents:              map[string]bool{"claude": true},
+	}
+	if err := config.Save(ConfigPath(dataHome), cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := runSyncWithUserHome(dataHome, runtime.GOOS, userHome)
+	if err != nil {
+		t.Fatalf("runSyncWithUserHome error: %v", err)
+	}
+	if !result.Pushed {
+		t.Fatal("expected provider file from the user home to be pushed")
+	}
+	want := filepath.Join(RepoDir(dataHome), "agents", "claude", "config", "settings.json")
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("synced provider file missing: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/config"
@@ -9,6 +10,14 @@ import (
 
 // RunSync loads settings from home and performs one sync pass for goos.
 func RunSync(home, goos string) (syncengine.Result, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return syncengine.Result{}, err
+	}
+	return runSyncWithUserHome(home, goos, userHome)
+}
+
+func runSyncWithUserHome(home, goos, userHome string) (syncengine.Result, error) {
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
 		return syncengine.Result{}, err
@@ -17,7 +26,7 @@ func RunSync(home, goos string) (syncengine.Result, error) {
 	if err != nil {
 		return syncengine.Result{}, err
 	}
-	specs, err := BuildSpecs(cfg, providers, goos, home)
+	specs, err := BuildSpecs(cfg, providers, goos, userHome)
 	if err != nil {
 		return syncengine.Result{}, err
 	}

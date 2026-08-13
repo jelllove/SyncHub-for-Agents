@@ -79,7 +79,7 @@ func LoadProviders(home string) ([]provider.Provider, error) {
 }
 
 // BuildSpecs resolves enabled providers into AgentSpecs for the given OS/home.
-func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, home string) (map[string]syncengine.AgentSpec, error) {
+func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, userHome string) (map[string]syncengine.AgentSpec, error) {
 	specs := map[string]syncengine.AgentSpec{}
 	for _, p := range providers {
 		if !cfg.Agents[p.Name] {
@@ -89,7 +89,7 @@ func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, home str
 		if !ok || raw == "" {
 			continue
 		}
-		root, err := pathresolver.ResolveFor(raw, goos, home)
+		root, err := pathresolver.ResolveFor(raw, goos, userHome)
 		if err != nil {
 			return nil, err
 		}
