@@ -13,12 +13,23 @@ import (
 	"github.com/qinqingxu/acsync/internal/scheduler"
 )
 
+// CycleResult describes one completed sync and cleanup cycle.
+type CycleResult struct {
+	Actions    int
+	Blocked    int
+	Pushed     bool
+	Purged     int
+	Error      string
+	FinishedAt time.Time
+}
+
 // Daemon runs the sync scheduler for a given acsync home.
 type Daemon struct {
 	Home      string
 	GOOS      string
 	Scheduler *scheduler.Scheduler
 	Logger    *log.Logger
+	OnCycle   func(CycleResult)
 
 	closeLog func() error
 }
@@ -48,21 +59,35 @@ func New(home, goos string) (*Daemon, error) {
 
 // syncJob runs one full sync followed by a trash cleanup pass.
 func (d *Daemon) syncJob() error {
+	result := CycleResult{}
+	defer func() {
+		result.FinishedAt = time.Now()
+		if d.OnCycle != nil {
+			d.OnCycle(result)
+		}
+	}()
+
 	res, err := cli.RunSync(d.Home, d.GOOS)
 	if err != nil {
+		result.Error = err.Error()
 		d.Logger.Printf("sync error: %v", err)
 		return err
 	}
+	result.Actions = len(res.Actions)
+	result.Blocked = len(res.Blocked)
+	result.Pushed = res.Pushed
 	d.Logger.Printf("sync ok: %d actions, %d blocked, pushed=%v",
-		len(res.Actions), len(res.Blocked), res.Pushed)
+		result.Actions, result.Blocked, result.Pushed)
 
 	purged, err := cli.RunCleanup(d.Home, time.Now())
 	if err != nil {
+		result.Error = err.Error()
 		d.Logger.Printf("cleanup error: %v", err)
 		return err
 	}
-	if len(purged) > 0 {
-		d.Logger.Printf("purged %d expired trash entries", len(purged))
+	result.Purged = len(purged)
+	if result.Purged > 0 {
+		d.Logger.Printf("purged %d expired trash entries", result.Purged)
 	}
 	return nil
 }

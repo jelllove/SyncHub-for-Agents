@@ -86,3 +86,36 @@ func TestRunStopsOnContextCancelAndLogs(t *testing.T) {
 		t.Errorf("log missing startup line: %s", data)
 	}
 }
+
+func TestDaemonPublishesCycleErrors(t *testing.T) {
+	home := filepath.Join(t.TempDir(), ".acsync")
+	writeConfig(t, home, config.Config{
+		SyncIntervalMinutes: 60,
+		Agents:              map[string]bool{},
+	})
+	d, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+
+	events := make(chan CycleResult, 1)
+	d.OnCycle = func(result CycleResult) {
+		events <- result
+	}
+
+	if err := d.syncJob(); err == nil {
+		t.Fatal("expected missing repository error")
+	}
+	select {
+	case result := <-events:
+		if result.Error == "" {
+			t.Fatal("cycle result should contain the sync error")
+		}
+		if result.FinishedAt.IsZero() {
+			t.Fatal("cycle result should contain a completion time")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cycle result was not published")
+	}
+}
