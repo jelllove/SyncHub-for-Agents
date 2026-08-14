@@ -111,6 +111,14 @@ func TestSaveSettingsPersistsCategoriesAndCustomResources(t *testing.T) {
 	if len(cfg.CustomResources) != 1 || cfg.CustomResources[0].ID != "notes" {
 		t.Fatalf("custom resources = %#v", cfg.CustomResources)
 	}
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.CustomResources) != 1 ||
+		snapshot.CustomResources[0].Paths[runtime.GOOS] != input.CustomResources[0].Paths[runtime.GOOS] {
+		t.Fatalf("snapshot custom resources = %#v", snapshot.CustomResources)
+	}
 }
 
 func TestApproveInstallPlanRequiresCurrentID(t *testing.T) {

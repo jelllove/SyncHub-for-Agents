@@ -8,6 +8,47 @@ export interface Agent {
     "name": string;
     "enabled": boolean;
     "exclude": string[] | null;
+    "resources": ResourceCategory[] | null;
+}
+
+export interface ConflictResolution {
+    "id": string;
+    "choice": string;
+    "content"?: string;
+}
+
+export interface ConflictSummary {
+    "id": string;
+    "resourceKey": string;
+    "path": string;
+    "createdAt": string;
+}
+
+export interface CustomResourceInput {
+    "id": string;
+    "category": string;
+    "paths": { [_ in string]?: string } | null;
+    "targets": { [_ in string]?: string } | null;
+    "include": string[] | null;
+    "exclude": string[] | null;
+    "strategy": string;
+}
+
+export interface InstallOperation {
+    "id": string;
+    "adapter": string;
+    "source": string;
+    "kind": string;
+    "executable": string;
+    "args": string[] | null;
+    "workingDir": string;
+    "error"?: string;
+}
+
+export interface InstallPlan {
+    "id": string;
+    "approved": boolean;
+    "operations": InstallOperation[] | null;
 }
 
 export interface Progress {
@@ -18,6 +59,45 @@ export interface Progress {
     "totalActions": number;
     "blockedFiles": number;
     "pushed": boolean;
+    "restored": number;
+    "reinstalled": number;
+    "skipped": number;
+    "conflicts": number;
+    "pendingInstalls": number;
+    "needsAttention": boolean;
+}
+
+export interface ResourceCategory {
+    "provider": string;
+    "id": string;
+    "category": string;
+    "enabled": boolean;
+    "supported": boolean;
+    "source": string;
+    "target": string;
+    "fileCount": number;
+    "bytes": number;
+    "excludedFiles": number;
+    "excludedBytes": number;
+    "status": string;
+    "reason"?: string;
+}
+
+export interface ResourceIssue {
+    "resourceKey": string;
+    "path": string;
+    "code": string;
+    "message": string;
+    "bytes": number;
+}
+
+export interface ResourcePreview {
+    "resources": ResourceCategory[] | null;
+    "files": number;
+    "bytes": number;
+    "excludedFiles": number;
+    "excludedBytes": number;
+    "issues": ResourceIssue[] | null;
 }
 
 /**
@@ -28,6 +108,8 @@ export interface SettingsInput {
     "intervalMinutes": number;
     "trashGraceDays": number;
     "agents": { [_ in string]?: boolean } | null;
+    "categories": { [_ in string]?: { [_ in string]?: boolean } | null } | null;
+    "customResources": CustomResourceInput[] | null;
 }
 
 /**
@@ -37,6 +119,7 @@ export interface Snapshot {
     "configured": boolean;
     "state": string;
     "repositoryUrl": string;
+    "platform": string;
     "intervalMinutes": number;
     "trashGraceDays": number;
     "agents": Agent[] | null;
@@ -46,4 +129,8 @@ export interface Snapshot {
     "blockedFiles": number;
     "lastError": string;
     "progress": Progress;
+    "preview": ResourcePreview;
+    "customResources": CustomResourceInput[] | null;
+    "pendingInstallPlan"?: InstallPlan | null;
+    "conflicts": ConflictSummary[] | null;
 }

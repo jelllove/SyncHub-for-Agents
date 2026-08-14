@@ -8,7 +8,15 @@ export {
 
 export type {
     Agent,
+    ConflictResolution,
+    ConflictSummary,
+    CustomResourceInput,
+    InstallOperation,
+    InstallPlan,
     Progress,
+    ResourceCategory,
+    ResourceIssue,
+    ResourcePreview,
     SettingsInput,
     Snapshot
 } from "./models.js";

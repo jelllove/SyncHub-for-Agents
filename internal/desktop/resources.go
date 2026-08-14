@@ -142,6 +142,22 @@ func (input CustomResourceInput) toConfig() config.CustomResource {
 	}
 }
 
+func desktopCustomResources(resources []config.CustomResource) []CustomResourceInput {
+	result := make([]CustomResourceInput, 0, len(resources))
+	for _, item := range resources {
+		result = append(result, CustomResourceInput{
+			ID:       item.ID,
+			Category: string(item.Category),
+			Paths:    cloneStringMap(item.Paths),
+			Targets:  cloneStringMap(item.Targets),
+			Include:  append([]string(nil), item.Include...),
+			Exclude:  append([]string(nil), item.Exclude...),
+			Strategy: string(item.Strategy),
+		})
+	}
+	return result
+}
+
 func sortedSpecs(specs map[string]resource.Spec) []resource.Spec {
 	keys := sortedSpecKeys(specs)
 	result := make([]resource.Spec, 0, len(keys))

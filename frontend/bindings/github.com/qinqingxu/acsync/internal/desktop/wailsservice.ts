@@ -18,6 +18,10 @@ import * as onboarding$0 from "../onboarding/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function ApproveInstallPlan(id: string): $CancellablePromise<void> {
+    return $Call.ByID(542360153, id);
+}
+
 export function CancelOnboarding(): $CancellablePromise<void> {
     return $Call.ByID(1199327865);
 }
@@ -36,6 +40,18 @@ export function OnboardingState(): $CancellablePromise<onboarding$0.State> {
 
 export function Pause(): $CancellablePromise<void> {
     return $Call.ByID(3233963532);
+}
+
+export function PreviewCustomResource(input: $models.CustomResourceInput): $CancellablePromise<$models.ResourcePreview> {
+    return $Call.ByID(2936582605, input);
+}
+
+export function ResolveConflict(input: $models.ConflictResolution): $CancellablePromise<void> {
+    return $Call.ByID(3670949432, input);
+}
+
+export function ResourcePreview(): $CancellablePromise<$models.ResourcePreview> {
+    return $Call.ByID(1033440782);
 }
 
 export function Resume(): $CancellablePromise<void> {

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import {
+  ApproveInstallPlan,
   Pause,
   NeedsOnboarding,
+  ResolveConflict,
   Resume,
   SaveSettings,
   SetStartAtLogin,
@@ -12,15 +14,36 @@ import {
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
 import {
   type Agent,
+  type CustomResourceInput,
   type Progress,
+  type ResourceCategory,
+  type ResourceIssue,
   type SettingsInput,
   type Snapshot,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
 import './style.css'
 import Onboarding from './onboarding/Onboarding'
+import { ConflictPanel } from './resources/ConflictPanel'
+import { CustomResourceEditor } from './resources/CustomResourceEditor'
+import { InstallPlanPanel } from './resources/InstallPlanPanel'
+import { ResourceSettings, type CategorySettings } from './resources/ResourceSettings'
+import { RestorePreview } from './resources/RestorePreview'
+import { ResultSummary } from './resources/ResultSummary'
 
-type AppAgent = Omit<Agent, 'exclude'> & { exclude: string[] }
-type AppSnapshot = Omit<Snapshot, 'agents'> & { agents: AppAgent[] }
+type AppAgent = Omit<Agent, 'exclude' | 'resources'> & {
+  exclude: string[]
+  resources: ResourceCategory[]
+}
+type AppPreview = Omit<Snapshot['preview'], 'resources' | 'issues'> & {
+  resources: ResourceCategory[]
+  issues: ResourceIssue[]
+}
+type AppSnapshot = Omit<Snapshot, 'agents' | 'preview' | 'conflicts' | 'customResources'> & {
+  agents: AppAgent[]
+  preview: AppPreview
+  conflicts: NonNullable<Snapshot['conflicts']>
+  customResources: CustomResourceInput[]
+}
 
 const stateLabels: Record<string, string> = {
   idle: 'Up to date',
@@ -50,13 +73,24 @@ function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
     agents: (snapshot.agents ?? []).map((agent) => ({
       ...agent,
       exclude: agent.exclude ?? [],
+      resources: agent.resources ?? [],
     })),
+    preview: {
+      ...snapshot.preview,
+      resources: snapshot.preview.resources ?? [],
+      issues: snapshot.preview.issues ?? [],
+    },
+    conflicts: snapshot.conflicts ?? [],
+    customResources: snapshot.customResources ?? [],
   }
 }
 
 function completionMessage(progress: Progress) {
+  if (progress.needsAttention) return 'Synchronization completed with items that need attention'
+  if (progress.restored + progress.reinstalled > 0) {
+    return `Restored ${progress.restored} files and reinstalled ${progress.reinstalled} integrations`
+  }
   if (progress.pushed) return `Uploaded ${progress.totalActions} change${progress.totalActions === 1 ? '' : 's'}`
-  if (progress.totalActions > 0) return `Synchronized ${progress.totalActions} change${progress.totalActions === 1 ? '' : 's'}`
   return 'Synchronization complete; no changes needed'
 }
 
@@ -115,8 +149,10 @@ function App() {
       await action()
       if (success) setNotice(success)
       await refresh()
+      return true
     } catch (cause) {
       setError(errorMessage(cause))
+      return false
     } finally {
       setBusy(false)
     }
@@ -215,6 +251,30 @@ function App() {
               <Metric label="Protected agents" value={`${enabledAgents} / ${snapshot.agents.length}`} />
             </section>
 
+            <ResultSummary progress={progress} />
+
+            {snapshot.pendingInstallPlan && (
+              <InstallPlanPanel
+                plan={snapshot.pendingInstallPlan}
+                busy={busy}
+                approve={(id) => perform(
+                  () => ApproveInstallPlan(id),
+                  'Install plan approved; synchronization queued',
+                )}
+              />
+            )}
+
+            {snapshot.conflicts.length > 0 && (
+              <ConflictPanel
+                conflicts={snapshot.conflicts}
+                busy={busy}
+                resolve={(input) => perform(
+                  () => ResolveConflict(input),
+                  'Conflict resolved; synchronization queued',
+                )}
+              />
+            )}
+
             <section className="panel">
               <div className="panel-heading">
                 <div>
@@ -251,7 +311,10 @@ function App() {
           snapshot={snapshot}
           busy={busy}
           close={() => setSettingsOpen(false)}
-          save={(input) => perform(() => SaveSettings(input), 'Settings saved')}
+          save={(input, startAtLogin, startAtLoginChanged) => perform(async () => {
+            await SaveSettings(input)
+            if (startAtLoginChanged) await SetStartAtLogin(startAtLogin)
+          }, 'Settings saved')}
         />
       )}
     </div>
@@ -296,7 +359,11 @@ function SettingsPanel({
   snapshot: AppSnapshot
   busy: boolean
   close: () => void
-  save: (input: SettingsInput) => Promise<void>
+  save: (
+    input: SettingsInput,
+    startAtLogin: boolean,
+    startAtLoginChanged: boolean,
+  ) => Promise<boolean>
 }) {
   const [repositoryUrl, setRepositoryUrl] = useState(snapshot.repositoryUrl)
   const [intervalMinutes, setIntervalMinutes] = useState(snapshot.intervalMinutes)
@@ -304,23 +371,32 @@ function SettingsPanel({
   const [agents, setAgents] = useState<Record<string, boolean>>(
     Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
   )
+  const [categories, setCategories] = useState<CategorySettings>(
+    Object.fromEntries(snapshot.agents.map((agent) => [
+      agent.name,
+      Object.fromEntries(agent.resources.map((resource) => [resource.category, resource.enabled])),
+    ])),
+  )
+  const [customResources, setCustomResources] = useState<CustomResourceInput[]>(snapshot.customResources)
   const [startAtLogin, setStartAtLogin] = useState(false)
   const [initialStartAtLogin, setInitialStartAtLogin] = useState(false)
+  const [startAtLoginError, setStartAtLoginError] = useState('')
 
   useEffect(() => {
     void StartAtLogin().then((enabled) => {
       setStartAtLogin(enabled)
       setInitialStartAtLogin(enabled)
-    })
+    }).catch((cause) => setStartAtLoginError(errorMessage(cause)))
   }, [])
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
-    await save({ repositoryUrl, intervalMinutes, trashGraceDays, agents })
-    if (startAtLogin !== initialStartAtLogin) {
-      await SetStartAtLogin(startAtLogin)
-    }
-    close()
+    const saved = await save(
+      { repositoryUrl, intervalMinutes, trashGraceDays, agents, categories, customResources },
+      startAtLogin,
+      startAtLogin !== initialStartAtLogin,
+    )
+    if (saved) close()
   }
 
   return (
@@ -379,6 +455,16 @@ function SettingsPanel({
             ))}
           </fieldset>
           <fieldset>
+            <legend>Resource categories</legend>
+            <ResourceSettings agents={snapshot.agents} categories={categories} onChange={setCategories} />
+          </fieldset>
+          <RestorePreview preview={snapshot.preview} />
+          <CustomResourceEditor
+            platform={snapshot.platform}
+            resources={customResources}
+            onChange={setCustomResources}
+          />
+          <fieldset>
             <legend>Desktop application</legend>
             <label className="toggle-row">
               <span>
@@ -391,6 +477,7 @@ function SettingsPanel({
                 onChange={(event) => setStartAtLogin(event.target.checked)}
               />
             </label>
+            {startAtLoginError && <div className="inline-error">{startAtLoginError}</div>}
           </fieldset>
           <div className="form-actions">
             <button type="button" className="secondary" onClick={close}>Cancel</button>

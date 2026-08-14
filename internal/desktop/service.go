@@ -247,6 +247,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		LastError:          last.Error,
 		Progress:           progress,
 		Preview:            preview,
+		CustomResources:    desktopCustomResources(cfg.CustomResources),
 		PendingInstallPlan: desktopInstallPlan(pending),
 		Conflicts:          desktopConflicts(conflictRecords),
 	}, nil

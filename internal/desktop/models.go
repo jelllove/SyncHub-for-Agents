@@ -92,22 +92,23 @@ type Progress struct {
 
 // Snapshot is the current desktop-visible sync state.
 type Snapshot struct {
-	Configured         bool              `json:"configured"`
-	State              string            `json:"state"`
-	RepositoryURL      string            `json:"repositoryUrl"`
-	Platform           string            `json:"platform"`
-	IntervalMinutes    int               `json:"intervalMinutes"`
-	TrashGraceDays     int               `json:"trashGraceDays"`
-	Agents             []Agent           `json:"agents"`
-	LastSync           time.Time         `json:"lastSync"`
-	NextSync           time.Time         `json:"nextSync"`
-	PendingActions     int               `json:"pendingActions"`
-	BlockedFiles       int               `json:"blockedFiles"`
-	LastError          string            `json:"lastError"`
-	Progress           Progress          `json:"progress"`
-	Preview            ResourcePreview   `json:"preview"`
-	PendingInstallPlan *InstallPlan      `json:"pendingInstallPlan,omitempty"`
-	Conflicts          []ConflictSummary `json:"conflicts"`
+	Configured         bool                  `json:"configured"`
+	State              string                `json:"state"`
+	RepositoryURL      string                `json:"repositoryUrl"`
+	Platform           string                `json:"platform"`
+	IntervalMinutes    int                   `json:"intervalMinutes"`
+	TrashGraceDays     int                   `json:"trashGraceDays"`
+	Agents             []Agent               `json:"agents"`
+	LastSync           time.Time             `json:"lastSync"`
+	NextSync           time.Time             `json:"nextSync"`
+	PendingActions     int                   `json:"pendingActions"`
+	BlockedFiles       int                   `json:"blockedFiles"`
+	LastError          string                `json:"lastError"`
+	Progress           Progress              `json:"progress"`
+	Preview            ResourcePreview       `json:"preview"`
+	CustomResources    []CustomResourceInput `json:"customResources"`
+	PendingInstallPlan *InstallPlan          `json:"pendingInstallPlan,omitempty"`
+	Conflicts          []ConflictSummary     `json:"conflicts"`
 }
 
 // SettingsInput contains editable desktop settings.
