@@ -7,6 +7,7 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/conflict"
+	"github.com/qinqingxu/acsync/internal/installplan"
 	"github.com/qinqingxu/acsync/internal/portableconfig"
 	"github.com/qinqingxu/acsync/internal/state"
 	"github.com/qinqingxu/acsync/internal/syncengine"
@@ -57,19 +58,24 @@ func runSyncWithUserHome(
 		repoDir,
 		syncengine.ConflictScanner(resources),
 	)
+	runner := installplan.CommandRunner{}
+	inventory := installplan.NewBuiltinInventory(runner)
+	installManager := installplan.NewManager(home, inventory, runner)
 	eng := &syncengine.Engine{
-		Git:         client,
-		RepoDir:     repoDir,
-		Home:        home,
-		UserHome:    userHome,
-		GOOS:        goos,
-		StatePath:   StatePath(home),
-		Resources:   resources,
-		Codecs:      codecs,
-		Base:        baseStore,
-		Conflicts:   conflictStore,
-		PushRetries: 5,
-		Now:         time.Now,
+		Git:            client,
+		RepoDir:        repoDir,
+		Home:           home,
+		UserHome:       userHome,
+		GOOS:           goos,
+		StatePath:      StatePath(home),
+		Resources:      resources,
+		Codecs:         codecs,
+		Base:           baseStore,
+		Conflicts:      conflictStore,
+		Inventory:      inventory,
+		InstallManager: installManager,
+		PushRetries:    5,
+		Now:            time.Now,
 	}
 	if len(onProgress) > 0 {
 		eng.OnProgress = onProgress[0]

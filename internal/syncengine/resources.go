@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/qinqingxu/acsync/internal/conflict"
+	"github.com/qinqingxu/acsync/internal/installplan"
 	"github.com/qinqingxu/acsync/internal/portableconfig"
 	"github.com/qinqingxu/acsync/internal/resource"
 	"github.com/qinqingxu/acsync/internal/secret"
@@ -130,6 +131,26 @@ func ValidateRemoteResources(
 			})
 			continue
 		}
+		if spec.Strategy == resource.StrategyInstallManifest {
+			if ref.Relative != "manifest.json" {
+				blocked = append(blocked, resource.Issue{
+					ResourceKey: spec.Key,
+					Path:        repoRel,
+					Code:        "remote-install-manifest-invalid",
+					Message:     "install resources may contain only manifest.json",
+				})
+				continue
+			}
+			if _, err := installplan.ValidateDeclarations(spec.Installer, data); err != nil {
+				blocked = append(blocked, remoteIssue(
+					spec.Key,
+					repoRel,
+					"remote-install-manifest-invalid",
+					err,
+				))
+				continue
+			}
+		}
 		if spec.Transformer != "" {
 			if codecs == nil {
 				blocked = append(blocked, resource.Issue{
@@ -178,8 +199,11 @@ func validateInternalRemote(
 	}
 	parts := strings.Split(repoRel, "/")
 	if len(parts) == 5 && parts[3] == "install" {
-		if !json.Valid(data) {
-			return fmt.Errorf("install metadata is not valid JSON")
+		if parts[4] != "skill-dependencies.json" {
+			return fmt.Errorf("invalid install metadata path")
+		}
+		if _, err := installplan.ValidateDeclarations("skill-dependencies", data); err != nil {
+			return fmt.Errorf("validate Skill dependency declarations: %w", err)
 		}
 		return scanInternalData(repoRel, data)
 	}

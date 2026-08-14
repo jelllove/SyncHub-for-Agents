@@ -1,6 +1,7 @@
 package syncengine
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/conflict"
 	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/acsync/internal/installplan"
 	"github.com/qinqingxu/acsync/internal/portableconfig"
 	"github.com/qinqingxu/acsync/internal/portablemerge"
 	"github.com/qinqingxu/acsync/internal/resource"
@@ -32,22 +34,23 @@ type Result struct {
 }
 
 type Engine struct {
-	Git           *gitclient.Client
-	RepoDir       string
-	Home          string
-	UserHome      string
-	GOOS          string
-	StatePath     string
-	Resources     map[string]resource.Spec
-	Codecs        *portableconfig.Registry
-	Base          *state.BaseStore
-	Conflicts     *conflict.Store
-	Inventory     resourcecollect.InventoryProvider
-	ApprovedLinks resourcecollect.ApprovedLinkStore
-	TextMerger    portablemerge.TextMerger
-	PushRetries   int
-	Now           func() time.Time
-	OnProgress    func(Progress)
+	Git            *gitclient.Client
+	RepoDir        string
+	Home           string
+	UserHome       string
+	GOOS           string
+	StatePath      string
+	Resources      map[string]resource.Spec
+	Codecs         *portableconfig.Registry
+	Base           *state.BaseStore
+	Conflicts      *conflict.Store
+	Inventory      resourcecollect.InventoryProvider
+	InstallManager *installplan.Manager
+	ApprovedLinks  resourcecollect.ApprovedLinkStore
+	TextMerger     portablemerge.TextMerger
+	PushRetries    int
+	Now            func() time.Time
+	OnProgress     func(Progress)
 }
 
 func (e *Engine) SyncOnce() (result Result, retErr error) {
@@ -283,6 +286,9 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 				return Result{}, fmt.Errorf("push resource %q: %w", action.RepoRel, err)
 			}
 		case PullToLocal:
+			if spec.Strategy == resource.StrategyInstallManifest {
+				break
+			}
 			if err := applier.Restore(spec, action.RepoRel); err != nil {
 				result.Issues = append(result.Issues, applyIssue(spec.Key, action.RepoRel, "restore-failed", err))
 				preserve[action.RepoRel] = struct{}{}
@@ -294,6 +300,9 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 				return Result{}, fmt.Errorf("delete remote resource %q: %w", action.RepoRel, err)
 			}
 		case DeleteLocal:
+			if spec.Strategy == resource.StrategyInstallManifest {
+				break
+			}
 			if err := applier.Delete(spec, action.RepoRel); err != nil {
 				result.Issues = append(result.Issues, applyIssue(spec.Key, action.RepoRel, "delete-local-failed", err))
 				preserve[action.RepoRel] = struct{}{}
@@ -332,6 +341,31 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	result.Conflicts = len(conflictRecords)
 	for _, record := range conflictRecords {
 		preserve[record.RepoRel] = struct{}{}
+	}
+
+	if e.InstallManager != nil {
+		currentManifests, err := currentInstallManifests(collected.Artifacts, e.Resources)
+		if err != nil {
+			return Result{}, err
+		}
+		installResult, err := e.InstallManager.Reconcile(
+			context.Background(),
+			e.RepoDir,
+			e.Resources,
+			currentManifests,
+		)
+		if err != nil {
+			return Result{}, fmt.Errorf("reconcile install plans: %w", err)
+		}
+		result.Reinstalled += installResult.Executed
+		result.PendingInstalls += installResult.Pending
+		for operationID, message := range installResult.Errors {
+			result.Issues = append(result.Issues, resource.Issue{
+				ResourceKey: operationID,
+				Code:        "install-failed",
+				Message:     message,
+			})
+		}
 	}
 
 	e.publish(Progress{
@@ -419,6 +453,17 @@ func (e *Engine) validate() error {
 	if strings.TrimSpace(e.Home) == "" {
 		e.Home = filepath.Dir(e.StatePath)
 	}
+	for _, spec := range e.Resources {
+		if spec.Strategy != resource.StrategyInstallManifest {
+			continue
+		}
+		if e.Inventory == nil {
+			return fmt.Errorf("sync engine requires inventory for install resources")
+		}
+		if e.InstallManager == nil {
+			return fmt.Errorf("sync engine requires an install manager for install resources")
+		}
+	}
 	return nil
 }
 
@@ -494,6 +539,9 @@ func (e *Engine) mergeResource(
 	if err := writeAtomic(remotePath, merged.Data, 0o600); err != nil {
 		return false, err
 	}
+	if spec.Strategy == resource.StrategyInstallManifest {
+		return false, nil
+	}
 	ref, err := resource.ParseRepoPath(repoRel)
 	if err != nil {
 		return false, err
@@ -521,6 +569,27 @@ func sortedResourceSpecs(specs map[string]resource.Spec) []resource.Spec {
 		out = append(out, specs[key])
 	}
 	return out
+}
+
+func currentInstallManifests(
+	artifacts map[string]resourcecollect.Artifact,
+	specs map[string]resource.Spec,
+) (map[string][]byte, error) {
+	manifests := map[string][]byte{}
+	for repoRel, artifact := range artifacts {
+		spec, err := specForRepoPath(specs, repoRel)
+		if err != nil ||
+			spec.Strategy != resource.StrategyInstallManifest ||
+			artifact.Relative != "manifest.json" {
+			continue
+		}
+		data, err := os.ReadFile(artifact.StagePath)
+		if err != nil {
+			return nil, fmt.Errorf("read staged install manifest %q: %w", repoRel, err)
+		}
+		manifests[spec.Key] = data
+	}
+	return manifests, nil
 }
 
 func cloneSnapshot(source state.Snapshot) state.Snapshot {

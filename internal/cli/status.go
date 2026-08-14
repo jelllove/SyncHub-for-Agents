@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/installplan"
 	"github.com/qinqingxu/acsync/internal/portableconfig"
 	"github.com/qinqingxu/acsync/internal/resource"
 	"github.com/qinqingxu/acsync/internal/resourcecollect"
@@ -44,6 +45,7 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 		return Status{}, err
 	}
 	codecs := portableconfig.BuiltinRegistry()
+	inventory := installplan.NewBuiltinInventory(installplan.CommandRunner{})
 	stageParent := filepath.Join(RepoDir(home), ".git", "acsync-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Status{}, fmt.Errorf("create status stage parent: %w", err)
@@ -57,6 +59,7 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 		GOOS:        goos,
 		UserHome:    userHome,
 		Projector:   codecs,
+		Inventory:   inventory,
 	}).Collect(specList)
 	if err != nil {
 		return Status{}, err

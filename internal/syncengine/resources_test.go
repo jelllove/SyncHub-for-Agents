@@ -157,6 +157,37 @@ func TestValidateRemoteResourcesRejectsMalformedInternalMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateRemoteResourcesBlocksMismatchedInstallAdapter(t *testing.T) {
+	repo := t.TempDir()
+	spec := resource.Spec{
+		Key: "copilot/plugins", Provider: "copilot", ID: "plugins",
+		Category: resource.CategoryPlugins, Strategy: resource.StrategyInstallManifest,
+		Layout: resource.LayoutPortable, Installer: "copilot-plugin",
+	}
+	repoRel, err := spec.RepoPath("manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeRepoFile(t, repo, repoRel, []byte(`[{
+			"id":"review@official",
+			"adapter":"claude-plugin",
+			"source":"review@official",
+			"enabled":true
+		}]`))
+
+	valid, blocked := ValidateRemoteResources(
+		repo,
+		state.Snapshot{repoRel: {}},
+		map[string]resource.Spec{spec.Key: spec},
+		portableconfig.NewRegistry(),
+		"windows",
+		t.TempDir(),
+	)
+	if len(valid) != 0 || len(blocked) != 1 {
+		t.Fatalf("valid=%#v blocked=%#v", valid, blocked)
+	}
+}
+
 func TestValidateRemoteResourcesBlocksRepositorySymlinks(t *testing.T) {
 	repo := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "outside.json")
