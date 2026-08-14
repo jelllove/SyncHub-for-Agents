@@ -20,6 +20,8 @@ const (
 	DeleteLocal
 	// RemoveRemote deletes a blocked file from the repo without retaining it in trash.
 	RemoveRemote
+	// MergeBoth requests a strategy-specific three-way merge.
+	MergeBoth
 )
 
 func (t ActionType) String() string {
@@ -34,6 +36,8 @@ func (t ActionType) String() string {
 		return "delete-local"
 	case RemoveRemote:
 		return "remove-remote"
+	case MergeBoth:
+		return "merge"
 	default:
 		return "unknown"
 	}
@@ -119,16 +123,11 @@ func resolveConflict(p string, inL bool, l state.FileMeta, inR bool, r state.Fil
 		if l.Hash == r.Hash {
 			return Action{}, false // same content, already converged
 		}
-		if l.ModTime >= r.ModTime {
-			return Action{PushToRemote, p}, true
-		}
-		return Action{PullToLocal, p}, true
+		return Action{MergeBoth, p}, true
 	case inL && !inR:
-		// local modified, remote deleted: resurrect on remote (no data loss)
-		return Action{PushToRemote, p}, true
+		return Action{MergeBoth, p}, true
 	case !inL && inR:
-		// local deleted, remote modified: resurrect locally (no data loss)
-		return Action{PullToLocal, p}, true
+		return Action{MergeBoth, p}, true
 	default:
 		// both deleted
 		return Action{}, false

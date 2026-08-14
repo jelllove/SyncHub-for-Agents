@@ -60,21 +60,13 @@ func TestReconcileRemoteDeletePropagates(t *testing.T) {
 	}
 }
 
-func TestReconcileConflictLastWriterWins(t *testing.T) {
+func TestReconcileBothChangedRequestsMergeInsteadOfLWW(t *testing.T) {
 	base := state.Snapshot{"p": meta("h0", 5)}
-	// Local newer.
 	local := state.Snapshot{"p": meta("hL", 20)}
 	remote := state.Snapshot{"p": meta("hR", 10)}
 	a := find(Reconcile(base, local, remote), "p")
-	if a == nil || a.Type != PushToRemote {
-		t.Fatalf("expected PushToRemote (local newer), got %+v", a)
-	}
-	// Remote newer.
-	local2 := state.Snapshot{"p": meta("hL", 10)}
-	remote2 := state.Snapshot{"p": meta("hR", 20)}
-	a2 := find(Reconcile(base, local2, remote2), "p")
-	if a2 == nil || a2.Type != PullToLocal {
-		t.Fatalf("expected PullToLocal (remote newer), got %+v", a2)
+	if a == nil || a.Type != MergeBoth {
+		t.Fatalf("expected MergeBoth, got %+v", a)
 	}
 }
 
@@ -88,13 +80,12 @@ func TestReconcileUnchangedNoAction(t *testing.T) {
 }
 
 func TestReconcileDeleteModifyResurrects(t *testing.T) {
-	// Local deleted, remote modified -> keep remote copy (pull), avoid data loss.
 	base := state.Snapshot{"p": meta("h0", 5)}
 	local := state.Snapshot{}
 	remote := state.Snapshot{"p": meta("hR", 20)}
 	a := find(Reconcile(base, local, remote), "p")
-	if a == nil || a.Type != PullToLocal {
-		t.Fatalf("expected PullToLocal (resurrect), got %+v", a)
+	if a == nil || a.Type != MergeBoth {
+		t.Fatalf("expected MergeBoth for delete-versus-modify, got %+v", a)
 	}
 }
 
