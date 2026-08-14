@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	fyne.io/systray v1.12.2
 	github.com/bmatcuk/doublestar/v4 v4.6.1
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/spf13/cobra v1.8.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.8
 	github.com/zalando/go-keyring v0.2.8
