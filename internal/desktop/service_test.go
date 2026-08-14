@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -81,6 +82,64 @@ func TestSnapshotMapsConfiguredStatus(t *testing.T) {
 	}
 	if len(got.Agents) == 0 {
 		t.Fatal("snapshot should contain builtin agents")
+	}
+}
+
+func TestSnapshotReportsDoneAfterSuccessfulCycle(t *testing.T) {
+	service, err := New(configuredHome(t), runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	d := service.Daemon()
+	d.Scheduler.Job = func() error { return nil }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go d.Scheduler.Run(ctx)
+	d.Scheduler.Trigger()
+
+	deadline := time.Now().Add(time.Second)
+	for d.Scheduler.State() != scheduler.StateDone && time.Now().Before(deadline) {
+		time.Sleep(2 * time.Millisecond)
+	}
+	got, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != "done" {
+		t.Fatalf("snapshot state = %q, want done", got.State)
+	}
+}
+
+func TestSnapshotPromotesDoneToErrorWhenLastCycleNeedsAttention(t *testing.T) {
+	service, err := New(configuredHome(t), runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	d := service.Daemon()
+	d.Scheduler.Job = func() error { return nil }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go d.Scheduler.Run(ctx)
+	d.Scheduler.Trigger()
+
+	deadline := time.Now().Add(time.Second)
+	for d.Scheduler.State() != scheduler.StateDone && time.Now().Before(deadline) {
+		time.Sleep(2 * time.Millisecond)
+	}
+	service.mu.Lock()
+	service.last.NeedsAttention = true
+	service.mu.Unlock()
+
+	got, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.State != "error" {
+		t.Fatalf("snapshot state = %q, want error", got.State)
 	}
 }
 

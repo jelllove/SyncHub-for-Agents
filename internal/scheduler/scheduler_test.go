@@ -40,7 +40,7 @@ func waitFor(t *testing.T, cond func() bool, timeout time.Duration, msg string) 
 	t.Fatalf("timeout waiting for %s", msg)
 }
 
-func TestRunCycleReportsUpdatingThenIdle(t *testing.T) {
+func TestRunCycleReportsUpdatingThenDone(t *testing.T) {
 	var runs int64
 	rec := &recorder{}
 	s := New(time.Hour, func() error {
@@ -55,8 +55,11 @@ func TestRunCycleReportsUpdatingThenIdle(t *testing.T) {
 		t.Fatalf("runs = %d, want 1", got)
 	}
 	states := rec.snapshot()
-	if len(states) != 2 || states[0] != StateUpdating || states[1] != StateIdle {
-		t.Fatalf("states = %v, want [updating idle]", states)
+	if len(states) != 2 || states[0] != StateUpdating || states[1] != StateDone {
+		t.Fatalf("states = %v, want [updating done]", states)
+	}
+	if StateDone.String() != "done" {
+		t.Fatalf("StateDone.String() = %q, want done", StateDone.String())
 	}
 }
 
@@ -155,8 +158,8 @@ func TestSubscribeReceivesStateAndUnsubscribeStopsIt(t *testing.T) {
 	if got := <-states; got != StateUpdating {
 		t.Fatalf("first state = %v, want updating", got)
 	}
-	if got := <-states; got != StateIdle {
-		t.Fatalf("second state = %v, want idle", got)
+	if got := <-states; got != StateDone {
+		t.Fatalf("second state = %v, want done", got)
 	}
 
 	unsubscribe()

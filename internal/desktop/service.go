@@ -225,7 +225,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		next = last.FinishedAt.Add(d.Scheduler.IntervalDuration())
 	}
 	stateValue := d.Scheduler.State().String()
-	if last.NeedsAttention && stateValue == "idle" {
+	if last.NeedsAttention && (stateValue == "idle" || stateValue == "done") {
 		stateValue = "error"
 	}
 	agents, err := makeAgents(providers, cfg, s.goos, preview)

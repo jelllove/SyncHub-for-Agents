@@ -13,6 +13,7 @@ type State int
 const (
 	StateIdle State = iota
 	StateUpdating
+	StateDone
 	StateError
 	StatePaused
 )
@@ -23,6 +24,8 @@ func (s State) String() string {
 		return "idle"
 	case StateUpdating:
 		return "updating"
+	case StateDone:
+		return "done"
 	case StateError:
 		return "error"
 	case StatePaused:
@@ -168,7 +171,7 @@ func (s *Scheduler) runCycle() {
 		s.setState(StateError)
 		return
 	}
-	s.setState(StateIdle)
+	s.setState(StateDone)
 }
 
 // Run blocks executing the schedule until ctx is cancelled.
