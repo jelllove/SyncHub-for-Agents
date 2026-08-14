@@ -46,6 +46,21 @@ func TestDeclarationValidateRejectsUnsupportedValues(t *testing.T) {
 			want:        "missing id",
 		},
 		{
+			name:        "id-with-slash",
+			declaration: Declaration{ID: "config/settings", Category: CategoryConfig, Strategy: StrategyFileTree},
+			want:        "invalid resource id",
+		},
+		{
+			name:        "id-with-backslash",
+			declaration: Declaration{ID: `config\settings`, Category: CategoryConfig, Strategy: StrategyFileTree},
+			want:        "invalid resource id",
+		},
+		{
+			name:        "unsafe-shared-as",
+			declaration: Declaration{ID: "skills", Category: CategorySkills, Strategy: StrategySourceTree, SharedAs: "../common"},
+			want:        "invalid shared_as",
+		},
+		{
 			name:        "bad-category",
 			declaration: Declaration{ID: "bad-category", Category: Category("unknown"), Strategy: StrategyFileTree},
 			want:        "unsupported category",

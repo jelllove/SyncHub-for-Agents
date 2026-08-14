@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/qinqingxu/acsync/internal/config"
@@ -187,4 +188,28 @@ func TestBuildResourceSpecsKeepsCustomResourceWithoutCurrentPlatformTarget(t *te
 	if len(spec.Targets) != 0 {
 		t.Fatalf("targets = %#v, want empty without current-platform mapping", spec.Targets)
 	}
+}
+
+func TestBuildResourceSpecsRejectsUnsafeIdentifiers(t *testing.T) {
+	providers := []provider.Provider{
+		{
+			Name: "foo/bar",
+			Resources: []resource.Declaration{{
+				ID:       "settings",
+				Category: resource.CategoryConfig,
+				Paths:    map[string]string{"linux": "~/.demo"},
+				Include:  []string{"settings.json"},
+				Strategy: resource.StrategyFileTree,
+			}},
+		},
+	}
+
+	_, err := BuildResourceSpecs(config.Config{Agents: map[string]bool{"foo/bar": true}}, providers, "linux", "/home/alice")
+	if err == nil || !testingErrorContains(err, "invalid provider name") {
+		t.Fatalf("BuildResourceSpecs() error = %v", err)
+	}
+}
+
+func testingErrorContains(err error, want string) bool {
+	return err != nil && strings.Contains(err.Error(), want)
 }

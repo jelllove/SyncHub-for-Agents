@@ -73,6 +73,9 @@ func Parse(data []byte) (Provider, error) {
 	if p.Name == "_portable" {
 		return Provider{}, fmt.Errorf("provider: name %q is reserved", p.Name)
 	}
+	if err := resource.ValidateIdentifier("provider name", p.Name); err != nil {
+		return Provider{}, err
+	}
 	if document.Resources != nil && p.hasLegacyConfig() {
 		return Provider{}, fmt.Errorf("provider: mixed legacy config and typed resources for %q", p.Name)
 	}

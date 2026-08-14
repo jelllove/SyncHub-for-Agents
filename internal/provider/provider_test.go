@@ -117,6 +117,18 @@ func TestParseRejectsMissingName(t *testing.T) {
 	}
 }
 
+func TestParseRejectsUnsafeProviderName(t *testing.T) {
+	_, err := Parse([]byte(`
+name: foo/bar
+config:
+  paths: {linux: "~/.demo"}
+  include: ["settings.json"]
+`))
+	if err == nil || !strings.Contains(err.Error(), "invalid provider name") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestProviderDeclarationsNormalizeV1(t *testing.T) {
 	p, err := Parse([]byte(`
 name: demo
@@ -223,6 +235,48 @@ resources:
     strategy: install-manifest
 `,
 			want: "missing installer",
+		},
+		{
+			name: "resource-id-with-slash",
+			data: `
+schema_version: 2
+name: demo
+resources:
+  - id: config/settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+`,
+			want: "invalid resource id",
+		},
+		{
+			name: "resource-id-with-backslash",
+			data: `
+schema_version: 2
+name: demo
+resources:
+  - id: config\settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+`,
+			want: "invalid resource id",
+		},
+		{
+			name: "shared-as-unsafe-segment",
+			data: `
+schema_version: 2
+name: demo
+resources:
+  - id: skills
+    category: skills
+    paths: {linux: "~/.demo/skills"}
+    strategy: source-tree
+    shared_as: ../common-skills
+`,
+			want: "invalid shared_as",
 		},
 	}
 

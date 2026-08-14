@@ -21,8 +21,8 @@ func (s Spec) RepoPath(relative string) (string, error) {
 	if err := validateRepoRelative(relative); err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(s.Provider) == "" {
-		return "", fmt.Errorf("resource %q: missing provider", s.Key)
+	if err := ValidateIdentifier("provider name", s.Provider); err != nil {
+		return "", err
 	}
 
 	switch s.Layout {
@@ -43,13 +43,13 @@ func (s Spec) RepoPath(relative string) (string, error) {
 			if resourceID == "" {
 				resourceID = s.ID
 			}
-			if err := validateRepoSegment(resourceID); err != nil {
-				return "", fmt.Errorf("resource %q: invalid shared id %q: %w", s.Key, resourceID, err)
+			if err := ValidateIdentifier("shared_as", resourceID); err != nil {
+				return "", err
 			}
 			return path.Join("agents", portableProviderName, "config", "common", string(s.Category), resourceID, relative), nil
 		}
-		if err := validateRepoSegment(s.ID); err != nil {
-			return "", fmt.Errorf("resource %q: invalid resource id %q: %w", s.Key, s.ID, err)
+		if err := ValidateIdentifier("resource id", s.ID); err != nil {
+			return "", err
 		}
 		return path.Join("agents", portableProviderName, "config", "providers", s.Provider, string(s.Category), s.ID, relative), nil
 	default:

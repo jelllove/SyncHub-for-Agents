@@ -41,6 +41,34 @@ func TestCommonRepoPathUsesSharedIdentity(t *testing.T) {
 	}
 }
 
+func TestPortableRepoPathRoundTrips(t *testing.T) {
+	spec := Spec{
+		Key:      "common/common-skills",
+		Provider: "common",
+		ID:       "skills",
+		Category: CategorySkills,
+		Layout:   LayoutPortable,
+		SharedAs: "common-skills",
+	}
+
+	repoPath, err := spec.RepoPath("brainstorming/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseRepoPath(repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Provider != "common" ||
+		got.Category != CategorySkills ||
+		got.ResourceID != "common-skills" ||
+		got.Relative != "brainstorming/SKILL.md" ||
+		!got.Portable ||
+		!got.Common {
+		t.Fatalf("round trip = %#v", got)
+	}
+}
+
 func TestRepoPathRejectsUnsafeRelativePaths(t *testing.T) {
 	spec := Spec{
 		Key:      "claude/settings",
@@ -62,6 +90,39 @@ func TestRepoPathRejectsUnsafeRelativePaths(t *testing.T) {
 	} {
 		if _, err := spec.RepoPath(relative); err == nil {
 			t.Fatalf("RepoPath(%q) error = nil, want rejection", relative)
+		}
+	}
+}
+
+func TestRepoPathRejectsUnsafeIdentifiers(t *testing.T) {
+	tests := []Spec{
+		{
+			Key:      "bad/settings",
+			Provider: "foo/bar",
+			ID:       "settings",
+			Category: CategoryConfig,
+			Layout:   LayoutPortable,
+		},
+		{
+			Key:      "claude/bad",
+			Provider: "claude",
+			ID:       "config/settings",
+			Category: CategoryConfig,
+			Layout:   LayoutPortable,
+		},
+		{
+			Key:      "common/bad",
+			Provider: "common",
+			ID:       "skills",
+			Category: CategorySkills,
+			Layout:   LayoutPortable,
+			SharedAs: "../common-skills",
+		},
+	}
+
+	for _, spec := range tests {
+		if _, err := spec.RepoPath("settings.json"); err == nil {
+			t.Fatalf("RepoPath(%#v) error = nil, want rejection", spec)
 		}
 	}
 }

@@ -109,11 +109,20 @@ func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, userHome
 func BuildResourceSpecs(cfg config.Config, providers []provider.Provider, goos, userHome string) (map[string]resource.Spec, error) {
 	specs := map[string]resource.Spec{}
 	for _, p := range providers {
+		if err := resource.ValidateIdentifier("provider name", p.Name); err != nil {
+			return nil, err
+		}
 		declarations, err := p.Declarations()
 		if err != nil {
 			return nil, err
 		}
 		for _, declaration := range declarations {
+			if err := resource.ValidateIdentifier("resource id", declaration.ID); err != nil {
+				return nil, err
+			}
+			if err := resource.ValidateOptionalIdentifier("shared_as", declaration.SharedAs); err != nil {
+				return nil, err
+			}
 			if !cfg.CategoryEnabled(p.Name, declaration.Category) {
 				continue
 			}
@@ -171,6 +180,9 @@ func BuildResourceSpecs(cfg config.Config, providers []provider.Provider, goos, 
 	}
 
 	for _, custom := range cfg.CustomResources {
+		if err := resource.ValidateIdentifier("resource id", custom.ID); err != nil {
+			return nil, err
+		}
 		raw, ok := custom.Paths[goos]
 		if !ok || strings.TrimSpace(raw) == "" {
 			continue

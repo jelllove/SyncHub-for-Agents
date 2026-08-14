@@ -81,8 +81,17 @@ func (d Declaration) Validate(provider string) error {
 	if provider == "_portable" {
 		return fmt.Errorf("provider name %q is reserved", provider)
 	}
+	if err := ValidateIdentifier("provider name", provider); err != nil {
+		return err
+	}
 	if strings.TrimSpace(d.ID) == "" {
 		return fmt.Errorf("provider %s resource: missing id", provider)
+	}
+	if err := ValidateIdentifier("resource id", d.ID); err != nil {
+		return err
+	}
+	if err := ValidateOptionalIdentifier("shared_as", d.SharedAs); err != nil {
+		return err
 	}
 	switch d.Category {
 	case CategorySessions, CategoryConfig, CategoryInstructions, CategorySkills, CategoryPlugins:
