@@ -79,7 +79,7 @@ func TestRunStatusUsesUserHomeForProviderPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.PendingActions != 1 {
-		t.Fatalf("pending actions = %d, want 1", status.PendingActions)
+	if status.PendingActions != 2 {
+		t.Fatalf("pending actions = %d, want legacy and portable settings", status.PendingActions)
 	}
 }

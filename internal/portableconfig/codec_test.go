@@ -342,6 +342,92 @@ func TestDocumentMarshalIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestBuiltinRegistryProjectsOnlyPortableFields(t *testing.T) {
+	tests := []struct {
+		transformer string
+		rel         string
+		document    string
+		want        []string
+		forbidden   []string
+	}{
+		{
+			transformer: "claude-settings",
+			rel:         "settings.json",
+			document:    `{"theme":"dark","accessToken":"credential","installationId":"machine"}`,
+			want:        []string{"theme", "dark"},
+			forbidden:   []string{"credential", "machine"},
+		},
+		{
+			transformer: "copilot-settings",
+			rel:         "config.json",
+			document:    `{"theme":"dark","hosts":{"github":"credential"},"session":{"id":"machine"}}`,
+			want:        []string{"theme", "dark"},
+			forbidden:   []string{"credential", "machine"},
+		},
+		{
+			transformer: "gemini-settings",
+			rel:         "settings.json",
+			document:    `{"theme":"dark","model":"gemini","accounts":{"email":"credential"},"trustedFolders":["machine"]}`,
+			want:        []string{"theme", "dark", "model", "gemini"},
+			forbidden:   []string{"credential", "machine"},
+		},
+		{
+			transformer: "vscode-settings",
+			rel:         "settings.json",
+			document:    `{"editor.fontSize":14,"accessToken":"credential","window.restoreWindows":"machine"}`,
+			want:        []string{"editor.fontSize", "14"},
+			forbidden:   []string{"credential", "machine"},
+		},
+		{
+			transformer: "vscode-mcp",
+			rel:         "mcp.json",
+			document:    `{"servers":{"demo":{"type":"stdio","command":"npx","args":["tool"],"env":{"TOKEN":"credential"}}}}`,
+			want:        []string{"demo", "stdio", "npx", "tool"},
+			forbidden:   []string{"credential", "env"},
+		},
+		{
+			transformer: "cursor-settings",
+			rel:         "settings.json",
+			document:    `{"theme":"dark","oauthToken":"credential","recentWorkspaces":["machine"]}`,
+			want:        []string{"theme", "dark"},
+			forbidden:   []string{"credential", "machine"},
+		},
+		{
+			transformer: "common-skill-lock",
+			rel:         ".skill-lock.json",
+			document:    `{"skills":{"review":{"name":"review","source":"github","version":"1","revision":"abc","token":"credential"}}}`,
+			want:        []string{"review", "github", "revision", "abc"},
+			forbidden:   []string{"credential", "token"},
+		},
+	}
+
+	registry := BuiltinRegistry()
+	for _, test := range tests {
+		t.Run(test.transformer, func(t *testing.T) {
+			projected, err := registry.Project(
+				test.transformer,
+				test.rel,
+				"windows",
+				`C:\Users\alice`,
+				[]byte(test.document),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range test.want {
+				if !bytes.Contains(projected, []byte(want)) {
+					t.Errorf("projection missing %q: %s", want, projected)
+				}
+			}
+			for _, forbidden := range test.forbidden {
+				if bytes.Contains(projected, []byte(forbidden)) {
+					t.Errorf("projection contains %q: %s", forbidden, projected)
+				}
+			}
+		})
+	}
+}
+
 func documentFixture(rel string) string {
 	switch {
 	case strings.HasSuffix(rel, ".json"):

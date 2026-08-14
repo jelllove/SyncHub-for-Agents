@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const currentVersion = 2
+const currentVersion = 3
 
 type CustomResource struct {
 	ID       string            `yaml:"id"`
@@ -93,6 +93,9 @@ func Load(path string) (Config, error) {
 		c.Version = 1
 	}
 	if c.Version < currentVersion {
+		if _, configured := c.Agents["common"]; !configured {
+			c.Agents["common"] = true
+		}
 		c.Version = currentVersion
 	}
 	return c, nil

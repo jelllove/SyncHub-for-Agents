@@ -16,65 +16,56 @@ func TestBuiltinsLoaded(t *testing.T) {
 	for _, p := range ps {
 		byName[p.Name] = p
 	}
-	for _, want := range []string{"claude", "copilot", "gemini", "cursor", "vscode-copilot"} {
-		if _, ok := byName[want]; !ok {
-			t.Errorf("missing builtin provider %q", want)
+	required := map[string][]resource.Category{
+		"claude":         {resource.CategoryConfig, resource.CategorySessions, resource.CategoryInstructions, resource.CategorySkills, resource.CategoryPlugins},
+		"copilot":        {resource.CategoryConfig, resource.CategorySessions, resource.CategoryInstructions, resource.CategorySkills, resource.CategoryPlugins},
+		"gemini":         {resource.CategoryConfig, resource.CategorySessions, resource.CategoryInstructions, resource.CategorySkills},
+		"vscode-copilot": {resource.CategoryConfig, resource.CategorySessions, resource.CategoryInstructions},
+		"cursor":         {resource.CategoryConfig, resource.CategorySessions, resource.CategoryInstructions, resource.CategorySkills},
+		"common":         {resource.CategoryConfig, resource.CategoryInstructions, resource.CategorySkills},
+	}
+	for name, categories := range required {
+		builtin, ok := byName[name]
+		if !ok {
+			t.Errorf("missing builtin provider %q", name)
+			continue
 		}
-	}
-	claude := byName["claude"]
-	if claude.Config.Paths["linux"] != "~/.claude" {
-		t.Errorf("claude linux path = %q", claude.Config.Paths["linux"])
-	}
-	if len(claude.Config.Sessions) == 0 {
-		t.Error("claude should declare session globs")
-	}
-	if len(claude.Secrets.KeyPatterns) == 0 {
-		t.Error("claude should declare secret key patterns")
-	}
-	for _, session := range []string{
-		"history.jsonl",
-		"sessions/**/*.json",
-		"projects/**/sessions-index.json",
-	} {
-		if !contains(claude.Config.Sessions, session) {
-			t.Errorf("claude sessions = %#v, missing %q", claude.Config.Sessions, session)
+		if builtin.SchemaVersion != 2 {
+			t.Errorf("%s schema_version = %d, want 2", name, builtin.SchemaVersion)
 		}
-	}
-
-	copilot := byName["copilot"]
-	for _, session := range []string{
-		"session-state/*/events.jsonl",
-		"session-state/*/workspace.yaml",
-		"session-state/*/checkpoints/**/*.md",
-	} {
-		if !contains(copilot.Config.Sessions, session) {
-			t.Errorf("copilot sessions = %#v, missing %q", copilot.Config.Sessions, session)
+		if len(builtin.Secrets.KeyPatterns) == 0 {
+			t.Errorf("%s has no secret key patterns", name)
 		}
-	}
-
-	gemini := byName["gemini"]
-	if !contains(gemini.Config.Sessions, "tmp/**/chats/**/*.jsonl") {
-		t.Fatalf("gemini sessions = %#v, want current Gemini CLI chat path", gemini.Config.Sessions)
-	}
-
-	vscode := byName["vscode-copilot"]
-	if len(vscode.Secrets.KeyPatterns) == 0 {
-		t.Error("VS Code provider must declare top-level secret key patterns")
-	}
-	if vscode.Config.Paths["windows"] != "%USERPROFILE%\\AppData\\Roaming\\Code\\User\\workspaceStorage" {
-		t.Errorf("VS Code Windows path = %q", vscode.Config.Paths["windows"])
-	}
-	for _, session := range []string{
-		"*/workspace.json",
-		"*/chatSessions/*.json",
-		"*/chatSessions/*.jsonl",
-	} {
-		if !contains(vscode.Config.Sessions, session) {
-			t.Errorf("VS Code sessions = %#v, missing %q", vscode.Config.Sessions, session)
+		seenIDs := map[string]struct{}{}
+		seenCategories := map[resource.Category]struct{}{}
+		for _, declaration := range builtin.Resources {
+			if _, duplicate := seenIDs[declaration.ID]; duplicate {
+				t.Errorf("%s repeats resource id %q", name, declaration.ID)
+			}
+			seenIDs[declaration.ID] = struct{}{}
+			seenCategories[declaration.Category] = struct{}{}
+			if declaration.Category == resource.CategorySkills &&
+				declaration.SharedAs != "common-skills" {
+				t.Errorf("%s skill %q shared_as = %q", name, declaration.ID, declaration.SharedAs)
+			}
+			for _, include := range declaration.Include {
+				lower := strings.ToLower(include)
+				for _, forbidden := range []string{
+					"credentials", "oauth_creds", "google_accounts",
+					"state.vscdb", "globalstorage", "chateditingsessions",
+					"node_modules", ".venv", "__pycache__",
+				} {
+					if strings.Contains(lower, forbidden) {
+						t.Errorf("%s resource %q includes unsafe path %q", name, declaration.ID, include)
+					}
+				}
+			}
 		}
-	}
-	if contains(vscode.Config.Sessions, "*/chatEditingSessions/*/state.json") {
-		t.Error("VS Code editing state contains raw source snapshots and must not be synced")
+		for _, category := range categories {
+			if _, ok := seenCategories[category]; !ok {
+				t.Errorf("%s missing category %q", name, category)
+			}
+		}
 	}
 }
 

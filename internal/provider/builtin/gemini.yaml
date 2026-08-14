@@ -1,19 +1,31 @@
+schema_version: 2
 name: gemini
-config:
-  paths:
-    windows: "%USERPROFILE%\\.gemini"
-    darwin: "~/.gemini"
-    linux: "~/.gemini"
-  include:
-    - "settings.json"
-    - "projects.json"
-    - "state.json"
-    - "trustedFolders.json"
-  sessions:
-    - "sessions/**/*.json"
-    - "tmp/**/chats/**/*.jsonl"
-  exclude:
-    - "**/*token*"
-    - "**/oauth_creds.json"
+resources:
+  - id: sessions
+    category: sessions
+    paths: {windows: "%USERPROFILE%\\.gemini", darwin: "~/.gemini", linux: "~/.gemini"}
+    include: ["sessions/**/*.json", "tmp/**/chats/**/*.jsonl", "history/**/*.json"]
+    exclude: &gemini_excludes ["**/*token*", "**/oauth_creds.json", "**/google_accounts.json", "**/installation_id", "**/state.json", "**/trustedFolders.json"]
+    strategy: file-tree
+    layout: legacy
+  - id: settings
+    category: config
+    paths: {windows: "%USERPROFILE%\\.gemini", darwin: "~/.gemini", linux: "~/.gemini"}
+    include: ["settings.json"]
+    exclude: *gemini_excludes
+    strategy: structured-merge
+    transformer: gemini-settings
+  - id: instructions
+    category: instructions
+    paths: {windows: "%USERPROFILE%\\.gemini", darwin: "~/.gemini", linux: "~/.gemini"}
+    include: ["GEMINI.md", "commands/**", "prompts/**", "README.md"]
+    exclude: *gemini_excludes
+    strategy: text-tree
+  - id: skills
+    category: skills
+    paths: {windows: "%USERPROFILE%\\.gemini\\skills", darwin: "~/.gemini/skills", linux: "~/.gemini/skills"}
+    include: ["**"]
+    strategy: source-tree
+    shared_as: common-skills
 secrets:
   key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

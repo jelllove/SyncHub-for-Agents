@@ -1,20 +1,41 @@
+schema_version: 2
 name: claude
-config:
-  paths:
-    windows: "%USERPROFILE%\\.claude"
-    darwin: "~/.claude"
-    linux: "~/.claude"
-  include:
-    - "settings.json"
-    - "CLAUDE.md"
-  sessions:
-    - "history.jsonl"
-    - "sessions/**/*.json"
-    - "projects/**/sessions-index.json"
-    - "projects/**/*.jsonl"
-  exclude:
-    - "**/.credentials.json"
-    - "**/*token*"
-    - "**/shell-snapshots/**"
+resources:
+  - id: legacy-config
+    category: config
+    paths: {windows: "%USERPROFILE%\\.claude", darwin: "~/.claude", linux: "~/.claude"}
+    include: ["settings.json", "CLAUDE.md"]
+    exclude: ["**/.credentials.json", "**/*token*", "**/shell-snapshots/**"]
+    strategy: file-tree
+    layout: legacy
+  - id: sessions
+    category: sessions
+    paths: {windows: "%USERPROFILE%\\.claude", darwin: "~/.claude", linux: "~/.claude"}
+    include: ["history.jsonl", "sessions/**/*.json", "projects/**/sessions-index.json", "projects/**/*.jsonl"]
+    exclude: ["**/.credentials.json", "**/*token*", "**/shell-snapshots/**"]
+    strategy: file-tree
+    layout: legacy
+  - id: settings
+    category: config
+    paths: {windows: "%USERPROFILE%\\.claude", darwin: "~/.claude", linux: "~/.claude"}
+    include: ["settings.json", "settings.local.json", "config.json", "parallel-agents.json"]
+    strategy: structured-merge
+    transformer: claude-settings
+  - id: instructions
+    category: instructions
+    paths: {windows: "%USERPROFILE%\\.claude", darwin: "~/.claude", linux: "~/.claude"}
+    include: ["CLAUDE.md", "commands/**", "prompts/**", "README.md"]
+    strategy: text-tree
+  - id: skills
+    category: skills
+    paths: {windows: "%USERPROFILE%\\.claude\\skills", darwin: "~/.claude/skills", linux: "~/.claude/skills"}
+    include: ["**"]
+    strategy: source-tree
+    shared_as: common-skills
+  - id: plugins
+    category: plugins
+    paths: {windows: "%USERPROFILE%\\.claude\\plugins", darwin: "~/.claude/plugins", linux: "~/.claude/plugins"}
+    strategy: install-manifest
+    installer: claude-plugin
 secrets:
   key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

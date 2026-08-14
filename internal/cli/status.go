@@ -43,7 +43,7 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 	if err != nil {
 		return Status{}, err
 	}
-	codecs := portableconfig.NewRegistry()
+	codecs := portableconfig.BuiltinRegistry()
 	stageParent := filepath.Join(RepoDir(home), ".git", "acsync-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Status{}, fmt.Errorf("create status stage parent: %w", err)

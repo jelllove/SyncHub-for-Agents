@@ -1,23 +1,43 @@
+schema_version: 2
 name: copilot
-config:
-  paths:
-    windows: "%USERPROFILE%\\.copilot"
-    darwin: "~/.copilot"
-    linux: "~/.copilot"
-  include:
-    - "config.json"
-  sessions:
-    - "history/**/*.json"
-    - "session-state/*/events.jsonl"
-    - "session-state/*/workspace.yaml"
-    - "session-state/*/vscode.metadata.json"
-    - "session-state/*/vscode.requests.metadata.json"
-    - "session-state/*/plan.md"
-    - "session-state/*/checkpoints/**/*.md"
-  exclude:
-    - "**/*token*"
-    - "**/hosts.json"
-    - "**/inuse.*.lock"
-    - "**/session.db*"
+resources:
+  - id: legacy-config
+    category: config
+    paths: {windows: "%USERPROFILE%\\.copilot", darwin: "~/.copilot", linux: "~/.copilot"}
+    include: ["config.json"]
+    exclude: &copilot_excludes ["pkg/**", "logs/**", "media-cache/**", "servers/**", "**/*token*", "**/hosts.json", "**/*.lock", "**/*.db", "**/*.db-*"]
+    strategy: file-tree
+    layout: legacy
+  - id: sessions
+    category: sessions
+    paths: {windows: "%USERPROFILE%\\.copilot", darwin: "~/.copilot", linux: "~/.copilot"}
+    include: ["session-state/*/events.jsonl", "session-state/*/workspace.yaml", "session-state/*/vscode.metadata.json", "session-state/*/vscode.requests.metadata.json", "session-state/*/plan.md", "session-state/*/checkpoints/**/*.md"]
+    exclude: *copilot_excludes
+    strategy: file-tree
+    layout: legacy
+  - id: settings
+    category: config
+    paths: {windows: "%USERPROFILE%\\.copilot", darwin: "~/.copilot", linux: "~/.copilot"}
+    include: ["config.json", "settings.json", "permissions-config.json"]
+    exclude: *copilot_excludes
+    strategy: structured-merge
+    transformer: copilot-settings
+  - id: instructions
+    category: instructions
+    paths: {windows: "%USERPROFILE%\\.copilot", darwin: "~/.copilot", linux: "~/.copilot"}
+    include: ["README.md", "prompts/**", "instructions/**"]
+    exclude: *copilot_excludes
+    strategy: text-tree
+  - id: skills
+    category: skills
+    paths: {windows: "%USERPROFILE%\\.copilot\\skills", darwin: "~/.copilot/skills", linux: "~/.copilot/skills"}
+    include: ["**"]
+    strategy: source-tree
+    shared_as: common-skills
+  - id: plugins
+    category: plugins
+    paths: {windows: "%USERPROFILE%\\.copilot\\installed-plugins", darwin: "~/.copilot/installed-plugins", linux: "~/.copilot/installed-plugins"}
+    strategy: install-manifest
+    installer: copilot-plugin
 secrets:
   key_patterns: ["apiKey", "token", "secret", "password", "oauth", "refresh_token"]

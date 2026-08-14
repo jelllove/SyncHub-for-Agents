@@ -50,7 +50,7 @@ func runSyncWithUserHome(
 		return syncengine.Result{}, err
 	}
 	repoDir := RepoDir(home)
-	codecs := portableconfig.NewRegistry()
+	codecs := portableconfig.BuiltinRegistry()
 	baseStore := state.NewBaseStore(home)
 	conflictStore := conflict.NewStore(
 		filepath.Join(home, "conflicts"),

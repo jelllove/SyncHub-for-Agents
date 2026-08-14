@@ -16,7 +16,10 @@ import (
 
 func configuredHome(t *testing.T) string {
 	t.Helper()
-	home := filepath.Join(t.TempDir(), ".acsync")
+	userHome := t.TempDir()
+	t.Setenv("HOME", userHome)
+	t.Setenv("USERPROFILE", userHome)
+	home := filepath.Join(userHome, ".acsync")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -119,6 +119,25 @@ agents:
 	}
 }
 
+func TestLoadV2EnablesNewCommonProvider(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(filename, []byte(`
+version: 2
+agents:
+  claude: true
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Agents["common"] {
+		t.Fatal("new common provider should default enabled during v3 migration")
+	}
+}
+
 func TestCategoryEnabledDefaultsWhenProviderEnabled(t *testing.T) {
 	cfg := Config{
 		Agents: map[string]bool{"claude": true},
