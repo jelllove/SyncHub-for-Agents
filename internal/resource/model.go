@@ -94,6 +94,11 @@ func (d Declaration) Validate(provider string) error {
 	default:
 		return fmt.Errorf("provider %s resource %s: unsupported strategy %q", provider, d.ID, d.Strategy)
 	}
+	switch d.Layout {
+	case LayoutLegacy, LayoutPortable:
+	default:
+		return fmt.Errorf("provider %s resource %s: unsupported layout %q", provider, d.ID, d.Layout)
+	}
 	if d.Strategy == StrategyStructuredMerge && strings.TrimSpace(d.Transformer) == "" {
 		return fmt.Errorf("provider %s resource %s: missing transformer", provider, d.ID)
 	}

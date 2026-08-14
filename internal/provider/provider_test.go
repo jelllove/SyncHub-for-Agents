@@ -236,3 +236,119 @@ resources:
 		})
 	}
 }
+
+func TestParseAcceptsLegacySchemaVersionOne(t *testing.T) {
+	p, err := Parse([]byte(`
+ schema_version: 1
+ name: demo
+ config:
+   paths: {linux: "~/.demo"}
+   include: ["settings.json"]
+ `))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	got, err := p.Declarations()
+	if err != nil {
+		t.Fatalf("Declarations() error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "legacy-config" {
+		t.Fatalf("declarations = %#v", got)
+	}
+}
+
+func TestParseRejectsInvalidSchemaVersions(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want string
+	}{
+		{
+			name: "typed-missing-schema-version",
+			data: `
+name: demo
+resources:
+  - id: settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+`,
+			want: "schema_version 2",
+		},
+		{
+			name: "typed-legacy-schema-version",
+			data: `
+schema_version: 1
+name: demo
+resources:
+  - id: settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+`,
+			want: "schema_version 2",
+		},
+		{
+			name: "legacy-unsupported-schema-version",
+			data: `
+schema_version: 3
+name: demo
+config:
+  paths: {linux: "~/.demo"}
+  include: ["settings.json"]
+`,
+			want: "unsupported schema_version 3",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(tt.data))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRejectsDuplicateTypedResourceIDs(t *testing.T) {
+	_, err := Parse([]byte(`
+schema_version: 2
+name: demo
+resources:
+  - id: shared
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+  - id: shared
+    category: sessions
+    paths: {linux: "~/.demo"}
+    include: ["sessions/**/*.json"]
+    strategy: file-tree
+`))
+	if err == nil || !strings.Contains(err.Error(), `duplicate resource id "shared"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseRejectsUnknownTypedResourceLayout(t *testing.T) {
+	_, err := Parse([]byte(`
+schema_version: 2
+name: demo
+resources:
+  - id: settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+    layout: sideways
+`))
+	if err == nil || !strings.Contains(err.Error(), "unsupported layout") {
+		t.Fatalf("error = %v", err)
+	}
+}

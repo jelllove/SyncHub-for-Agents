@@ -39,22 +39,45 @@ type Provider struct {
 	Secrets       SecretSpec             `yaml:"secrets"`
 }
 
+type providerDocument struct {
+	SchemaVersion *int                    `yaml:"schema_version,omitempty"`
+	Name          string                  `yaml:"name"`
+	Config        ConfigSpec              `yaml:"config,omitempty"`
+	Resources     *[]resource.Declaration `yaml:"resources,omitempty"`
+	Secrets       SecretSpec              `yaml:"secrets"`
+}
+
 // Parse decodes a single provider definition from YAML bytes.
 func Parse(data []byte) (Provider, error) {
-	var p Provider
+	var document providerDocument
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
-	if err := decoder.Decode(&p); err != nil {
+	if err := decoder.Decode(&document); err != nil {
 		return Provider{}, fmt.Errorf("provider: parse: %w", err)
 	}
+
+	var p Provider
+	if document.SchemaVersion != nil {
+		p.SchemaVersion = *document.SchemaVersion
+	}
+	p.Name = document.Name
+	p.Config = document.Config
+	if document.Resources != nil {
+		p.Resources = append(p.Resources, (*document.Resources)...)
+	}
+	p.Secrets = document.Secrets
+
 	if strings.TrimSpace(p.Name) == "" {
 		return Provider{}, fmt.Errorf("provider: missing name")
 	}
 	if p.Name == "_portable" {
 		return Provider{}, fmt.Errorf("provider: name %q is reserved", p.Name)
 	}
-	if len(p.Resources) > 0 && p.hasLegacyConfig() {
+	if document.Resources != nil && p.hasLegacyConfig() {
 		return Provider{}, fmt.Errorf("provider: mixed legacy config and typed resources for %q", p.Name)
+	}
+	if err := p.validateSchema(document.SchemaVersion != nil, document.Resources != nil); err != nil {
+		return Provider{}, err
 	}
 	if _, err := p.Declarations(); err != nil {
 		return Provider{}, err
@@ -69,17 +92,38 @@ func (p Provider) hasLegacyConfig() bool {
 		len(p.Config.Exclude) > 0
 }
 
+func (p Provider) validateSchema(hasSchemaVersion, hasResourcesField bool) error {
+	if hasResourcesField {
+		if !hasSchemaVersion || p.SchemaVersion == 0 || p.SchemaVersion == 1 {
+			return fmt.Errorf("provider %q: typed resources require schema_version 2", p.Name)
+		}
+		if p.SchemaVersion != 2 {
+			return fmt.Errorf("provider %q: unsupported schema_version %d", p.Name, p.SchemaVersion)
+		}
+		return nil
+	}
+	if hasSchemaVersion && p.SchemaVersion != 0 && p.SchemaVersion != 1 {
+		return fmt.Errorf("provider %q: unsupported schema_version %d", p.Name, p.SchemaVersion)
+	}
+	return nil
+}
+
 func (p Provider) Declarations() ([]resource.Declaration, error) {
 	if p.Name == "_portable" {
 		return nil, fmt.Errorf("provider name %q is reserved", p.Name)
 	}
 	if len(p.Resources) > 0 {
 		out := make([]resource.Declaration, len(p.Resources))
+		seen := make(map[string]struct{}, len(p.Resources))
 		for index, declaration := range p.Resources {
 			declaration = declaration.Normalized()
 			if err := declaration.Validate(p.Name); err != nil {
 				return nil, err
 			}
+			if _, exists := seen[declaration.ID]; exists {
+				return nil, fmt.Errorf("provider %s: duplicate resource id %q", p.Name, declaration.ID)
+			}
+			seen[declaration.ID] = struct{}{}
 			out[index] = declaration
 		}
 		return out, nil

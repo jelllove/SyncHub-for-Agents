@@ -115,7 +115,11 @@ func Save(path string, c Config) error {
 }
 
 func validateCustomResources(resources []CustomResource) error {
+	seen := make(map[string]struct{}, len(resources))
 	for _, item := range resources {
+		if item.Strategy == resource.StrategyInstallManifest {
+			return fmt.Errorf("custom resource %q: strategy %q is not supported", item.ID, item.Strategy)
+		}
 		declaration := resource.Declaration{
 			ID:       item.ID,
 			Category: item.Category,
@@ -130,9 +134,10 @@ func validateCustomResources(resources []CustomResource) error {
 		if err := declaration.Validate("custom"); err != nil {
 			return err
 		}
-		if item.Strategy == resource.StrategyInstallManifest {
-			return fmt.Errorf("custom resource %q: strategy %q is not supported", item.ID, item.Strategy)
+		if _, exists := seen[declaration.ID]; exists {
+			return fmt.Errorf("duplicate custom resource id %q", declaration.ID)
 		}
+		seen[declaration.ID] = struct{}{}
 		if err := validatePathMap(item.ID, "paths", item.Paths); err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/qinqingxu/acsync/internal/resource"
@@ -215,5 +216,53 @@ func TestSaveRejectsInvalidCustomResources(t *testing.T) {
 				t.Fatal("expected validation error")
 			}
 		})
+	}
+}
+
+func TestSaveRejectsCustomInstallManifestWithIntentionalError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	cfg := Config{
+		Agents: map[string]bool{"claude": true},
+		CustomResources: []CustomResource{{
+			ID:       "notes",
+			Category: resource.CategoryPlugins,
+			Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+			Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+			Strategy: resource.StrategyInstallManifest,
+		}},
+	}
+
+	err := Save(path, cfg)
+	want := `custom resource "notes": strategy "install-manifest" is not supported`
+	if err == nil || err.Error() != want {
+		t.Fatalf("Save() error = %v, want %q", err, want)
+	}
+}
+
+func TestSaveRejectsDuplicateCustomResourceIDs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	cfg := Config{
+		Agents: map[string]bool{"claude": true},
+		CustomResources: []CustomResource{
+			{
+				ID:       "notes",
+				Category: resource.CategoryInstructions,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyTextTree,
+			},
+			{
+				ID:       "notes",
+				Category: resource.CategorySkills,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\skills"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\skills"},
+				Strategy: resource.StrategySourceTree,
+			},
+		},
+	}
+
+	err := Save(path, cfg)
+	if err == nil || !strings.Contains(err.Error(), `duplicate custom resource id "notes"`) {
+		t.Fatalf("Save() error = %v", err)
 	}
 }

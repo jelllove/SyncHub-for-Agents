@@ -56,6 +56,11 @@ func TestDeclarationValidateRejectsUnsupportedValues(t *testing.T) {
 			want:        "unsupported strategy",
 		},
 		{
+			name:        "bad-layout",
+			declaration: Declaration{ID: "bad-layout", Category: CategoryConfig, Strategy: StrategyFileTree, Layout: Layout("sideways")},
+			want:        "unsupported layout",
+		},
+		{
 			name:        "bad-transformer",
 			declaration: Declaration{ID: "bad-transformer", Category: CategoryConfig, Strategy: StrategyStructuredMerge, Transformer: "unknown"},
 			want:        "unknown transformer",
