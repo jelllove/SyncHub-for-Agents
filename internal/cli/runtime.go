@@ -9,6 +9,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/pathresolver"
 	"github.com/qinqingxu/acsync/internal/provider"
+	"github.com/qinqingxu/acsync/internal/resource"
 	"github.com/qinqingxu/acsync/internal/secret"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
@@ -93,9 +94,7 @@ func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, userHome
 		if err != nil {
 			return nil, err
 		}
-		if goos != "windows" {
-			root = filepath.ToSlash(root)
-		}
+		root = normalizeResolvedPath(goos, root)
 		specs[p.Name] = syncengine.AgentSpec{
 			Name:     p.Name,
 			Root:     root,
@@ -105,4 +104,141 @@ func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, userHome
 		}
 	}
 	return specs, nil
+}
+
+func BuildResourceSpecs(cfg config.Config, providers []provider.Provider, goos, userHome string) (map[string]resource.Spec, error) {
+	specs := map[string]resource.Spec{}
+	for _, p := range providers {
+		declarations, err := p.Declarations()
+		if err != nil {
+			return nil, err
+		}
+		for _, declaration := range declarations {
+			if !cfg.CategoryEnabled(p.Name, declaration.Category) {
+				continue
+			}
+			raw, ok := declaration.Paths[goos]
+			if !ok || strings.TrimSpace(raw) == "" {
+				continue
+			}
+			root, err := pathresolver.ResolveFor(raw, goos, userHome)
+			if err != nil {
+				return nil, err
+			}
+			root = normalizeResolvedPath(goos, root)
+
+			spec := resource.Spec{
+				Key:         p.Name + "/" + declaration.ID,
+				Provider:    p.Name,
+				ID:          declaration.ID,
+				Category:    declaration.Category,
+				Strategy:    declaration.Strategy,
+				Layout:      declaration.Layout,
+				Root:        root,
+				Targets:     []string{root},
+				Include:     append([]string(nil), declaration.Include...),
+				Exclude:     append([]string(nil), declaration.Exclude...),
+				Transformer: declaration.Transformer,
+				Installer:   declaration.Installer,
+				SharedAs:    declaration.SharedAs,
+				KeyPatterns: append([]string(nil), p.Secrets.KeyPatterns...),
+			}
+
+			if declaration.SharedAs == "" {
+				specs[spec.Key] = spec
+				continue
+			}
+
+			key := "common/" + declaration.SharedAs
+			if existing, ok := specs[key]; ok {
+				if existing.Strategy != declaration.Strategy {
+					return nil, conflictError(key, "strategy", string(existing.Strategy), string(declaration.Strategy))
+				}
+				if existing.Transformer != declaration.Transformer {
+					return nil, conflictError(key, "transformer", existing.Transformer, declaration.Transformer)
+				}
+				existing.Targets = appendUnique(existing.Targets, root)
+				existing.KeyPatterns = appendUnique(existing.KeyPatterns, p.Secrets.KeyPatterns...)
+				specs[key] = existing
+				continue
+			}
+
+			spec.Key = key
+			spec.Provider = "common"
+			spec.Targets = []string{root}
+			specs[key] = spec
+		}
+	}
+
+	for _, custom := range cfg.CustomResources {
+		raw, ok := custom.Paths[goos]
+		if !ok || strings.TrimSpace(raw) == "" {
+			continue
+		}
+		root, err := pathresolver.ResolveFor(raw, goos, userHome)
+		if err != nil {
+			return nil, err
+		}
+		spec := resource.Spec{
+			Key:      "custom/" + custom.ID,
+			Provider: "custom",
+			ID:       custom.ID,
+			Category: custom.Category,
+			Strategy: custom.Strategy,
+			Layout:   resource.LayoutPortable,
+			Root:     normalizeResolvedPath(goos, root),
+			Include:  append([]string(nil), custom.Include...),
+			Exclude:  append([]string(nil), custom.Exclude...),
+		}
+		if custom.Strategy == resource.StrategyStructuredMerge {
+			spec.Transformer = "generic-safe"
+		}
+		if rawTarget, ok := custom.Targets[goos]; ok && strings.TrimSpace(rawTarget) != "" {
+			target, err := pathresolver.ResolveFor(rawTarget, goos, userHome)
+			if err != nil {
+				return nil, err
+			}
+			spec.Targets = []string{normalizeResolvedPath(goos, target)}
+		}
+		specs[spec.Key] = spec
+	}
+
+	return specs, nil
+}
+
+func normalizeResolvedPath(goos, value string) string {
+	if goos == "windows" {
+		return value
+	}
+	return filepath.ToSlash(value)
+}
+
+func appendUnique(values []string, additions ...string) []string {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		seen[value] = struct{}{}
+	}
+	for _, value := range additions {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		values = append(values, value)
+		seen[value] = struct{}{}
+	}
+	return values
+}
+
+func conflictError(key, field, left, right string) error {
+	return &resourceConflictError{key: key, field: field, left: left, right: right}
+}
+
+type resourceConflictError struct {
+	key   string
+	field string
+	left  string
+	right string
+}
+
+func (e *resourceConflictError) Error() string {
+	return "shared resource " + e.key + ": conflicting " + e.field + " (" + e.left + " != " + e.right + ")"
 }
