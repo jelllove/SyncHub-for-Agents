@@ -113,8 +113,17 @@ agents:
 	if cfg.Agents["claude"] {
 		t.Fatal("disabled provider was re-enabled")
 	}
+	if cfg.CategoryEnabled("claude", resource.CategorySkills) {
+		t.Fatal("disabled provider should keep all categories disabled")
+	}
+}
+
+func TestCategoryEnabledDefaultsWhenProviderEnabled(t *testing.T) {
+	cfg := Config{
+		Agents: map[string]bool{"claude": true},
+	}
 	if !cfg.CategoryEnabled("claude", resource.CategorySkills) {
-		t.Fatal("missing v1 category should default enabled")
+		t.Fatal("missing category should default enabled when provider is enabled")
 	}
 }
 

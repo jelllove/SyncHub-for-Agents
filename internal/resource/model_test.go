@@ -61,9 +61,19 @@ func TestDeclarationValidateRejectsUnsupportedValues(t *testing.T) {
 			want:        "unknown transformer",
 		},
 		{
+			name:        "missing-transformer",
+			declaration: Declaration{ID: "missing-transformer", Category: CategoryConfig, Strategy: StrategyStructuredMerge},
+			want:        "missing transformer",
+		},
+		{
 			name:        "bad-installer",
 			declaration: Declaration{ID: "bad-installer", Category: CategoryPlugins, Strategy: StrategyInstallManifest, Installer: "unknown"},
 			want:        "unknown installer",
+		},
+		{
+			name:        "missing-installer",
+			declaration: Declaration{ID: "missing-installer", Category: CategoryPlugins, Strategy: StrategyInstallManifest},
+			want:        "missing installer",
 		},
 	}
 

@@ -137,10 +137,31 @@ config:
 	if len(got) != 2 {
 		t.Fatalf("declarations = %#v", got)
 	}
-	if got[0].Category != resource.CategoryConfig ||
-		got[0].Layout != resource.LayoutLegacy ||
-		got[1].Category != resource.CategorySessions {
-		t.Fatalf("normalized declarations = %#v", got)
+
+	config := got[0]
+	if config.ID != "legacy-config" ||
+		config.Category != resource.CategoryConfig ||
+		config.Strategy != resource.StrategyFileTree ||
+		config.Layout != resource.LayoutLegacy {
+		t.Fatalf("config declaration = %#v", config)
+	}
+	if config.Paths["windows"] != "%USERPROFILE%\\.demo" ||
+		len(config.Include) != 1 || config.Include[0] != "settings.json" ||
+		len(config.Exclude) != 1 || config.Exclude[0] != "**/*token*" {
+		t.Fatalf("config declaration inheritance = %#v", config)
+	}
+
+	sessions := got[1]
+	if sessions.ID != "legacy-sessions" ||
+		sessions.Category != resource.CategorySessions ||
+		sessions.Strategy != resource.StrategyFileTree ||
+		sessions.Layout != resource.LayoutLegacy {
+		t.Fatalf("sessions declaration = %#v", sessions)
+	}
+	if sessions.Paths["windows"] != "%USERPROFILE%\\.demo" ||
+		len(sessions.Include) != 1 || sessions.Include[0] != "sessions/**/*.jsonl" ||
+		len(sessions.Exclude) != 1 || sessions.Exclude[0] != "**/*token*" {
+		t.Fatalf("sessions declaration inheritance = %#v", sessions)
 	}
 }
 
@@ -167,5 +188,51 @@ resources:
 `))
 	if err == nil || !strings.Contains(err.Error(), "mixed") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseRejectsMalformedTypedResources(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want string
+	}{
+		{
+			name: "structured-merge-missing-transformer",
+			data: `
+schema_version: 2
+name: demo
+resources:
+  - id: settings
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: structured-merge
+`,
+			want: "missing transformer",
+		},
+		{
+			name: "install-manifest-missing-installer",
+			data: `
+schema_version: 2
+name: demo
+resources:
+  - id: plugins
+    category: plugins
+    paths: {linux: "~/.demo/plugins"}
+    strategy: install-manifest
+`,
+			want: "missing installer",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(tt.data))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
 	}
 }

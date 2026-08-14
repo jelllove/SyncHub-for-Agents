@@ -94,10 +94,16 @@ func (d Declaration) Validate(provider string) error {
 	default:
 		return fmt.Errorf("provider %s resource %s: unsupported strategy %q", provider, d.ID, d.Strategy)
 	}
+	if d.Strategy == StrategyStructuredMerge && strings.TrimSpace(d.Transformer) == "" {
+		return fmt.Errorf("provider %s resource %s: missing transformer", provider, d.ID)
+	}
 	if d.Transformer != "" {
 		if _, ok := knownTransformers[d.Transformer]; !ok {
 			return fmt.Errorf("provider %s resource %s: unknown transformer %q", provider, d.ID, d.Transformer)
 		}
+	}
+	if d.Strategy == StrategyInstallManifest && strings.TrimSpace(d.Installer) == "" {
+		return fmt.Errorf("provider %s resource %s: missing installer", provider, d.ID)
 	}
 	if d.Installer != "" {
 		if _, ok := knownInstallers[d.Installer]; !ok {

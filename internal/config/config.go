@@ -62,6 +62,9 @@ func (c Config) EnabledAgents() []string {
 }
 
 func (c Config) CategoryEnabled(provider string, category resource.Category) bool {
+	if !c.Agents[provider] {
+		return false
+	}
 	values, exists := c.Categories[provider]
 	if !exists {
 		return true
@@ -121,6 +124,9 @@ func validateCustomResources(resources []CustomResource) error {
 			Exclude:  item.Exclude,
 			Strategy: item.Strategy,
 		}.Normalized()
+		if item.Strategy == resource.StrategyStructuredMerge {
+			declaration.Transformer = "generic-safe"
+		}
 		if err := declaration.Validate("custom"); err != nil {
 			return err
 		}
