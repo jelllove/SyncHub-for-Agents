@@ -106,6 +106,31 @@ func TestNewAllowsMissingConfiguration(t *testing.T) {
 	}
 }
 
+func TestOnboardingAgentsLoadSettingsWithoutBuildingSnapshot(t *testing.T) {
+	service, err := New(configuredHome(t), runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	agents, err := service.OnboardingAgents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, agent := range agents {
+		if agent.Name == "claude" {
+			if !agent.Enabled {
+				t.Fatal("configured Claude agent should be enabled")
+			}
+			if len(agent.Exclude) == 0 {
+				t.Fatal("Claude onboarding settings should include declaration exclusions")
+			}
+			return
+		}
+	}
+	t.Fatal("Claude onboarding settings are missing")
+}
+
 func TestSaveSettingsUpdatesConfigAndLiveInterval(t *testing.T) {
 	home := configuredHome(t)
 	service, err := New(home, runtime.GOOS)

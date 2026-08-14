@@ -253,6 +253,27 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	}, nil
 }
 
+// OnboardingAgents returns provider settings without scanning resource files or
+// querying repository status.
+func (s *Service) OnboardingAgents() ([]Agent, error) {
+	providers, err := cli.LoadProviders(s.home)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := config.Load(cli.ConfigPath(s.home))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		names := make([]string, 0, len(providers))
+		for _, item := range providers {
+			names = append(names, item.Name)
+		}
+		cfg = config.Default(names)
+	}
+	return makeAgents(providers, cfg, s.goos, ResourcePreview{})
+}
+
 func (s *Service) unconfiguredSnapshot() (Snapshot, error) {
 	providers, err := cli.LoadProviders(s.home)
 	if err != nil {

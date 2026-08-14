@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
 
 	"github.com/qinqingxu/acsync/internal/desktop"
 	"github.com/qinqingxu/acsync/internal/onboarding"
@@ -16,19 +17,45 @@ import (
 )
 
 type guiApplication struct {
-	app     *application.App
-	window  *application.WebviewWindow
-	tray    *application.SystemTray
-	service *desktop.Service
-	startup *startup.Manager
+	app        *application.App
+	window     *application.WebviewWindow
+	tray       *application.SystemTray
+	service    *desktop.Service
+	startup    *startup.Manager
+	activation activationQueue
 }
 
-func newGUIApplication(
-	core *desktop.Service,
-	onboardingService *onboarding.Service,
-	hidden bool,
-) (*guiApplication, error) {
-	gui := &guiApplication{service: core}
+type activationQueue struct {
+	mu      sync.Mutex
+	pending bool
+	show    func()
+}
+
+func (q *activationQueue) Request() {
+	q.mu.Lock()
+	show := q.show
+	if show == nil {
+		q.pending = true
+	}
+	q.mu.Unlock()
+	if show != nil {
+		show()
+	}
+}
+
+func (q *activationQueue) Ready(show func()) {
+	q.mu.Lock()
+	q.show = show
+	pending := q.pending
+	q.pending = false
+	q.mu.Unlock()
+	if pending {
+		show()
+	}
+}
+
+func newGUIApplication() *guiApplication {
+	gui := &guiApplication{}
 	gui.app = application.New(application.Options{
 		Name:        "AgentConfigSync",
 		Description: "Synchronize AI agent settings and sessions across computers",
@@ -52,7 +79,15 @@ func newGUIApplication(
 			},
 		},
 	})
+	return gui
+}
 
+func (gui *guiApplication) configure(
+	core *desktop.Service,
+	onboardingService *onboarding.Service,
+	hidden bool,
+) error {
+	gui.service = core
 	gui.startup = &startup.Manager{
 		Backend:    gui.app.Autostart,
 		Identifier: "io.github.qinqingxu.agentconfigsync",
@@ -60,7 +95,7 @@ func newGUIApplication(
 		GOOS:       runtime.GOOS,
 	}
 	if err := gui.migrateLegacyStartup(); err != nil {
-		return nil, err
+		return err
 	}
 	gui.app.RegisterService(application.NewService(
 		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
@@ -75,6 +110,7 @@ func newGUIApplication(
 		MinHeight: 560,
 		Hidden:    hidden,
 	})
+	gui.activation.Ready(gui.showWindow)
 	gui.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		gui.window.Hide()
 		event.Cancel()
@@ -83,7 +119,7 @@ func newGUIApplication(
 		gui.show()
 	})
 	gui.configureTray()
-	return gui, nil
+	return nil
 }
 
 func (g *guiApplication) migrateLegacyStartup() error {
@@ -149,9 +185,10 @@ func (g *guiApplication) configureTray() {
 }
 
 func (g *guiApplication) show() {
-	if g.window == nil {
-		return
-	}
+	g.activation.Request()
+}
+
+func (g *guiApplication) showWindow() {
 	g.window.Show()
 	g.window.Restore()
 	g.window.Focus()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,13 @@ import (
 
 var githubOAuthClientID string
 
+type desktopBootstrap struct {
+	newGUI        func() *guiApplication
+	home          func() (string, error)
+	newService    func(string, string) (*desktop.Service, error)
+	newOnboarding func(string, *desktop.Service) (*onboarding.Service, error)
+}
+
 func main() {
 	if len(os.Args) == 3 && os.Args[1] == "--git-credential" {
 		if err := cli.RunCredential(os.Args[2], os.Stdin, os.Stdout); err != nil {
@@ -24,30 +32,36 @@ func main() {
 		return
 	}
 	hidden := len(os.Args) == 2 && os.Args[1] == "--hidden"
-	home, err := defaultDesktopHome()
+	err := runDesktop(hidden, desktopBootstrap{
+		newGUI:        newGUIApplication,
+		home:          defaultDesktopHome,
+		newService:    desktop.New,
+		newOnboarding: newOnboardingService,
+	})
 	if err != nil {
-		log.Printf("resolve AgentConfigSync home: %v", err)
-		os.Exit(1)
-	}
-	core, err := desktop.New(home, "")
-	if err != nil {
-		log.Printf("initialize AgentConfigSync: %v", err)
-		os.Exit(1)
-	}
-	onboardingService, err := newOnboardingService(home, core)
-	if err != nil {
-		log.Printf("initialize onboarding: %v", err)
-		os.Exit(1)
-	}
-	gui, err := newGUIApplication(core, onboardingService, hidden)
-	if err != nil {
-		log.Printf("initialize desktop application: %v", err)
-		os.Exit(1)
-	}
-	if err := gui.run(); err != nil {
 		log.Printf("run AgentConfigSync: %v", err)
 		os.Exit(1)
 	}
+}
+
+func runDesktop(hidden bool, bootstrap desktopBootstrap) error {
+	gui := bootstrap.newGUI()
+	home, err := bootstrap.home()
+	if err != nil {
+		return fmt.Errorf("resolve AgentConfigSync home: %w", err)
+	}
+	core, err := bootstrap.newService(home, "")
+	if err != nil {
+		return fmt.Errorf("initialize AgentConfigSync: %w", err)
+	}
+	onboardingService, err := bootstrap.newOnboarding(home, core)
+	if err != nil {
+		return fmt.Errorf("initialize onboarding: %w", err)
+	}
+	if err := gui.configure(core, onboardingService, hidden); err != nil {
+		return fmt.Errorf("initialize desktop application: %w", err)
+	}
+	return gui.run()
 }
 
 func defaultDesktopHome() (string, error) {
@@ -59,12 +73,12 @@ func newOnboardingService(home string, core *desktop.Service) (*onboarding.Servi
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := core.Snapshot()
+	desktopAgents, err := core.OnboardingAgents()
 	if err != nil {
 		return nil, err
 	}
-	agents := make([]onboarding.Agent, 0, len(snapshot.Agents))
-	for _, agent := range snapshot.Agents {
+	agents := make([]onboarding.Agent, 0, len(desktopAgents))
+	for _, agent := range desktopAgents {
 		agents = append(agents, onboarding.Agent{
 			Name:    agent.Name,
 			Enabled: agent.Enabled,
