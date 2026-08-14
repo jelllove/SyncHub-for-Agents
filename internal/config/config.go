@@ -2,22 +2,37 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/qinqingxu/acsync/internal/resource"
 	"gopkg.in/yaml.v3"
 )
 
-const currentVersion = 1
+const currentVersion = 2
+
+type CustomResource struct {
+	ID       string            `yaml:"id"`
+	Category resource.Category `yaml:"category"`
+	Paths    map[string]string `yaml:"paths"`
+	Targets  map[string]string `yaml:"targets"`
+	Include  []string          `yaml:"include,omitempty"`
+	Exclude  []string          `yaml:"exclude,omitempty"`
+	Strategy resource.Strategy `yaml:"strategy"`
+}
 
 // Config is the user-editable settings model.
 type Config struct {
-	Version             int             `yaml:"version,omitempty"`
-	RepoURL             string          `yaml:"repo_url"`
-	SyncIntervalMinutes int             `yaml:"sync_interval_minutes"`
-	TrashGraceDays      int             `yaml:"trash_grace_days"`
-	Agents              map[string]bool `yaml:"agents"`
+	Version             int                        `yaml:"version,omitempty"`
+	RepoURL             string                     `yaml:"repo_url"`
+	SyncIntervalMinutes int                        `yaml:"sync_interval_minutes"`
+	TrashGraceDays      int                        `yaml:"trash_grace_days"`
+	Agents              map[string]bool            `yaml:"agents"`
+	Categories          map[string]map[string]bool `yaml:"categories,omitempty"`
+	CustomResources     []CustomResource           `yaml:"custom_resources,omitempty"`
 }
 
 // Default returns a Config with all provided agent names enabled.
@@ -46,6 +61,15 @@ func (c Config) EnabledAgents() []string {
 	return out
 }
 
+func (c Config) CategoryEnabled(provider string, category resource.Category) bool {
+	values, exists := c.Categories[provider]
+	if !exists {
+		return true
+	}
+	enabled, exists := values[string(category)]
+	return !exists || enabled
+}
+
 // Load reads a config from path. A missing file is an error (run init first).
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
@@ -65,11 +89,17 @@ func Load(path string) (Config, error) {
 		}
 		c.Version = 1
 	}
+	if c.Version < currentVersion {
+		c.Version = currentVersion
+	}
 	return c, nil
 }
 
 // Save writes the config to path (creating parent dirs).
 func Save(path string, c Config) error {
+	if err := validateCustomResources(c.CustomResources); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -79,4 +109,45 @@ func Save(path string, c Config) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func validateCustomResources(resources []CustomResource) error {
+	for _, item := range resources {
+		declaration := resource.Declaration{
+			ID:       item.ID,
+			Category: item.Category,
+			Paths:    item.Paths,
+			Include:  item.Include,
+			Exclude:  item.Exclude,
+			Strategy: item.Strategy,
+		}.Normalized()
+		if err := declaration.Validate("custom"); err != nil {
+			return err
+		}
+		if item.Strategy == resource.StrategyInstallManifest {
+			return fmt.Errorf("custom resource %q: strategy %q is not supported", item.ID, item.Strategy)
+		}
+		if err := validatePathMap(item.ID, "paths", item.Paths); err != nil {
+			return err
+		}
+		if err := validatePathMap(item.ID, "targets", item.Targets); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validatePathMap(id, field string, values map[string]string) error {
+	if len(values) == 0 {
+		return fmt.Errorf("custom resource %q: missing %s", id, field)
+	}
+	for key, value := range values {
+		if strings.TrimSpace(key) == "" {
+			return fmt.Errorf("custom resource %q: %s has empty platform key", id, field)
+		}
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("custom resource %q: %s[%s] is empty", id, field, key)
+		}
+	}
+	return nil
 }

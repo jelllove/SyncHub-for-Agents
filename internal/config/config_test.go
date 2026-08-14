@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/qinqingxu/acsync/internal/resource"
 )
 
 func TestDefault(t *testing.T) {
@@ -26,6 +28,19 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		SyncIntervalMinutes: 15,
 		TrashGraceDays:      7,
 		Agents:              map[string]bool{"claude": true, "gemini": false},
+		Categories: map[string]map[string]bool{
+			"claude": {string(resource.CategoryPlugins): false},
+		},
+		CustomResources: []CustomResource{
+			{
+				ID:       "notes",
+				Category: resource.CategoryInstructions,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Include:  []string{"**/*.md"},
+				Strategy: resource.StrategyTextTree,
+			},
+		},
 	}
 	if err := Save(path, in); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -39,6 +54,12 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if out.Agents["claude"] != true || out.Agents["gemini"] != false {
 		t.Errorf("agents mismatch: %+v", out.Agents)
+	}
+	if out.Categories["claude"][string(resource.CategoryPlugins)] {
+		t.Errorf("categories mismatch: %+v", out.Categories)
+	}
+	if len(out.CustomResources) != 1 || out.CustomResources[0].ID != "notes" {
+		t.Errorf("custom resources mismatch: %+v", out.CustomResources)
 	}
 }
 
@@ -72,5 +93,118 @@ func TestLoadMigratesVSCodeProviderIntoOlderConfig(t *testing.T) {
 	}
 	if got.Agents["claude"] {
 		t.Fatal("migration must preserve explicit agent settings")
+	}
+}
+
+func TestLoadV1DefaultsSafeCategoriesWithoutReenablingAgent(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(filename, []byte(`
+version: 1
+agents:
+  claude: false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agents["claude"] {
+		t.Fatal("disabled provider was re-enabled")
+	}
+	if !cfg.CategoryEnabled("claude", resource.CategorySkills) {
+		t.Fatal("missing v1 category should default enabled")
+	}
+}
+
+func TestExplicitCategoryDisableWins(t *testing.T) {
+	cfg := Config{
+		Agents: map[string]bool{"claude": true},
+		Categories: map[string]map[string]bool{
+			"claude": {string(resource.CategoryPlugins): false},
+		},
+	}
+	if cfg.CategoryEnabled("claude", resource.CategoryPlugins) {
+		t.Fatal("explicit category disable was ignored")
+	}
+}
+
+func TestSaveRejectsInvalidCustomResources(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	tests := []struct {
+		name     string
+		resource CustomResource
+	}{
+		{
+			name: "missing-id",
+			resource: CustomResource{
+				Category: resource.CategoryInstructions,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyTextTree,
+			},
+		},
+		{
+			name: "bad-category",
+			resource: CustomResource{
+				ID:       "notes",
+				Category: resource.Category("bad"),
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyTextTree,
+			},
+		},
+		{
+			name: "bad-strategy",
+			resource: CustomResource{
+				ID:       "notes",
+				Category: resource.CategoryInstructions,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.Strategy("bad"),
+			},
+		},
+		{
+			name: "install-manifest",
+			resource: CustomResource{
+				ID:       "notes",
+				Category: resource.CategoryPlugins,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyInstallManifest,
+			},
+		},
+		{
+			name: "missing-paths",
+			resource: CustomResource{
+				ID:       "notes",
+				Category: resource.CategoryInstructions,
+				Targets:  map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyTextTree,
+			},
+		},
+		{
+			name: "missing-targets",
+			resource: CustomResource{
+				ID:       "notes",
+				Category: resource.CategoryInstructions,
+				Paths:    map[string]string{"windows": "%USERPROFILE%\\notes"},
+				Strategy: resource.StrategyTextTree,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Agents:          map[string]bool{"claude": true},
+				CustomResources: []CustomResource{tt.resource},
+			}
+			if err := Save(path, cfg); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
 	}
 }

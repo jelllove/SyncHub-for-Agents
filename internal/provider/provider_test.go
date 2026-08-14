@@ -1,6 +1,11 @@
 package provider
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/qinqingxu/acsync/internal/resource"
+)
 
 func TestBuiltinsLoaded(t *testing.T) {
 	ps, err := Builtins()
@@ -109,5 +114,58 @@ secrets:
 func TestParseRejectsMissingName(t *testing.T) {
 	if _, err := Parse([]byte(`config: {}`)); err == nil {
 		t.Fatal("expected error for provider without name")
+	}
+}
+
+func TestProviderDeclarationsNormalizeV1(t *testing.T) {
+	p, err := Parse([]byte(`
+name: demo
+config:
+  paths: {windows: "%USERPROFILE%\\.demo"}
+  include: ["settings.json"]
+  sessions: ["sessions/**/*.jsonl"]
+  exclude: ["**/*token*"]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := p.Declarations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("declarations = %#v", got)
+	}
+	if got[0].Category != resource.CategoryConfig ||
+		got[0].Layout != resource.LayoutLegacy ||
+		got[1].Category != resource.CategorySessions {
+		t.Fatalf("normalized declarations = %#v", got)
+	}
+}
+
+func TestParseRejectsReservedPortableProvider(t *testing.T) {
+	_, err := Parse([]byte("schema_version: 2\nname: _portable\nresources: []\n"))
+	if err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParseRejectsMixedLegacyAndTypedDefinitions(t *testing.T) {
+	_, err := Parse([]byte(`
+schema_version: 2
+name: demo
+config:
+  paths: {linux: "~/.demo"}
+  include: ["settings.json"]
+resources:
+  - id: config
+    category: config
+    paths: {linux: "~/.demo"}
+    include: ["settings.json"]
+    strategy: file-tree
+`))
+	if err == nil || !strings.Contains(err.Error(), "mixed") {
+		t.Fatalf("error = %v", err)
 	}
 }
