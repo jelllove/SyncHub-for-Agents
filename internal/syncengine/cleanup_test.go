@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/secret"
+	"github.com/qinqingxu/acsync/internal/resource"
 )
 
 func TestCleanupTrashRemovesExpired(t *testing.T) {
@@ -66,16 +66,22 @@ func TestPurgeBlockedTrashRemovesSecretAndIndexEntry(t *testing.T) {
 	writeFile(t, filepath.Join(repo, ".trash", "files", filepath.FromSlash(repoRel)), `{"accessToken":"secret"}`)
 	data, _ := json.Marshal(map[string]int64{repoRel: time.Now().Unix()})
 	writeFile(t, filepath.Join(repo, ".trash", "index.json"), string(data))
-	specs := map[string]AgentSpec{"demo": {
-		Name:     "demo",
-		Sessions: []string{"*.json"},
-		Scanner:  secret.NewScanner(nil, []string{"token"}),
+	specs := map[string]resource.Spec{"demo/legacy-sessions": {
+		Key:         "demo/legacy-sessions",
+		Provider:    "demo",
+		ID:          "legacy-sessions",
+		Category:    resource.CategorySessions,
+		Strategy:    resource.StrategyFileTree,
+		Layout:      resource.LayoutLegacy,
+		Include:     []string{"*.json"},
+		KeyPatterns: []string{"token"},
 	}}
 
 	purged, err := PurgeBlockedTrash(repo, specs)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if len(purged) != 1 || purged[0] != repoRel {
 		t.Fatalf("purged = %#v", purged)
 	}
@@ -92,6 +98,77 @@ func TestPurgeBlockedTrashRemovesSecretAndIndexEntry(t *testing.T) {
 	}
 	if _, exists := index[repoRel]; exists {
 		t.Fatal("blocked trash entry still exists in index")
+	}
+}
+
+func TestPurgeBlockedTrashValidatesPortableResourcePaths(t *testing.T) {
+	repo := t.TempDir()
+	spec := resource.Spec{
+		Key:         "demo/settings",
+		Provider:    "demo",
+		ID:          "settings",
+		Category:    resource.CategoryConfig,
+		Strategy:    resource.StrategyFileTree,
+		Layout:      resource.LayoutPortable,
+		Include:     []string{"*.json"},
+		KeyPatterns: []string{"token"},
+	}
+	repoRel, err := spec.RepoPath("settings.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(
+		t,
+		filepath.Join(repo, ".trash", "files", filepath.FromSlash(repoRel)),
+		`{"accessToken":"secret"}`,
+	)
+	data, _ := json.Marshal(map[string]int64{repoRel: time.Now().Unix()})
+	writeFile(t, filepath.Join(repo, ".trash", "index.json"), string(data))
+
+	purged, err := PurgeBlockedTrash(repo, map[string]resource.Spec{spec.Key: spec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(purged) != 1 || purged[0] != repoRel {
+		t.Fatalf("purged = %#v", purged)
+	}
+}
+
+func TestPurgeBlockedTrashPreservesValidConflictBundle(t *testing.T) {
+	repo := t.TempDir()
+	bundleRoot := filepath.Join(
+		repo,
+		".trash",
+		"files",
+		"agents",
+		"_portable",
+		"config",
+		"conflicts",
+		"c1",
+	)
+	record := `{
+  "id": "c1",
+  "resourceKey": "disabled/settings",
+  "repoRel": "agents/_portable/config/providers/disabled/config/settings/settings.json",
+  "createdAt": "2026-08-14T12:00:00Z"
+}`
+	writeFile(t, filepath.Join(bundleRoot, "record.json"), record)
+	for _, variant := range []string{"base", "local", "remote"} {
+		writeFile(t, filepath.Join(bundleRoot, variant), `{"theme":"dark"}`)
+	}
+	index := map[string]int64{}
+	for _, filename := range []string{"record.json", "base", "local", "remote"} {
+		index["agents/_portable/config/conflicts/c1/"+filename] = time.Now().Unix()
+	}
+	data, _ := json.Marshal(index)
+	writeFile(t, filepath.Join(repo, ".trash", "index.json"), string(data))
+
+	purged, err := PurgeBlockedTrash(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(purged) != 0 {
+		t.Fatalf("valid conflict bundle was purged: %#v", purged)
 	}
 }
 
@@ -117,7 +194,7 @@ func TestPurgeBlockedTrashRemovesUnindexedFile(t *testing.T) {
 	writeFile(t, orphan, `{"accessToken":"secret"}`)
 	writeFile(t, filepath.Join(repo, ".trash", "index.json"), "{}")
 
-	purged, err := PurgeBlockedTrash(repo, map[string]AgentSpec{})
+	purged, err := PurgeBlockedTrash(repo, map[string]resource.Spec{})
 	if err != nil {
 		t.Fatal(err)
 	}

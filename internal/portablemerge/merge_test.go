@@ -2,9 +2,12 @@ package portablemerge
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/qinqingxu/acsync/internal/portableconfig"
 )
 
 func TestStructuredMergeCombinesIndependentKeys(t *testing.T) {
@@ -69,6 +72,54 @@ func TestStructuredMergeRejectsMalformedOrNonObjectDocuments(t *testing.T) {
 		if _, err := Structured(input, []byte(`{}`), []byte(`{}`)); err == nil {
 			t.Fatalf("Structured(%s) error = nil", input)
 		}
+	}
+}
+
+func TestStructuredDocumentMergesYAMLAndTOML(t *testing.T) {
+	tests := []struct {
+		rel    string
+		base   string
+		local  string
+		remote string
+	}{
+		{
+			rel:    "settings.yaml",
+			base:   "theme: dark\nfont: 12\n",
+			local:  "theme: light\nfont: 12\n",
+			remote: "theme: dark\nfont: 14\n",
+		},
+		{
+			rel:    "settings.toml",
+			base:   "theme = \"dark\"\nfont = 12\n",
+			local:  "theme = \"light\"\nfont = 12\n",
+			remote: "theme = \"dark\"\nfont = 14\n",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.rel, func(t *testing.T) {
+			result, err := StructuredDocument(
+				test.rel,
+				[]byte(test.base),
+				[]byte(test.local),
+				[]byte(test.remote),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Conflict {
+				t.Fatal("independent keys should merge")
+			}
+			_, document, err := portableconfig.Parse(test.rel, result.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if document["theme"] != "light" {
+				t.Fatalf("theme = %#v", document["theme"])
+			}
+			if fmt.Sprint(document["font"]) != "14" {
+				t.Fatalf("font = %#v", document["font"])
+			}
+		})
 	}
 }
 

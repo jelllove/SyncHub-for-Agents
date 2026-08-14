@@ -109,6 +109,7 @@ func TestStoreResolveScansWritesCanonicalAndRemovesBundles(t *testing.T) {
 		ResourceKey: "demo/settings",
 		RepoRel:     "agents/_portable/config/providers/demo/config/settings/settings.json",
 	}
+
 	if err := store.Create(record, []byte("base"), []byte("local"), []byte("remote")); err != nil {
 		t.Fatal(err)
 	}
@@ -130,11 +131,53 @@ func TestStoreResolveScansWritesCanonicalAndRemovesBundles(t *testing.T) {
 			t.Fatalf("bundle remains at %s: %v", path, err)
 		}
 	}
+
 	records, err := store.List()
 	if err != nil || len(records) != 0 {
 		t.Fatalf("List() = %#v, %v", records, err)
 	}
 	if err := store.Resolve("missing", []byte("data")); err == nil {
 		t.Fatal("resolving a missing conflict succeeded")
+	}
+}
+
+func TestStoreMirrorsRepositoryBundlesAndRemoteResolution(t *testing.T) {
+	repoDir := t.TempDir()
+	record := Record{
+		ID:          "shared-conflict",
+		ResourceKey: "demo/settings",
+		RepoRel:     "agents/_portable/config/providers/demo/config/settings/settings.json",
+	}
+	source := NewStore(t.TempDir(), repoDir, nil)
+	if err := source.Create(record, []byte("base"), []byte("local"), []byte("remote")); err != nil {
+		t.Fatal(err)
+	}
+	localRoot := t.TempDir()
+	mirror := NewStore(localRoot, repoDir, nil)
+
+	if err := mirror.MirrorFromRepo(nil); err != nil {
+		t.Fatal(err)
+	}
+	records, err := mirror.List()
+	if err != nil || len(records) != 1 || records[0].ID != record.ID {
+		t.Fatalf("mirrored records = %#v, %v", records, err)
+	}
+
+	if err := os.RemoveAll(filepath.Join(
+		repoDir,
+		"agents",
+		"_portable",
+		"config",
+		"conflicts",
+		record.ID,
+	)); err != nil {
+		t.Fatal(err)
+	}
+	if err := mirror.MirrorFromRepo(nil); err != nil {
+		t.Fatal(err)
+	}
+	records, err = mirror.List()
+	if err != nil || len(records) != 0 {
+		t.Fatalf("resolved remote conflict remains locally: %#v, %v", records, err)
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/resource"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
@@ -155,6 +156,7 @@ func TestDaemonPublishesCycleErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer d.Close()
 
 	events := make(chan CycleResult, 1)
@@ -175,5 +177,57 @@ func TestDaemonPublishesCycleErrors(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("cycle result was not published")
+	}
+}
+
+func TestDaemonCompletesCleanupWhenSyncNeedsAttention(t *testing.T) {
+	home := filepath.Join(t.TempDir(), ".acsync")
+	writeConfig(t, home, config.Config{SyncIntervalMinutes: 60, Agents: map[string]bool{}})
+	d, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	d.sync = func(_ string, _ string, _ func(syncengine.Progress)) (syncengine.Result, error) {
+		return syncengine.Result{
+			Restored: 1,
+			Blocked:  []string{"agents/demo/config/secret.json"},
+			Issues: []resource.Issue{{
+				ResourceKey: "demo/config",
+				Path:        "secret.json",
+				Code:        "secret-detected",
+				Message:     "blocked",
+			}},
+			NeedsAttention: true,
+		}, nil
+	}
+	cleanupRan := false
+	d.cleanup = func(string, time.Time) ([]string, error) {
+		cleanupRan = true
+		return nil, nil
+	}
+	var cycle CycleResult
+	d.OnCycle = func(result CycleResult) {
+		cycle = result
+	}
+	var progress []syncengine.Progress
+	d.OnProgress = func(update syncengine.Progress) {
+		progress = append(progress, update)
+	}
+
+	if err := d.syncJob(); err != nil {
+		t.Fatal(err)
+	}
+	if !cleanupRan {
+		t.Fatal("cleanup did not run")
+	}
+	if !cycle.NeedsAttention || cycle.Restored != 1 || cycle.Blocked != 1 {
+		t.Fatalf("cycle = %#v", cycle)
+	}
+	last := progress[len(progress)-1]
+	if last.Stage != syncengine.StageComplete ||
+		last.Label != "Synchronization needs attention" ||
+		!last.NeedsAttention {
+		t.Fatalf("completion = %#v", last)
 	}
 }

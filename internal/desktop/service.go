@@ -97,6 +97,12 @@ func (s *Service) recordProgress(update syncengine.Progress) {
 		TotalActions:     update.TotalActions,
 		BlockedFiles:     update.BlockedFiles,
 		Pushed:           update.Pushed,
+		Restored:         update.Restored,
+		Reinstalled:      update.Reinstalled,
+		Skipped:          update.Skipped,
+		Conflicts:        update.Conflicts,
+		PendingInstalls:  update.PendingInstalls,
+		NeedsAttention:   update.NeedsAttention,
 	}
 	s.mu.Lock()
 	s.progress = progress

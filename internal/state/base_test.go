@@ -74,6 +74,29 @@ func TestBaseStoreCaptureRepoReadsOnlySnapshotPaths(t *testing.T) {
 	}
 }
 
+func TestBaseStoreCaptureRepoPreservingDoesNotAdvancePreservedBytes(t *testing.T) {
+	repoDir := t.TempDir()
+	repoRel := "agents/demo/config/settings.json"
+	writeStateFile(t, filepath.Join(repoDir, filepath.FromSlash(repoRel)), "new")
+	store := NewBaseStore(t.TempDir())
+	if err := store.Put(repoRel, []byte("old")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.CaptureRepoPreserving(
+		repoDir,
+		Snapshot{repoRel: {Hash: "new"}},
+		map[string]struct{}{repoRel: {}},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok, err := store.Get(repoRel)
+	if err != nil || !ok || string(got) != "old" {
+		t.Fatalf("preserved Get = %q, %v, %v", got, ok, err)
+	}
+}
+
 func TestBaseStoreRejectsUnsafeRepoPaths(t *testing.T) {
 	store := NewBaseStore(t.TempDir())
 	for _, repoRel := range []string{

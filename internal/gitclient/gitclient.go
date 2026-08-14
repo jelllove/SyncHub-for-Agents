@@ -107,7 +107,7 @@ func sanitizedGitEnvironment(environment []string) []string {
 
 // Clone clones url into dir. Dir on the client should match dir.
 func (c *Client) Clone(url, dir string) error {
-	_, err := c.run("clone", url, dir)
+	_, err := c.run("clone", "-c", "core.autocrlf=false", url, dir)
 	return err
 }
 
@@ -133,6 +133,16 @@ func (c *Client) Commit(message string) error {
 // Push pushes the current branch to origin.
 func (c *Client) Push() error {
 	_, err := c.run("push")
+	return err
+}
+
+func (c *Client) FetchOrigin() error {
+	_, err := c.run("fetch", "origin")
+	return err
+}
+
+func (c *Client) ResetKeepUpstream() error {
+	_, err := c.run("reset", "--keep", "@{upstream}")
 	return err
 }
 

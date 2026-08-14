@@ -1,6 +1,7 @@
 package syncengine
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,6 +9,9 @@ import (
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/acsync/internal/portableconfig"
+	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/acsync/internal/state"
 )
 
 func git(t *testing.T, dir string, args ...string) {
@@ -28,7 +32,9 @@ func newBareRemote(t *testing.T) string {
 	git(t, root, "clone", bare, seed)
 	git(t, seed, "config", "user.email", "s@e.com")
 	git(t, seed, "config", "user.name", "seed")
-	os.WriteFile(filepath.Join(seed, "manifest.json"), []byte("{}\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(seed, "manifest.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	git(t, seed, "add", ".")
 	git(t, seed, "commit", "-m", "seed")
 	git(t, seed, "push", "origin", "main")
@@ -37,25 +43,48 @@ func newBareRemote(t *testing.T) string {
 
 func cloneWorkspace(t *testing.T, bare, dir string) *gitclient.Client {
 	t.Helper()
-	c := &gitclient.Client{Dir: dir}
-	if err := c.Clone(bare, dir); err != nil {
+	client := &gitclient.Client{Dir: dir}
+	if err := client.Clone(bare, dir); err != nil {
 		t.Fatalf("clone: %v", err)
 	}
 	git(t, dir, "config", "user.email", "m@e.com")
 	git(t, dir, "config", "user.name", "machine")
-	return c
+	return client
 }
 
 func engineFor(client *gitclient.Client, repoDir, statePath, agentRoot string) *Engine {
 	return &Engine{
 		Git:       client,
 		RepoDir:   repoDir,
+		Home:      filepath.Dir(statePath),
+		UserHome:  filepath.Dir(agentRoot),
+		GOOS:      "windows",
 		StatePath: statePath,
-		Specs: map[string]AgentSpec{
-			"demo": {Name: "demo", Root: agentRoot, Include: []string{"settings.json"}},
+		Resources: map[string]resource.Spec{
+			"demo/legacy-config": {
+				Key:      "demo/legacy-config",
+				Provider: "demo",
+				ID:       "legacy-config",
+				Category: resource.CategoryConfig,
+				Strategy: resource.StrategyFileTree,
+				Layout:   resource.LayoutLegacy,
+				Root:     agentRoot,
+				Targets:  []string{agentRoot},
+				Include:  []string{"settings.json"},
+			},
 		},
 		PushRetries: 3,
 		Now:         func() time.Time { return time.Unix(1000, 0) },
+	}
+}
+
+func writeFile(t *testing.T, filename, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filename, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -63,34 +92,18 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
-
 	bare := newBareRemote(t)
-
-	// Machine A.
 	repoA := filepath.Join(t.TempDir(), "repoA")
-	clientA := cloneWorkspace(t, bare, repoA)
 	rootA := t.TempDir()
-	stateA := filepath.Join(t.TempDir(), "stateA.json")
-	engA := engineFor(clientA, repoA, stateA, rootA)
-
-	// Machine B.
+	engA := engineFor(cloneWorkspace(t, bare, repoA), repoA, filepath.Join(t.TempDir(), "stateA.json"), rootA)
 	repoB := filepath.Join(t.TempDir(), "repoB")
-	clientB := cloneWorkspace(t, bare, repoB)
 	rootB := t.TempDir()
-	stateB := filepath.Join(t.TempDir(), "stateB.json")
-	engB := engineFor(clientB, repoB, stateB, rootB)
+	engB := engineFor(cloneWorkspace(t, bare, repoB), repoB, filepath.Join(t.TempDir(), "stateB.json"), rootB)
 
-	// A creates a config file and syncs (push).
 	writeFile(t, filepath.Join(rootA, "settings.json"), `{"theme":"dark"}`)
 	if _, err := engA.SyncOnce(); err != nil {
 		t.Fatalf("A first sync: %v", err)
 	}
-
-	if _, err := os.Stat(filepath.Join(repoA, "agents", "demo", "config", "settings.json")); err != nil {
-		t.Fatalf("A repo should contain settings.json: %v", err)
-	}
-
-	// B syncs (pull) and should receive the file locally.
 	if _, err := engB.SyncOnce(); err != nil {
 		t.Fatalf("B first sync: %v", err)
 	}
@@ -98,7 +111,6 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 		t.Fatalf("B should have pulled settings.json locally: %v", err)
 	}
 
-	// A deletes the file and syncs (delete propagation + soft delete).
 	if err := os.Remove(filepath.Join(rootA, "settings.json")); err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +120,6 @@ func TestSyncOncePropagatesCreateAndDelete(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repoA, ".trash", "files", "agents", "demo", "config", "settings.json")); err != nil {
 		t.Fatalf("deleted file should be in A's trash: %v", err)
 	}
-
-	// B syncs and should delete its local copy.
 	if _, err := engB.SyncOnce(); err != nil {
 		t.Fatalf("B delete sync: %v", err)
 	}
@@ -124,11 +134,14 @@ func TestEnginePublishesProgress(t *testing.T) {
 	}
 	bare := newBareRemote(t)
 	repo := filepath.Join(t.TempDir(), "repo")
-	client := cloneWorkspace(t, bare, repo)
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "settings.json"), `{"theme":"dark"}`)
-	engine := engineFor(client, repo, filepath.Join(t.TempDir(), "state.json"), root)
-
+	engine := engineFor(
+		cloneWorkspace(t, bare, repo),
+		repo,
+		filepath.Join(t.TempDir(), "state.json"),
+		root,
+	)
 	var progress []Progress
 	engine.OnProgress = func(update Progress) {
 		progress = append(progress, update)
@@ -142,6 +155,7 @@ func TestEnginePublishesProgress(t *testing.T) {
 		StagePulling,
 		StageScanning,
 		StageComparing,
+		StageApplying,
 		StageApplying,
 		StageUploading,
 	}
@@ -163,4 +177,233 @@ func TestEnginePublishesProgress(t *testing.T) {
 		last.BlockedFiles != len(result.Blocked) {
 		t.Fatalf("complete progress = %#v, result = %#v", last, result)
 	}
+}
+
+func TestSyncOncePreservesConcurrentBinaryEditsAsConflict(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bare := newBareRemote(t)
+	repoA := filepath.Join(t.TempDir(), "repoA")
+	repoB := filepath.Join(t.TempDir(), "repoB")
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+	engineA := engineFor(cloneWorkspace(t, bare, repoA), repoA, filepath.Join(t.TempDir(), "state.json"), rootA)
+	engineB := engineFor(cloneWorkspace(t, bare, repoB), repoB, filepath.Join(t.TempDir(), "state.json"), rootB)
+
+	writeFile(t, filepath.Join(rootA, "settings.json"), `{"value":"base"}`)
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engineB.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(rootA, "settings.json"), `{"value":"machine-a"}`)
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(rootB, "settings.json"), `{"value":"machine-b"}`)
+
+	result, err := engineB.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Conflicts != 1 || !result.NeedsAttention {
+		t.Fatalf("result = %#v", result)
+	}
+	assertFileContent(t, filepath.Join(rootB, "settings.json"), `{"value":"machine-b"}`)
+	assertFileContent(t, filepath.Join(repoB, "agents", "demo", "config", "settings.json"), `{"value":"machine-a"}`)
+	entries, err := os.ReadDir(filepath.Join(engineB.Home, "conflicts"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("local conflicts = %#v, %v", entries, err)
+	}
+}
+
+func TestSyncOnceDoesNotAdvanceUnavailableResourceBase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bare := newBareRemote(t)
+	repoA := filepath.Join(t.TempDir(), "repoA")
+	rootA := t.TempDir()
+	engineA := engineFor(cloneWorkspace(t, bare, repoA), repoA, filepath.Join(t.TempDir(), "state.json"), rootA)
+	writeFile(t, filepath.Join(rootA, "settings.json"), "remote")
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+
+	repoB := filepath.Join(t.TempDir(), "repoB")
+	rootB := filepath.Join(t.TempDir(), "not-created")
+	stateB := filepath.Join(t.TempDir(), "state.json")
+	engineB := engineFor(cloneWorkspace(t, bare, repoB), repoB, stateB, rootB)
+	result, err := engineB.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.NeedsAttention || result.Skipped == 0 {
+		t.Fatalf("result = %#v", result)
+	}
+	snapshot, err := state.Load(stateB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot) != 0 {
+		t.Fatalf("unavailable resource advanced state: %#v", snapshot)
+	}
+
+	if err := os.MkdirAll(rootB, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engineB.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	assertFileContent(t, filepath.Join(rootB, "settings.json"), "remote")
+}
+
+func TestSyncOnceMergesIndependentStructuredEdits(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bare := newBareRemote(t)
+	makeEngine := func(repo, statePath, root string) *Engine {
+		engine := engineFor(cloneWorkspace(t, bare, repo), repo, statePath, root)
+		spec := engine.Resources["demo/legacy-config"]
+		spec.Strategy = resource.StrategyStructuredMerge
+		spec.Transformer = "demo-settings"
+		engine.Resources[spec.Key] = spec
+		registry := portableconfig.NewRegistry()
+		registry.Register("demo-settings", portableconfig.Policy{Portable: []string{"theme", "font"}})
+		engine.Codecs = registry
+		return engine
+	}
+	repoA := filepath.Join(t.TempDir(), "repoA")
+	repoB := filepath.Join(t.TempDir(), "repoB")
+	rootA := t.TempDir()
+	rootB := t.TempDir()
+	engineA := makeEngine(repoA, filepath.Join(t.TempDir(), "state.json"), rootA)
+	engineB := makeEngine(repoB, filepath.Join(t.TempDir(), "state.json"), rootB)
+
+	writeFile(t, filepath.Join(rootA, "settings.json"), `{"theme":"dark","font":12}`)
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engineB.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(rootA, "settings.json"), `{"theme":"light","font":12}`)
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(rootB, "settings.json"), `{"theme":"dark","font":14}`)
+
+	result, err := engineB.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Conflicts != 0 {
+		t.Fatalf("result = %#v", result)
+	}
+	data, err := os.ReadFile(filepath.Join(rootB, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document["theme"] != "light" || document["font"] != float64(14) {
+		t.Fatalf("merged document = %#v", document)
+	}
+}
+
+func TestSyncOnceCombinesLegacySessionsAndPortableInstructions(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bare := newBareRemote(t)
+	makeEngine := func(repo, home, sessionRoot, instructionRoot string) *Engine {
+		return &Engine{
+			Git:       cloneWorkspace(t, bare, repo),
+			RepoDir:   repo,
+			Home:      home,
+			UserHome:  filepath.Dir(sessionRoot),
+			GOOS:      "windows",
+			StatePath: filepath.Join(home, "state.json"),
+			Resources: map[string]resource.Spec{
+				"demo/legacy-sessions": {
+					Key:      "demo/legacy-sessions",
+					Provider: "demo",
+					ID:       "legacy-sessions",
+					Category: resource.CategorySessions,
+					Strategy: resource.StrategyFileTree,
+					Layout:   resource.LayoutLegacy,
+					Root:     sessionRoot,
+					Targets:  []string{sessionRoot},
+					Include:  []string{"*.jsonl"},
+				},
+				"demo/global": {
+					Key:      "demo/global",
+					Provider: "demo",
+					ID:       "global",
+					Category: resource.CategoryInstructions,
+					Strategy: resource.StrategyTextTree,
+					Layout:   resource.LayoutPortable,
+					Root:     instructionRoot,
+					Targets:  []string{instructionRoot},
+					Include:  []string{"*.md"},
+				},
+			},
+			PushRetries: 3,
+		}
+	}
+	sessionA := t.TempDir()
+	sessionB := t.TempDir()
+	instructionsA := t.TempDir()
+	instructionsB := t.TempDir()
+	repoA := filepath.Join(t.TempDir(), "repoA")
+	repoB := filepath.Join(t.TempDir(), "repoB")
+	engineA := makeEngine(repoA, t.TempDir(), sessionA, instructionsA)
+	engineB := makeEngine(repoB, t.TempDir(), sessionB, instructionsB)
+	baseText := "first\nlocal-base\nmiddle\nremote-base\nlast\n"
+	writeFile(t, filepath.Join(sessionA, "session.jsonl"), `{"message":"hello"}`+"\n")
+	writeFile(t, filepath.Join(instructionsA, "AGENTS.md"), baseText)
+
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engineB.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	assertFileContent(t, filepath.Join(sessionB, "session.jsonl"), `{"message":"hello"}`+"\n")
+	portablePath := filepath.Join(
+		repoB,
+		"agents",
+		"_portable",
+		"config",
+		"providers",
+		"demo",
+		"instructions",
+		"global",
+		"AGENTS.md",
+	)
+	assertFileContent(t, portablePath, baseText)
+
+	writeFile(t, filepath.Join(instructionsA, "AGENTS.md"), "first\nmachine-a\nmiddle\nremote-base\nlast\n")
+	writeFile(t, filepath.Join(instructionsB, "AGENTS.md"), "first\nlocal-base\nmiddle\nmachine-b\nlast\n")
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	result, err := engineB.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Conflicts != 0 {
+		t.Fatalf("result = %#v", result)
+	}
+	wantMerged := "first\nmachine-a\nmiddle\nmachine-b\nlast\n"
+	assertFileContent(t, filepath.Join(instructionsB, "AGENTS.md"), wantMerged)
+	if _, err := engineA.SyncOnce(); err != nil {
+		t.Fatal(err)
+	}
+	assertFileContent(t, filepath.Join(instructionsA, "AGENTS.md"), wantMerged)
 }

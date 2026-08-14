@@ -8,11 +8,15 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/bmatcuk/doublestar/v4"
+	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/acsync/internal/secret"
 )
 
 // PurgeBlockedTrash permanently removes trash files that are no longer allowed
 // by their provider or are blocked by its secret scanner.
-func PurgeBlockedTrash(repoDir string, specs map[string]AgentSpec) ([]string, error) {
+func PurgeBlockedTrash(repoDir string, specs map[string]resource.Spec) ([]string, error) {
 	idxPath := filepath.Join(repoDir, ".trash", "index.json")
 	data, err := os.ReadFile(idxPath)
 	if os.IsNotExist(err) {
@@ -58,24 +62,53 @@ func PurgeBlockedTrash(repoDir string, specs map[string]AgentSpec) ([]string, er
 		}
 		_, indexed := idx[repoRel]
 		blocked := !indexed
-		parts := strings.Split(repoRel, "/")
-		spec, ok := specs[parts[1]]
+		if isInternalPortablePath(repoRel) {
+			if !blocked {
+				blocked = validateInternalRemote(filesRoot, repoRel, specs) != nil
+			}
+			if !blocked {
+				continue
+			}
+			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+				return nil, err
+			}
+			delete(idx, repoRel)
+			purged = append(purged, repoRel)
+			continue
+		}
+		ref, parseErr := resource.ParseRepoPath(repoRel)
+		if parseErr != nil {
+			if strings.HasPrefix(repoRel, portablePrefix) {
+				blocked = true
+			} else if !blocked {
+				continue
+			}
+		}
+		spec, ok := specForRef(specs, ref)
 		if !ok {
 			if !blocked {
 				continue
 			}
 		} else {
-			rel := strings.Join(parts[3:], "/")
-			sub, allowed := classify(rel, spec.Include, spec.Sessions)
-			blocked = blocked || !allowed || sub != parts[2]
-			if !blocked && spec.Scanner != nil {
+			info, statErr := os.Stat(filePath)
+			if statErr != nil {
+				return nil, statErr
+			}
+			allowed := resourcePathAllowed(spec, ref.Relative)
+			if allowed {
+				allowed, _ = resource.DefaultFilterPolicy().Check(ref.Relative, info.Size(), spec.Strategy)
+			}
+			blocked = blocked || !refMatchesSpec(ref, spec) || !allowed
+			if !blocked {
 				content, readErr := os.ReadFile(filePath)
 				if readErr != nil {
 					return nil, readErr
 				}
-				isBlocked, scanErr := spec.Scanner.Scan(rel, content)
+				scanner := secret.NewScanner(spec.Exclude, spec.KeyPatterns)
+				isBlocked, scanErr := scanner.Scan(ref.Relative, content)
 				blocked = isBlocked || scanErr != nil
 			}
+
 		}
 		if !blocked {
 			continue
@@ -107,6 +140,19 @@ func PurgeBlockedTrash(repoDir string, specs map[string]AgentSpec) ([]string, er
 	}
 	sort.Strings(purged)
 	return purged, nil
+}
+
+func resourcePathAllowed(spec resource.Spec, relative string) bool {
+	if spec.Strategy == resource.StrategyInstallManifest {
+		return true
+	}
+	for _, pattern := range spec.Include {
+		matched, err := doublestar.Match(strings.ReplaceAll(pattern, `\`, "/"), relative)
+		if err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 // CleanupTrash permanently removes soft-deleted files whose deletion time is

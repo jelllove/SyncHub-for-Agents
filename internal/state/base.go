@@ -93,10 +93,21 @@ func (s *BaseStore) Delete(repoRel string) error {
 }
 
 func (s *BaseStore) CaptureRepo(repoDir string, snapshot Snapshot) error {
+	return s.CaptureRepoPreserving(repoDir, snapshot, nil)
+}
+
+func (s *BaseStore) CaptureRepoPreserving(
+	repoDir string,
+	snapshot Snapshot,
+	preserve map[string]struct{},
+) error {
 	paths := make([]string, 0, len(snapshot))
 	for repoRel := range snapshot {
 		if err := validateBaseRepoPath(repoRel); err != nil {
 			return err
+		}
+		if _, keep := preserve[repoRel]; keep {
+			continue
 		}
 		paths = append(paths, repoRel)
 	}
@@ -124,6 +135,9 @@ func (s *BaseStore) CaptureRepo(repoDir string, snapshot Snapshot) error {
 		index[repoRel] = hash
 	}
 	for repoRel := range index {
+		if _, keep := preserve[repoRel]; keep {
+			continue
+		}
 		if _, keep := snapshot[repoRel]; !keep {
 			delete(index, repoRel)
 		}

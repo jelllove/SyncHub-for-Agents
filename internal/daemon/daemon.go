@@ -16,12 +16,18 @@ import (
 
 // CycleResult describes one completed sync and cleanup cycle.
 type CycleResult struct {
-	Actions    int
-	Blocked    int
-	Pushed     bool
-	Purged     int
-	Error      string
-	FinishedAt time.Time
+	Actions         int
+	Blocked         int
+	Pushed          bool
+	Purged          int
+	Restored        int
+	Reinstalled     int
+	Skipped         int
+	Conflicts       int
+	PendingInstalls int
+	NeedsAttention  bool
+	Error           string
+	FinishedAt      time.Time
 }
 
 // Daemon runs the sync scheduler for a given acsync home.
@@ -87,8 +93,20 @@ func (d *Daemon) syncJob() error {
 	result.Actions = len(res.Actions)
 	result.Blocked = len(res.Blocked)
 	result.Pushed = res.Pushed
-	d.Logger.Printf("sync ok: %d actions, %d blocked, pushed=%v",
-		result.Actions, result.Blocked, result.Pushed)
+	result.Restored = res.Restored
+	result.Reinstalled = res.Reinstalled
+	result.Skipped = res.Skipped
+	result.Conflicts = res.Conflicts
+	result.PendingInstalls = res.PendingInstalls
+	result.NeedsAttention = res.NeedsAttention
+	d.Logger.Printf(
+		"sync ok: %d actions, %d blocked, %d skipped, %d conflicts, pushed=%v",
+		result.Actions,
+		result.Blocked,
+		result.Skipped,
+		result.Conflicts,
+		result.Pushed,
+	)
 
 	purged, err := d.cleanup(d.Home, time.Now())
 	if err != nil {
@@ -101,14 +119,24 @@ func (d *Daemon) syncJob() error {
 		d.Logger.Printf("purged %d expired trash entries", result.Purged)
 	}
 	if d.OnProgress != nil {
+		label := "Synchronization complete"
+		if result.NeedsAttention {
+			label = "Synchronization needs attention"
+		}
 		d.OnProgress(syncengine.Progress{
 			Stage:            syncengine.StageComplete,
-			Label:            "Synchronization complete",
+			Label:            label,
 			Percentage:       100,
 			CompletedActions: result.Actions,
 			TotalActions:     result.Actions,
 			BlockedFiles:     result.Blocked,
 			Pushed:           result.Pushed,
+			Restored:         result.Restored,
+			Reinstalled:      result.Reinstalled,
+			Skipped:          result.Skipped,
+			Conflicts:        result.Conflicts,
+			PendingInstalls:  result.PendingInstalls,
+			NeedsAttention:   result.NeedsAttention,
 		})
 	}
 	return nil

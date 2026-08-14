@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/qinqingxu/acsync/internal/portableconfig"
 	"github.com/qinqingxu/acsync/internal/processattr"
 )
 
@@ -29,6 +30,7 @@ func Structured(base, local, remote []byte) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("parse structured base: %w", err)
 	}
+
 	localDocument, err := parseObject(local)
 	if err != nil {
 		return Result{}, fmt.Errorf("parse structured local: %w", err)
@@ -48,6 +50,33 @@ func Structured(base, local, remote []byte) (Result, error) {
 		return Result{}, fmt.Errorf("marshal structured merge: %w", err)
 	}
 	return Result{Data: buffer.Bytes()}, nil
+}
+
+func StructuredDocument(rel string, base, local, remote []byte) (Result, error) {
+	format, baseDocument, err := portableconfig.Parse(rel, base)
+	if err != nil {
+		return Result{}, fmt.Errorf("parse structured base: %w", err)
+	}
+	localFormat, localDocument, err := portableconfig.Parse(rel, local)
+	if err != nil {
+		return Result{}, fmt.Errorf("parse structured local: %w", err)
+	}
+	remoteFormat, remoteDocument, err := portableconfig.Parse(rel, remote)
+	if err != nil {
+		return Result{}, fmt.Errorf("parse structured remote: %w", err)
+	}
+	if localFormat != format || remoteFormat != format {
+		return Result{}, fmt.Errorf("structured merge formats do not match")
+	}
+	merged, conflict := mergeMaps(baseDocument, localDocument, remoteDocument)
+	if conflict {
+		return Result{Conflict: true}, nil
+	}
+	data, err := portableconfig.Marshal(format, merged)
+	if err != nil {
+		return Result{}, fmt.Errorf("marshal structured merge: %w", err)
+	}
+	return Result{Data: data}, nil
 }
 
 func Binary(base, local, remote []byte) Result {

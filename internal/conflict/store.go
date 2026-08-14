@@ -1,6 +1,7 @@
 package conflict
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -110,6 +111,142 @@ func (s *Store) List() ([]Record, error) {
 		return records[left].CreatedAt.Before(records[right].CreatedAt)
 	})
 	return records, nil
+}
+
+func (s *Store) MirrorFromRepo(preserveLocal map[string]struct{}) error {
+	repoRoot := s.repoConflictRoot()
+	entries, err := os.ReadDir(repoRoot)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	remoteIDs := map[string]struct{}{}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".tmp-") {
+			continue
+		}
+		id := entry.Name()
+		if _, preserve := preserveLocal[id]; preserve {
+			continue
+		}
+		record, variants, err := s.readBundle(repoRoot, id)
+		if err != nil {
+			return err
+		}
+		remoteIDs[id] = struct{}{}
+		localFinal := filepath.Join(s.localRoot, id)
+		if info, err := os.Lstat(localFinal); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+				return fmt.Errorf("local conflict %q is not a regular directory", id)
+			}
+			localRecord, localVariants, err := s.readBundle(s.localRoot, id)
+			if err != nil {
+				return err
+			}
+			if localRecord != record || !sameVariants(localVariants, variants) {
+				return fmt.Errorf("local and repository conflict %q do not match", id)
+			}
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		localTemp, err := s.writeTempBundle(s.localRoot, record, variants)
+		if err != nil {
+			return err
+		}
+		if err := os.Rename(localTemp, localFinal); err != nil {
+			_ = os.RemoveAll(localTemp)
+			return fmt.Errorf("publish mirrored local conflict bundle: %w", err)
+		}
+	}
+
+	localEntries, err := os.ReadDir(s.localRoot)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range localEntries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".tmp-") {
+			continue
+		}
+		id := entry.Name()
+		if _, preserve := preserveLocal[id]; preserve {
+			continue
+		}
+		if _, exists := remoteIDs[id]; exists {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(s.localRoot, id)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) readBundle(parent, id string) (
+	Record,
+	[]struct {
+		name string
+		data []byte
+	},
+	error,
+) {
+	if err := validateSegment("conflict id", id); err != nil {
+		return Record{}, nil, err
+	}
+	data, err := os.ReadFile(filepath.Join(parent, id, "record.json"))
+	if err != nil {
+		return Record{}, nil, err
+	}
+	var record Record
+	if err := json.Unmarshal(data, &record); err != nil {
+		return Record{}, nil, fmt.Errorf("parse conflict %q: %w", id, err)
+	}
+	if err := validateRecord(record); err != nil {
+		return Record{}, nil, err
+	}
+	if record.ID != id {
+		return Record{}, nil, fmt.Errorf("conflict directory %q contains record %q", id, record.ID)
+	}
+	variants := make([]struct {
+		name string
+		data []byte
+	}, 0, 3)
+	for _, variant := range []string{"base", "local", "remote"} {
+		data, err := os.ReadFile(filepath.Join(parent, id, variant))
+		if err != nil {
+			return Record{}, nil, err
+		}
+		if s.scanner != nil {
+			if err := s.scanner(record, variant, data); err != nil {
+				return Record{}, nil, fmt.Errorf("scan conflict %s %s: %w", id, variant, err)
+			}
+		}
+		variants = append(variants, struct {
+			name string
+			data []byte
+		}{name: variant, data: data})
+	}
+	return record, variants, nil
+}
+
+func sameVariants(
+	left, right []struct {
+		name string
+		data []byte
+	},
+) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index].name != right[index].name ||
+			!bytes.Equal(left[index].data, right[index].data) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Store) Resolve(id string, merged []byte) error {

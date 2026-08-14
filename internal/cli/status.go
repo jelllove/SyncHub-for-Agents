@@ -1,15 +1,20 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/portableconfig"
+	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/acsync/internal/resourcecollect"
 	"github.com/qinqingxu/acsync/internal/state"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
-// Status is a snapshot of the current sync situation.
 type Status struct {
 	RepoURL        string
 	EnabledAgents  []string
@@ -17,7 +22,6 @@ type Status struct {
 	PendingActions int
 }
 
-// RunStatus computes status for home without contacting the remote.
 func RunStatus(home, goos string) (Status, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
@@ -26,7 +30,7 @@ func RunStatus(home, goos string) (Status, error) {
 	return runStatusWithUserHome(home, goos, userHome)
 }
 
-func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
+func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr error) {
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
 		return Status{}, err
@@ -35,38 +39,61 @@ func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	specs, err := BuildSpecs(cfg, providers, goos, userHome)
+	resources, err := BuildResourceSpecs(cfg, providers, goos, userHome)
 	if err != nil {
 		return Status{}, err
 	}
-
-	specList := make([]syncengine.AgentSpec, 0, len(specs))
-	for _, s := range specs {
-		specList = append(specList, s)
+	codecs := portableconfig.NewRegistry()
+	stageParent := filepath.Join(RepoDir(home), ".git", "acsync-stage")
+	if err := os.MkdirAll(stageParent, 0o700); err != nil {
+		return Status{}, fmt.Errorf("create status stage parent: %w", err)
 	}
-	collected, err := syncengine.Collect(specList)
+	specList := make([]resource.Spec, 0, len(resources))
+	for _, spec := range resources {
+		specList = append(specList, spec)
+	}
+	collected, err := resourcecollect.New(resourcecollect.Options{
+		StageParent: stageParent,
+		GOOS:        goos,
+		UserHome:    userHome,
+		Projector:   codecs,
+	}).Collect(specList)
 	if err != nil {
 		return Status{}, err
 	}
+	defer func() {
+		retErr = errors.Join(retErr, collected.Close())
+	}()
 
 	remote, err := syncengine.SnapshotRepo(RepoDir(home))
 	if err != nil {
 		return Status{}, err
 	}
-	remoteBlocked, err := syncengine.ScanRemoteBlocked(RepoDir(home), specs, remote)
-	if err != nil {
-		return Status{}, err
-	}
+	remoteOwned, _, ownershipBlocked := syncengine.SplitRemoteSnapshot(remote, resources)
+	validRemote, validationBlocked := syncengine.ValidateRemoteResources(
+		RepoDir(home),
+		remoteOwned,
+		resources,
+		codecs,
+		goos,
+		userHome,
+	)
 	base, err := state.Load(StatePath(home))
 	if err != nil {
 		return Status{}, err
 	}
-
-	blocked := append(append([]string{}, collected.Blocked...), remoteBlocked...)
-	actions := syncengine.ReconcileWithBlocked(
-		syncengine.FilterSnapshotForSpecs(base, specs),
+	blocked := append(append(append(
+		[]resource.Issue{},
+		collected.Blocked...),
+		ownershipBlocked...),
+		validationBlocked...)
+	actions, _ := syncengine.PrepareResourceActions(
+		base,
 		collected.Snapshot,
-		syncengine.FilterSnapshotForSpecs(remote, specs),
+		remote,
+		validRemote,
+		resources,
+		collected.Skipped,
 		blocked,
 	)
 
@@ -74,7 +101,6 @@ func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
 	if info, err := os.Stat(StatePath(home)); err == nil {
 		last = info.ModTime()
 	}
-
 	return Status{
 		RepoURL:        cfg.RepoURL,
 		EnabledAgents:  cfg.EnabledAgents(),

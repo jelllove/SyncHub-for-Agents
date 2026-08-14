@@ -19,4 +19,10 @@ type Progress struct {
 	TotalActions     int           `json:"totalActions"`
 	BlockedFiles     int           `json:"blockedFiles"`
 	Pushed           bool          `json:"pushed"`
+	Restored         int           `json:"restored"`
+	Reinstalled      int           `json:"reinstalled"`
+	Skipped          int           `json:"skipped"`
+	Conflicts        int           `json:"conflicts"`
+	PendingInstalls  int           `json:"pendingInstalls"`
+	NeedsAttention   bool          `json:"needsAttention"`
 }

@@ -10,8 +10,6 @@ import (
 	"github.com/qinqingxu/acsync/internal/pathresolver"
 	"github.com/qinqingxu/acsync/internal/provider"
 	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/secret"
-	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
 // Home returns the acsync home directory (~/.acsync).
@@ -77,33 +75,6 @@ func LoadProviders(home string) ([]provider.Provider, error) {
 		out = append(out, byName[name])
 	}
 	return out, nil
-}
-
-// BuildSpecs resolves enabled providers into AgentSpecs for the given OS/home.
-func BuildSpecs(cfg config.Config, providers []provider.Provider, goos, userHome string) (map[string]syncengine.AgentSpec, error) {
-	specs := map[string]syncengine.AgentSpec{}
-	for _, p := range providers {
-		if !cfg.Agents[p.Name] {
-			continue
-		}
-		raw, ok := p.Config.Paths[goos]
-		if !ok || raw == "" {
-			continue
-		}
-		root, err := pathresolver.ResolveFor(raw, goos, userHome)
-		if err != nil {
-			return nil, err
-		}
-		root = normalizeResolvedPath(goos, root)
-		specs[p.Name] = syncengine.AgentSpec{
-			Name:     p.Name,
-			Root:     root,
-			Include:  p.Config.Include,
-			Sessions: p.Config.Sessions,
-			Scanner:  secret.NewScanner(p.Config.Exclude, p.Secrets.KeyPatterns),
-		}
-	}
-	return specs, nil
 }
 
 func BuildResourceSpecs(cfg config.Config, providers []provider.Provider, goos, userHome string) (map[string]resource.Spec, error) {

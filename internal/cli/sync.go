@@ -2,9 +2,13 @@ package cli
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/conflict"
+	"github.com/qinqingxu/acsync/internal/portableconfig"
+	"github.com/qinqingxu/acsync/internal/state"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
@@ -36,7 +40,7 @@ func runSyncWithUserHome(
 	if err != nil {
 		return syncengine.Result{}, err
 	}
-	specs, err := BuildSpecs(cfg, providers, goos, userHome)
+	resources, err := BuildResourceSpecs(cfg, providers, goos, userHome)
 	if err != nil {
 		return syncengine.Result{}, err
 	}
@@ -45,11 +49,25 @@ func runSyncWithUserHome(
 	if err != nil {
 		return syncengine.Result{}, err
 	}
+	repoDir := RepoDir(home)
+	codecs := portableconfig.NewRegistry()
+	baseStore := state.NewBaseStore(home)
+	conflictStore := conflict.NewStore(
+		filepath.Join(home, "conflicts"),
+		repoDir,
+		syncengine.ConflictScanner(resources),
+	)
 	eng := &syncengine.Engine{
 		Git:         client,
-		RepoDir:     RepoDir(home),
+		RepoDir:     repoDir,
+		Home:        home,
+		UserHome:    userHome,
+		GOOS:        goos,
 		StatePath:   StatePath(home),
-		Specs:       specs,
+		Resources:   resources,
+		Codecs:      codecs,
+		Base:        baseStore,
+		Conflicts:   conflictStore,
 		PushRetries: 5,
 		Now:         time.Now,
 	}
