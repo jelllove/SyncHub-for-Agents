@@ -69,16 +69,29 @@ AgentConfigSync records that stable path, not the temporary AppImage mount.
      operating-system keyring.
 3. Choose agents to synchronize. Detected agents are enabled by default.
 4. Select **Start synchronizing**.
+5. Open **Sync settings** and review the resource categories, source-to-target
+   mappings, excluded files, and restore totals.
+6. If the repository contains Plugin declarations or Skill dependencies,
+   review the exact executable and arguments in the installation plan before
+   approving it.
 
 The app runs an initial synchronization and then checks every ten minutes.
 Closing the window keeps it running in the system tray. Use **Quit** from the
 tray menu to stop it completely.
+
+On a new computer, safe configuration, instructions, Skills, and sessions
+restore from the connected repository. Existing local credentials remain
+local. See [Portable agent resources](portable-resources.md) for category
+details, exclusions, conflict handling, and recovery behavior.
 
 ## Settings and startup
 
 Open the dashboard from the tray icon. Settings let you:
 
 - enable or disable each detected agent;
+- enable or disable individual resource categories;
+- preview portable and excluded files;
+- add validated custom resource directories;
 - change the synchronization interval;
 - enable or disable **Start at login**;
 - trigger a synchronization immediately.

@@ -210,6 +210,13 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	for _, record := range existingConflictRecords {
 		existingConflictPaths[record.RepoRel] = struct{}{}
 	}
+	var pendingInstallPlan *installplan.Plan
+	if e.InstallManager != nil {
+		pendingInstallPlan, err = e.InstallManager.Store.Pending()
+		if err != nil {
+			return Result{}, fmt.Errorf("load pending install plan: %w", err)
+		}
+	}
 	e.publish(Progress{
 		Stage:        StageApplying,
 		Label:        "Applying synchronized resources",
@@ -245,6 +252,12 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		spec, specErr := specForRepoPath(e.Resources, action.RepoRel)
 		if specErr != nil && action.Type != RemoveRemote {
 			return Result{}, specErr
+		}
+		if action.Type == DeleteRemote &&
+			spec.Strategy == resource.StrategyInstallManifest &&
+			pendingInstallForAdapter(pendingInstallPlan, spec.Installer) {
+			preserve[action.RepoRel] = struct{}{}
+			continue
 		}
 		switch action.Type {
 		case MergeBoth:
@@ -298,6 +311,16 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		case DeleteRemote:
 			if err := applier.SoftDeleteRemote(action.RepoRel); err != nil {
 				return Result{}, fmt.Errorf("delete remote resource %q: %w", action.RepoRel, err)
+			}
+			if spec.Strategy != resource.StrategyInstallManifest {
+				if err := applier.Delete(spec, action.RepoRel); err != nil {
+					result.Issues = append(
+						result.Issues,
+						applyIssue(spec.Key, action.RepoRel, "delete-local-alias-failed", err),
+					)
+					preserve[action.RepoRel] = struct{}{}
+					continue
+				}
 			}
 		case DeleteLocal:
 			if spec.Strategy == resource.StrategyInstallManifest {
@@ -453,6 +476,9 @@ func (e *Engine) validate() error {
 	if strings.TrimSpace(e.Home) == "" {
 		e.Home = filepath.Dir(e.StatePath)
 	}
+	if e.InstallManager != nil && e.InstallManager.Store == nil {
+		return fmt.Errorf("sync engine install manager requires a store")
+	}
 	for _, spec := range e.Resources {
 		if spec.Strategy != resource.StrategyInstallManifest {
 			continue
@@ -498,7 +524,27 @@ func (e *Engine) mergeResource(
 	}
 
 	var merged portablemerge.Result
-	if !baseExists || !localExists || !remoteExists {
+	if !baseExists &&
+		localExists &&
+		remoteExists &&
+		spec.Strategy == resource.StrategyStructuredMerge {
+		ref, parseErr := resource.ParseRepoPath(repoRel)
+		if parseErr != nil {
+			return false, parseErr
+		}
+		format, _, parseErr := portableconfig.Parse(ref.Relative, remote)
+		if parseErr != nil {
+			return false, fmt.Errorf("parse initial structured remote %q: %w", repoRel, parseErr)
+		}
+		emptyBase, marshalErr := portableconfig.Marshal(format, map[string]any{})
+		if marshalErr != nil {
+			return false, fmt.Errorf("create initial structured base %q: %w", repoRel, marshalErr)
+		}
+		merged, err = portablemerge.StructuredDocument(ref.Relative, emptyBase, local, remote)
+		if err != nil {
+			return false, fmt.Errorf("merge resource %q: %w", repoRel, err)
+		}
+	} else if !baseExists || !localExists || !remoteExists {
 		merged.Conflict = true
 	} else {
 		switch spec.Strategy {
@@ -550,6 +596,19 @@ func (e *Engine) mergeResource(
 		return false, fmt.Errorf("restore merged resource %q: %w", repoRel, err)
 	}
 	return false, nil
+}
+
+func pendingInstallForAdapter(plan *installplan.Plan, adapter string) bool {
+	if plan == nil {
+		return false
+	}
+	for _, operation := range plan.Operations {
+		if operation.Adapter == adapter &&
+			(operation.Kind == "install" || operation.Kind == "update") {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Engine) publish(progress Progress) {
