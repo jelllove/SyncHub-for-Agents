@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/qinqingxu/acsync/internal/processattr"
 )
 
 type RunResult struct {
@@ -25,7 +27,7 @@ func (CommandRunner) Run(
 	args []string,
 	workingDir string,
 ) (RunResult, error) {
-	command := exec.CommandContext(ctx, executable, args...)
+	command := newRunnerCommand(ctx, executable, args)
 	command.Dir = workingDir
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -33,6 +35,12 @@ func (CommandRunner) Run(
 	command.Stderr = &stderr
 	err := command.Run()
 	return RunResult{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}, err
+}
+
+func newRunnerCommand(ctx context.Context, executable string, args []string) *exec.Cmd {
+	command := exec.CommandContext(ctx, executable, args...)
+	processattr.HideWindow(command)
+	return command
 }
 
 type ExecutionResult struct {
