@@ -3,6 +3,7 @@ package desktop
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/daemon"
+	"github.com/qinqingxu/acsync/internal/installplan"
 	"github.com/qinqingxu/acsync/internal/provider"
 	"github.com/qinqingxu/acsync/internal/scheduler"
 	"github.com/qinqingxu/acsync/internal/syncengine"
@@ -197,6 +199,18 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	preview, err := s.preview(cfg, providers)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	pending, err := installplan.NewStore(filepath.Join(s.home, "install")).Pending()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	conflictRecords, err := conflictStore(s.home, nil).List()
+	if err != nil {
+		return Snapshot{}, err
+	}
 
 	s.mu.RLock()
 	d := s.daemon
@@ -210,19 +224,31 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	if !last.FinishedAt.IsZero() {
 		next = last.FinishedAt.Add(d.Scheduler.IntervalDuration())
 	}
+	stateValue := d.Scheduler.State().String()
+	if last.NeedsAttention && stateValue == "idle" {
+		stateValue = "error"
+	}
+	agents, err := makeAgents(providers, cfg, s.goos, preview)
+	if err != nil {
+		return Snapshot{}, err
+	}
 	return Snapshot{
-		Configured:      true,
-		State:           d.Scheduler.State().String(),
-		RepositoryURL:   cfg.RepoURL,
-		IntervalMinutes: cfg.SyncIntervalMinutes,
-		TrashGraceDays:  cfg.TrashGraceDays,
-		Agents:          makeAgents(providers, cfg.Agents),
-		LastSync:        status.LastSync,
-		NextSync:        next,
-		PendingActions:  status.PendingActions,
-		BlockedFiles:    last.Blocked,
-		LastError:       last.Error,
-		Progress:        progress,
+		Configured:         true,
+		State:              stateValue,
+		RepositoryURL:      cfg.RepoURL,
+		Platform:           s.goos,
+		IntervalMinutes:    cfg.SyncIntervalMinutes,
+		TrashGraceDays:     cfg.TrashGraceDays,
+		Agents:             agents,
+		LastSync:           status.LastSync,
+		NextSync:           next,
+		PendingActions:     status.PendingActions,
+		BlockedFiles:       last.Blocked,
+		LastError:          last.Error,
+		Progress:           progress,
+		Preview:            preview,
+		PendingInstallPlan: desktopInstallPlan(pending),
+		Conflicts:          desktopConflicts(conflictRecords),
 	}, nil
 }
 
@@ -231,30 +257,81 @@ func (s *Service) unconfiguredSnapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	enabled := make(map[string]bool, len(providers))
+	names := make([]string, 0, len(providers))
 	for _, provider := range providers {
-		enabled[provider.Name] = true
+		names = append(names, provider.Name)
+	}
+	cfg := config.Default(names)
+	agents, err := makeAgents(providers, cfg, s.goos, ResourcePreview{})
+	if err != nil {
+		return Snapshot{}, err
 	}
 	return Snapshot{
 		Configured:      false,
 		State:           "idle",
 		IntervalMinutes: 10,
 		TrashGraceDays:  30,
-		Agents:          makeAgents(providers, enabled),
+		Platform:        s.goos,
+		Agents:          agents,
 	}, nil
 }
 
-func makeAgents(providers []provider.Provider, enabled map[string]bool) []Agent {
+func makeAgents(
+	providers []provider.Provider,
+	cfg config.Config,
+	goos string,
+	preview ResourcePreview,
+) ([]Agent, error) {
+	previewItems := previewByIdentity(preview)
 	agents := make([]Agent, 0, len(providers))
-	for _, provider := range providers {
-		agents = append(agents, Agent{
-			Name:    provider.Name,
-			Enabled: enabled[provider.Name],
-			Exclude: provider.Config.Exclude,
-		})
+	for _, item := range providers {
+		agent := Agent{Name: item.Name, Enabled: cfg.Agents[item.Name]}
+		declarations, err := item.Declarations()
+		if err != nil {
+			return nil, err
+		}
+		excludes := map[string]struct{}{}
+		for _, declaration := range declarations {
+			for _, exclude := range declaration.Exclude {
+				excludes[exclude] = struct{}{}
+			}
+			enabled := cfg.CategoryEnabled(item.Name, declaration.Category)
+			resourceItem, exists := previewItems[resourceIdentity(
+				item.Name,
+				declaration.ID,
+				string(declaration.Category),
+			)]
+			if exists {
+				resourceItem.Enabled = enabled
+				agent.Resources = append(agent.Resources, resourceItem)
+				continue
+			}
+			source, supported := declaration.Paths[goos]
+			resourceItem = ResourceCategory{
+				Provider: item.Name, ID: declaration.ID,
+				Category: string(declaration.Category),
+				Enabled:  enabled, Supported: supported, Source: source,
+				Target: source, Status: "disabled",
+			}
+			if !supported {
+				resourceItem = unsupportedResource(
+					item.Name,
+					declaration.ID,
+					declaration.Category,
+					source,
+					enabled,
+				)
+			}
+			agent.Resources = append(agent.Resources, resourceItem)
+		}
+		for exclude := range excludes {
+			agent.Exclude = append(agent.Exclude, exclude)
+		}
+		sort.Strings(agent.Exclude)
+		agents = append(agents, agent)
 	}
 	sort.Slice(agents, func(i, j int) bool { return agents[i].Name < agents[j].Name })
-	return agents
+	return agents, nil
 }
 
 // SaveSettings persists edits and applies the interval to the running daemon.
@@ -265,11 +342,29 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 	if input.TrashGraceDays < 0 {
 		return errors.New("trash grace days cannot be negative")
 	}
+	existing, err := config.Load(cli.ConfigPath(s.home))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	categories := input.Categories
+	if categories == nil {
+		categories = existing.Categories
+	}
+	custom := make([]config.CustomResource, 0, len(input.CustomResources))
+	if input.CustomResources == nil {
+		custom = existing.CustomResources
+	} else {
+		for _, item := range input.CustomResources {
+			custom = append(custom, item.toConfig())
+		}
+	}
 	cfg := config.Config{
 		RepoURL:             input.RepositoryURL,
 		SyncIntervalMinutes: input.IntervalMinutes,
 		TrashGraceDays:      input.TrashGraceDays,
 		Agents:              input.Agents,
+		Categories:          categories,
+		CustomResources:     custom,
 	}
 	if err := config.Save(cli.ConfigPath(s.home), cfg); err != nil {
 		return err

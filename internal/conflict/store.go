@@ -253,6 +253,7 @@ func (s *Store) Resolve(id string, merged []byte) error {
 	if err := validateSegment("conflict id", id); err != nil {
 		return err
 	}
+
 	record, err := s.readRecord(id)
 	if err != nil {
 		return err
@@ -269,6 +270,23 @@ func (s *Store) Resolve(id string, merged []byte) error {
 	localErr := os.RemoveAll(filepath.Join(s.localRoot, id))
 	repoErr := os.RemoveAll(filepath.Join(s.repoConflictRoot(), id))
 	return errors.Join(localErr, repoErr)
+}
+
+func (s *Store) ResolveVariant(id, variant string) error {
+	if variant != "local" && variant != "remote" {
+		return fmt.Errorf("conflict choice %q is not supported", variant)
+	}
+	if err := validateSegment("conflict id", id); err != nil {
+		return err
+	}
+	if _, err := s.readRecord(id); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(s.localRoot, id, variant))
+	if err != nil {
+		return fmt.Errorf("read conflict %s %s variant: %w", id, variant, err)
+	}
+	return s.Resolve(id, data)
 }
 
 func (s *Store) readRecord(id string) (Record, error) {

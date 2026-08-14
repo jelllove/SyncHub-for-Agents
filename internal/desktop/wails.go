@@ -103,6 +103,22 @@ func (s *WailsService) SaveSettings(input SettingsInput) error {
 	return s.core.SaveSettings(input)
 }
 
+func (s *WailsService) ResourcePreview() (ResourcePreview, error) {
+	return s.core.ResourcePreview()
+}
+
+func (s *WailsService) PreviewCustomResource(input CustomResourceInput) (ResourcePreview, error) {
+	return s.core.PreviewCustomResource(input)
+}
+
+func (s *WailsService) ApproveInstallPlan(id string) error {
+	return s.core.ApproveInstallPlan(id)
+}
+
+func (s *WailsService) ResolveConflict(input ConflictResolution) error {
+	return s.core.ResolveConflict(input)
+}
+
 func (s *WailsService) SetStartAtLogin(enabled bool) error {
 	if enabled {
 		return s.startup.Enable()

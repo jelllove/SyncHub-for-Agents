@@ -123,6 +123,7 @@ func validateCustomResources(resources []CustomResource) error {
 		if item.Strategy == resource.StrategyInstallManifest {
 			return fmt.Errorf("custom resource %q: strategy %q is not supported", item.ID, item.Strategy)
 		}
+
 		declaration := resource.Declaration{
 			ID:       item.ID,
 			Category: item.Category,
@@ -149,6 +150,10 @@ func validateCustomResources(resources []CustomResource) error {
 		}
 	}
 	return nil
+}
+
+func ValidateCustomResources(resources []CustomResource) error {
+	return validateCustomResources(resources)
 }
 
 func validatePathMap(id, field string, values map[string]string) error {
