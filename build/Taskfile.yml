@@ -195,12 +195,20 @@ tasks:
     run: once
     dir: build
     sources:
-      - "appicon.png"
+      - "../assets/icons/*.svg"
+      - "../frontend/scripts/generate-icons.mjs"
+      - "../frontend/package.json"
+      - "../frontend/package-lock.json"
       - "appicon.icon"
     generates:
+      - "appicon.png"
       - "darwin/icons.icns"
       - "windows/icon.ico"
+      - "../internal/tray/assets/*.png"
+    deps:
+      - task: install:frontend:deps
     cmds:
+      - npm --prefix ../frontend run generate:icons
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
 
   dev:frontend:
