@@ -14,6 +14,7 @@ import {
   type Agent,
   type State,
 } from '../../bindings/github.com/qinqingxu/acsync/internal/onboarding/models'
+import { BrandMark } from '../BrandMark'
 
 type WizardState = Omit<State, 'agents'> & { agents: Agent[] }
 
@@ -94,14 +95,14 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   }
 
   if (!state) {
-    return <main className="loading"><div className="brand-mark">A</div><p>{error || 'Preparing setup…'}</p></main>
+    return <main className="loading"><BrandMark label="AgentConfigSync" /><p>{error || 'Preparing setup…'}</p></main>
   }
 
   if (state.step === Step.Welcome && !showRepository) {
     return (
       <div className="onboarding-shell">
         <section className="onboarding-card welcome-card">
-          <div className="brand-mark large">A</div>
+          <BrandMark className="large" label="AgentConfigSync" />
           <span className="eyebrow">WELCOME TO AGENTCONFIGSYNC</span>
           <h1>One workspace.<br />Every computer.</h1>
           <p>Synchronize Claude, Copilot, Gemini, Cursor, and their sessions through a private repository you control.</p>
@@ -190,14 +191,14 @@ export default function Onboarding({ complete }: { complete: () => void }) {
     )
   }
 
-  return <main className="loading"><div className="brand-mark">A</div><p>Setup complete</p></main>
+  return <main className="loading"><BrandMark label="AgentConfigSync" /><p>Setup complete</p></main>
 }
 
 function WizardFrame({ step, title, subtitle, error, children }: { step: number; title: string; subtitle: string; error: string; children: React.ReactNode }) {
   const cancel = () => void CancelOnboarding()
   return (
     <div className="onboarding-shell">
-      <button className="onboarding-brand" onClick={cancel}><span className="brand-mark">A</span> AgentConfigSync</button>
+      <button className="onboarding-brand" onClick={cancel}><BrandMark /> AgentConfigSync</button>
       <section className="onboarding-card">
         <div className="stepper"><span className={step >= 1 ? 'done' : ''}>1</span><i /><span className={step >= 2 ? 'done' : ''}>2</span><i /><span className={step >= 3 ? 'done' : ''}>3</span></div>
         <h1>{title}</h1>

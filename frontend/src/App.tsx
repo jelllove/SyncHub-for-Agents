@@ -22,6 +22,7 @@ import {
   type Snapshot,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
 import './style.css'
+import { BrandMark } from './BrandMark'
 import Onboarding from './onboarding/Onboarding'
 import { ConflictPanel } from './resources/ConflictPanel'
 import { CustomResourceEditor } from './resources/CustomResourceEditor'
@@ -46,8 +47,9 @@ type AppSnapshot = Omit<Snapshot, 'agents' | 'preview' | 'conflicts' | 'customRe
 }
 
 const stateLabels: Record<string, string> = {
-  idle: 'Up to date',
+  idle: 'Ready',
   updating: 'Updating',
+  done: 'Sync complete',
   paused: 'Paused',
   error: 'Needs attention',
 }
@@ -168,7 +170,7 @@ function App() {
   if (needsOnboarding === undefined || !snapshot) {
     return (
       <main className="loading">
-        <div className="brand-mark">A</div>
+        <BrandMark label="AgentConfigSync" />
         <p>{error || 'Opening AgentConfigSync…'}</p>
       </main>
     )
@@ -187,7 +189,7 @@ function App() {
     <div className="app-shell">
       <header>
         <div className="brand">
-          <div className="brand-mark">A</div>
+          <BrandMark label="AgentConfigSync" />
           <div>
             <strong>AgentConfigSync</strong>
             <span>Desktop</span>
@@ -217,7 +219,7 @@ function App() {
         ) : (
           <>
             <section className={`hero state-${state}`}>
-              <div className="status-orb"><span /></div>
+              <StatusMark state={state} />
               <div className="hero-copy">
                 <span className="eyebrow">SYNC STATUS</span>
                 <h1>{stateLabels[state] ?? state}</h1>
@@ -347,6 +349,40 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  )
+}
+
+function StatusMark({ state }: { state: string }) {
+  return (
+    <div className="status-orb" aria-hidden="true">
+      <svg viewBox="0 0 32 32">
+        {state === 'updating' && (
+          <>
+            <path d="M7 15a9 9 0 0 1 15-6M25 17a9 9 0 0 1-15 6" />
+            <path d="m20 6 4 3-4 3M12 26l-4-3 4-3" />
+          </>
+        )}
+        {state === 'done' && <path d="m9 16 5 5 10-11" />}
+        {state === 'error' && (
+          <>
+            <path d="M16 8v10" />
+            <circle cx="16" cy="23" r="1.5" />
+          </>
+        )}
+        {state === 'paused' && (
+          <>
+            <path d="M12 9v14" />
+            <path d="M20 9v14" />
+          </>
+        )}
+        {!['updating', 'done', 'error', 'paused'].includes(state) && (
+          <>
+            <path d="m16 9 7 4v8l-7 4-7-4v-8Z" />
+            <circle cx="16" cy="17" r="2.5" />
+          </>
+        )}
+      </svg>
+    </div>
   )
 }
 
