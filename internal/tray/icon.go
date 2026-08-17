@@ -3,71 +3,80 @@ package tray
 
 import (
 	"bytes"
+	"embed"
 	"encoding/binary"
-	"image"
-	"image/color"
-	"image/png"
+	"fmt"
 
 	"github.com/qinqingxu/acsync/internal/scheduler"
 )
 
-func colorFor(s scheduler.State) color.RGBA {
-	switch s {
+var iconSizes = []int{16, 20, 24, 32}
+
+//go:embed assets/*.png
+var iconAssets embed.FS
+
+func assetName(state scheduler.State) string {
+	switch state {
 	case scheduler.StateUpdating:
-		return color.RGBA{0x1e, 0x90, 0xff, 0xff} // blue
+		return "updating"
+	case scheduler.StateDone:
+		return "done"
 	case scheduler.StateError:
-		return color.RGBA{0xd3, 0x2f, 0x2f, 0xff} // red
+		return "error"
 	case scheduler.StatePaused:
-		return color.RGBA{0x9e, 0x9e, 0x9e, 0xff} // gray
+		return "paused"
 	default:
-		return color.RGBA{0x2e, 0x7d, 0x32, 0xff} // green (idle)
+		return "ready"
 	}
 }
 
-func renderPNG(c color.RGBA, size int) []byte {
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			img.SetRGBA(x, y, c)
-		}
+func assetPNG(state scheduler.State, size int) []byte {
+	data, err := iconAssets.ReadFile(fmt.Sprintf("assets/%s-%d.png", assetName(state), size))
+	if err != nil {
+		panic(fmt.Sprintf("tray icon asset is missing: %v", err))
 	}
-	var buf bytes.Buffer
-	_ = png.Encode(&buf, img)
-	return buf.Bytes()
+	return data
 }
 
-// pngToICO wraps a square PNG (side=size) in a single-image ICO container.
-// Windows Vista+ accepts PNG-compressed icon images.
-func pngToICO(pngData []byte, size int) []byte {
-	var buf bytes.Buffer
-	// ICONDIR
-	binary.Write(&buf, binary.LittleEndian, uint16(0)) // reserved
-	binary.Write(&buf, binary.LittleEndian, uint16(1)) // type: 1 = icon
-	binary.Write(&buf, binary.LittleEndian, uint16(1)) // image count
-	// ICONDIRENTRY
-	dim := byte(size)
-	if size >= 256 {
-		dim = 0 // 0 means 256
+// pngsToICO wraps PNG-compressed images in a multi-resolution ICO container.
+func pngsToICO(images [][]byte, sizes []int) []byte {
+	const (
+		headerSize = 6
+		entrySize  = 16
+	)
+	dataOffset := headerSize + entrySize*len(images)
+	totalSize := dataOffset
+	for _, image := range images {
+		totalSize += len(image)
 	}
-	buf.WriteByte(dim)                                           // width
-	buf.WriteByte(dim)                                           // height
-	buf.WriteByte(0)                                             // palette size
-	buf.WriteByte(0)                                             // reserved
-	binary.Write(&buf, binary.LittleEndian, uint16(1))          // color planes
-	binary.Write(&buf, binary.LittleEndian, uint16(32))         // bits per pixel
-	binary.Write(&buf, binary.LittleEndian, uint32(len(pngData))) // image size
-	binary.Write(&buf, binary.LittleEndian, uint32(22))         // offset (6 + 16)
-	buf.Write(pngData)
-	return buf.Bytes()
+
+	ico := make([]byte, totalSize)
+	binary.LittleEndian.PutUint16(ico[2:4], 1)
+	binary.LittleEndian.PutUint16(ico[4:6], uint16(len(images)))
+
+	imageOffset := dataOffset
+	for index, image := range images {
+		entry := headerSize + index*entrySize
+		ico[entry] = byte(sizes[index])
+		ico[entry+1] = byte(sizes[index])
+		binary.LittleEndian.PutUint16(ico[entry+4:entry+6], 1)
+		binary.LittleEndian.PutUint16(ico[entry+6:entry+8], 32)
+		binary.LittleEndian.PutUint32(ico[entry+8:entry+12], uint32(len(image)))
+		binary.LittleEndian.PutUint32(ico[entry+12:entry+16], uint32(imageOffset))
+		copy(ico[imageOffset:], image)
+		imageOffset += len(image)
+	}
+	return ico
 }
 
-// Icon returns the tray icon bytes for a state, in the format the OS expects
-// (ICO on Windows, PNG elsewhere).
-func Icon(s scheduler.State, goos string) []byte {
-	const size = 32
-	pngData := renderPNG(colorFor(s), size)
-	if goos == "windows" {
-		return pngToICO(pngData, size)
+// Icon returns tray icon bytes in the format the OS expects.
+func Icon(state scheduler.State, goos string) []byte {
+	if goos != "windows" {
+		return bytes.Clone(assetPNG(state, 32))
 	}
-	return pngData
+	images := make([][]byte, 0, len(iconSizes))
+	for _, size := range iconSizes {
+		images = append(images, assetPNG(state, size))
+	}
+	return pngsToICO(images, iconSizes)
 }

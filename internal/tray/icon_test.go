@@ -2,51 +2,88 @@ package tray
 
 import (
 	"bytes"
-	"image/color"
+	"encoding/binary"
 	"image/png"
 	"testing"
 
 	"github.com/qinqingxu/acsync/internal/scheduler"
 )
 
-func TestRenderPNGIsSolidColor(t *testing.T) {
-	data := renderPNG(color.RGBA{10, 20, 30, 255}, 8)
-	img, err := png.Decode(bytes.NewReader(data))
-	if err != nil {
-		t.Fatalf("decode: %v", err)
+func TestAssetPNGSupportsEveryStateAndSize(t *testing.T) {
+	states := []scheduler.State{
+		scheduler.StateIdle,
+		scheduler.StateUpdating,
+		scheduler.StateDone,
+		scheduler.StateError,
+		scheduler.StatePaused,
 	}
-	if b := img.Bounds(); b.Dx() != 8 || b.Dy() != 8 {
-		t.Fatalf("size = %dx%d, want 8x8", b.Dx(), b.Dy())
-	}
-	r, g, b, a := img.At(4, 4).RGBA()
-	if uint8(r>>8) != 10 || uint8(g>>8) != 20 || uint8(b>>8) != 30 || uint8(a>>8) != 255 {
-		t.Errorf("center pixel = %d,%d,%d,%d", uint8(r>>8), uint8(g>>8), uint8(b>>8), uint8(a>>8))
+	for _, state := range states {
+		for _, size := range iconSizes {
+			data := assetPNG(state, size)
+			img, err := png.Decode(bytes.NewReader(data))
+			if err != nil {
+				t.Fatalf("decode %s %dpx: %v", state, size, err)
+			}
+			if bounds := img.Bounds(); bounds.Dx() != size || bounds.Dy() != size {
+				t.Fatalf("%s size = %dx%d, want %dx%d", state, bounds.Dx(), bounds.Dy(), size, size)
+			}
+		}
 	}
 }
 
-func TestPngToICOHeader(t *testing.T) {
-	ico := pngToICO(renderPNG(colorFor(scheduler.StateIdle), 32), 32)
-	// ICONDIR: reserved=0, type=1 (icon), count=1
-	if ico[0] != 0 || ico[1] != 0 || ico[2] != 1 || ico[3] != 0 || ico[4] != 1 || ico[5] != 0 {
-		t.Fatalf("bad ICO header: % x", ico[:6])
+func TestReadyAssetUsesTransparency(t *testing.T) {
+	img, err := png.Decode(bytes.NewReader(assetPNG(scheduler.StateIdle, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, alpha := img.At(0, 0).RGBA()
+	if alpha != 0 {
+		t.Fatalf("corner alpha = %d, want transparent", alpha)
+	}
+}
+
+func TestWindowsIconContainsEveryResolution(t *testing.T) {
+	ico := Icon(scheduler.StateDone, "windows")
+	if len(ico) < 6 {
+		t.Fatal("ICO is too short")
+	}
+	if got := binary.LittleEndian.Uint16(ico[2:4]); got != 1 {
+		t.Fatalf("ICO type = %d, want 1", got)
+	}
+	if got := int(binary.LittleEndian.Uint16(ico[4:6])); got != len(iconSizes) {
+		t.Fatalf("ICO image count = %d, want %d", got, len(iconSizes))
+	}
+	for index, want := range iconSizes {
+		offset := 6 + index*16
+		if got := int(ico[offset]); got != want {
+			t.Fatalf("entry %d width = %d, want %d", index, got, want)
+		}
+		if got := int(ico[offset+1]); got != want {
+			t.Fatalf("entry %d height = %d, want %d", index, got, want)
+		}
 	}
 }
 
 func TestIconDiffersByState(t *testing.T) {
-	idle := Icon(scheduler.StateIdle, "linux")
-	fail := Icon(scheduler.StateError, "linux")
-	if bytes.Equal(idle, fail) {
-		t.Error("idle and error icons should differ")
+	icons := map[string]struct{}{}
+	for _, state := range []scheduler.State{
+		scheduler.StateIdle,
+		scheduler.StateUpdating,
+		scheduler.StateDone,
+		scheduler.StateError,
+		scheduler.StatePaused,
+	} {
+		icons[string(Icon(state, "linux"))] = struct{}{}
+	}
+	if len(icons) != 5 {
+		t.Fatalf("distinct icons = %d, want 5", len(icons))
 	}
 }
 
-func TestIconWindowsIsICO(t *testing.T) {
-	ico := Icon(scheduler.StateIdle, "windows")
-	if len(ico) < 6 || ico[2] != 1 {
-		t.Error("windows icon should be ICO format")
-	}
-	png := Icon(scheduler.StateIdle, "linux")
-	if len(png) < 8 || png[0] != 0x89 || png[1] != 'P' {
-		t.Error("non-windows icon should be PNG format")
+func TestNonWindowsIconIsLargestPNG(t *testing.T) {
+	got := Icon(scheduler.StateIdle, "linux")
+	want := assetPNG(scheduler.StateIdle, 32)
+	if !bytes.Equal(got, want) {
+		t.Fatal("non-Windows icon should use the 32px embedded PNG")
 	}
 }
