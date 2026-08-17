@@ -1,7 +1,7 @@
 schema_version: 2
 name: vscode-copilot
 resources:
-  - id: sessions
+  - id: legacy-sessions
     category: sessions
     paths:
       windows: "%USERPROFILE%\\AppData\\Roaming\\Code\\User\\workspaceStorage"

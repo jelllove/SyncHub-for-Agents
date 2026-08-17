@@ -8,7 +8,7 @@ resources:
     exclude: ["**/.credentials.json", "**/*token*", "**/shell-snapshots/**"]
     strategy: file-tree
     layout: legacy
-  - id: sessions
+  - id: legacy-sessions
     category: sessions
     paths: {windows: "%USERPROFILE%\\.claude", darwin: "~/.claude", linux: "~/.claude"}
     include: ["history.jsonl", "sessions/**/*.json", "projects/**/sessions-index.json", "projects/**/*.jsonl"]

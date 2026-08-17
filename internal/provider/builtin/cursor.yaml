@@ -1,7 +1,7 @@
 schema_version: 2
 name: cursor
 resources:
-  - id: sessions
+  - id: legacy-sessions
     category: sessions
     paths: {windows: "%USERPROFILE%\\.cursor", darwin: "~/.cursor", linux: "~/.cursor"}
     include: ["chats/**/*.json"]

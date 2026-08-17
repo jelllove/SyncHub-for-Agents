@@ -1,7 +1,7 @@
 schema_version: 2
 name: gemini
 resources:
-  - id: sessions
+  - id: legacy-sessions
     category: sessions
     paths: {windows: "%USERPROFILE%\\.gemini", darwin: "~/.gemini", linux: "~/.gemini"}
     include: ["sessions/**/*.json", "tmp/**/chats/**/*.jsonl", "history/**/*.json"]

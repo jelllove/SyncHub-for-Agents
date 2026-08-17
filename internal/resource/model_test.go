@@ -76,6 +76,16 @@ func TestDeclarationValidateRejectsUnsupportedValues(t *testing.T) {
 			want:        "unsupported layout",
 		},
 		{
+			name:        "legacy-session-id-does-not-match-namespace",
+			declaration: Declaration{ID: "sessions", Category: CategorySessions, Strategy: StrategyFileTree, Layout: LayoutLegacy},
+			want:        `legacy sessions resource id must be "legacy-sessions"`,
+		},
+		{
+			name:        "legacy-config-id-does-not-match-namespace",
+			declaration: Declaration{ID: "settings", Category: CategoryConfig, Strategy: StrategyFileTree, Layout: LayoutLegacy},
+			want:        `legacy config resource id must be "legacy-config"`,
+		},
+		{
 			name:        "bad-transformer",
 			declaration: Declaration{ID: "bad-transformer", Category: CategoryConfig, Strategy: StrategyStructuredMerge, Transformer: "unknown"},
 			want:        "unknown transformer",

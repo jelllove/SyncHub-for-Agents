@@ -108,6 +108,26 @@ func (d Declaration) Validate(provider string) error {
 	default:
 		return fmt.Errorf("provider %s resource %s: unsupported layout %q", provider, d.ID, d.Layout)
 	}
+	if d.Layout == LayoutLegacy {
+		expectedID := legacyResourceID(d.Category)
+		if expectedID == "" {
+			return fmt.Errorf(
+				"provider %s resource %s: legacy layout does not support category %q",
+				provider,
+				d.ID,
+				d.Category,
+			)
+		}
+		if d.ID != expectedID {
+			return fmt.Errorf(
+				"provider %s resource %s: legacy %s resource id must be %q",
+				provider,
+				d.ID,
+				d.Category,
+				expectedID,
+			)
+		}
+	}
 	if d.Strategy == StrategyStructuredMerge && strings.TrimSpace(d.Transformer) == "" {
 		return fmt.Errorf("provider %s resource %s: missing transformer", provider, d.ID)
 	}

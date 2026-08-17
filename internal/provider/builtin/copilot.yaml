@@ -8,7 +8,7 @@ resources:
     exclude: &copilot_excludes ["pkg/**", "logs/**", "media-cache/**", "servers/**", "**/*token*", "**/hosts.json", "**/*.lock", "**/*.db", "**/*.db-*"]
     strategy: file-tree
     layout: legacy
-  - id: sessions
+  - id: legacy-sessions
     category: sessions
     paths: {windows: "%USERPROFILE%\\.copilot", darwin: "~/.copilot", linux: "~/.copilot"}
     include: ["session-state/*/events.jsonl", "session-state/*/workspace.yaml", "session-state/*/vscode.metadata.json", "session-state/*/vscode.requests.metadata.json", "session-state/*/plan.md", "session-state/*/checkpoints/**/*.md"]
