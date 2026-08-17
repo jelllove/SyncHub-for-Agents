@@ -200,8 +200,8 @@ func TestSaveSettingsUpdatesConfigAndLiveInterval(t *testing.T) {
 
 	err = service.SaveSettings(SettingsInput{
 		RepositoryURL:   "git@github.com:owner/new.git",
-		IntervalMinutes: 3,
-		TrashGraceDays:  45,
+		IntervalMinutes: 1440,
+		TrashGraceDays:  365,
 		Agents:          map[string]bool{"claude": false},
 	})
 	if err != nil {
@@ -211,11 +211,90 @@ func TestSaveSettingsUpdatesConfigAndLiveInterval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.RepoURL != "git@github.com:owner/new.git" || cfg.SyncIntervalMinutes != 3 {
+	if cfg.RepoURL != "git@github.com:owner/new.git" ||
+		cfg.SyncIntervalMinutes != 1440 ||
+		cfg.TrashGraceDays != 365 {
 		t.Fatalf("config = %#v", cfg)
 	}
-	if got := service.Daemon().Scheduler.IntervalDuration(); got != 3*time.Minute {
-		t.Fatalf("interval = %v, want 3m", got)
+	if got := service.Daemon().Scheduler.IntervalDuration(); got != 1440*time.Minute {
+		t.Fatalf("interval = %v, want 1440m", got)
+	}
+}
+
+func TestSaveSettingsAcceptsMinimumTimingValues(t *testing.T) {
+	home := configuredHome(t)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	err = service.SaveSettings(SettingsInput{
+		RepositoryURL:   "git@github.com:owner/repo.git",
+		IntervalMinutes: 1,
+		TrashGraceDays:  1,
+		Agents:          map[string]bool{"claude": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(cli.ConfigPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SyncIntervalMinutes != 1 || cfg.TrashGraceDays != 1 {
+		t.Fatalf("config = %#v", cfg)
+	}
+	if got := service.Daemon().Scheduler.IntervalDuration(); got != time.Minute {
+		t.Fatalf("interval = %v, want 1m", got)
+	}
+}
+
+func TestSaveSettingsRejectsTimingOutsideSupportedRanges(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval int
+		grace    int
+		want     string
+	}{
+		{name: "zero interval", interval: 0, grace: 30, want: "sync interval must be between 1 and 1440 minutes"},
+		{name: "interval above one day", interval: 1441, grace: 30, want: "sync interval must be between 1 and 1440 minutes"},
+		{name: "zero retention", interval: 10, grace: 0, want: "archive retention must be between 1 and 365 days"},
+		{name: "retention above one year", interval: 10, grace: 366, want: "archive retention must be between 1 and 365 days"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			home := configuredHome(t)
+			service, err := New(home, runtime.GOOS)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer service.Close()
+
+			err = service.SaveSettings(SettingsInput{
+				RepositoryURL:   "git@github.com:owner/changed.git",
+				IntervalMinutes: test.interval,
+				TrashGraceDays:  test.grace,
+				Agents:          map[string]bool{"claude": false},
+			})
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("error = %v, want %q", err, test.want)
+			}
+
+			cfg, err := config.Load(cli.ConfigPath(home))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.RepoURL != "git@github.com:owner/repo.git" ||
+				cfg.SyncIntervalMinutes != 10 ||
+				cfg.TrashGraceDays != 30 {
+				t.Fatalf("config changed after rejected settings: %#v", cfg)
+			}
+			if got := service.Daemon().Scheduler.IntervalDuration(); got != 10*time.Minute {
+				t.Fatalf("interval = %v, want unchanged 10m", got)
+			}
+		})
 	}
 }
 

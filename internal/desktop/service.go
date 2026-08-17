@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +27,13 @@ type stateObserver struct {
 // ErrNotConfigured indicates that onboarding must finish before sync controls
 // can be used.
 var ErrNotConfigured = errors.New("AgentConfigSync is not configured")
+
+const (
+	minSyncIntervalMinutes  = 1
+	maxSyncIntervalMinutes  = 24 * 60
+	minArchiveRetentionDays = 1
+	maxArchiveRetentionDays = 365
+)
 
 // Service is the UI-independent desktop application facade.
 type Service struct {
@@ -358,11 +366,8 @@ func makeAgents(
 
 // SaveSettings persists edits and applies the interval to the running daemon.
 func (s *Service) SaveSettings(input SettingsInput) error {
-	if input.IntervalMinutes < 1 {
-		return errors.New("sync interval must be at least one minute")
-	}
-	if input.TrashGraceDays < 0 {
-		return errors.New("trash grace days cannot be negative")
+	if err := validateTimingSettings(input.IntervalMinutes, input.TrashGraceDays); err != nil {
+		return err
 	}
 	existing, err := config.Load(cli.ConfigPath(s.home))
 	if err != nil && !os.IsNotExist(err) {
@@ -395,6 +400,24 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 		return err
 	}
 	s.Daemon().Scheduler.SetInterval(time.Duration(input.IntervalMinutes) * time.Minute)
+	return nil
+}
+
+func validateTimingSettings(intervalMinutes, retentionDays int) error {
+	if intervalMinutes < minSyncIntervalMinutes || intervalMinutes > maxSyncIntervalMinutes {
+		return fmt.Errorf(
+			"sync interval must be between %d and %d minutes",
+			minSyncIntervalMinutes,
+			maxSyncIntervalMinutes,
+		)
+	}
+	if retentionDays < minArchiveRetentionDays || retentionDays > maxArchiveRetentionDays {
+		return fmt.Errorf(
+			"archive retention must be between %d and %d days",
+			minArchiveRetentionDays,
+			maxArchiveRetentionDays,
+		)
+	}
 	return nil
 }
 
