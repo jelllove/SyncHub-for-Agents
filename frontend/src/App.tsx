@@ -65,6 +65,14 @@ function formatTime(value: string) {
   }).format(date)
 }
 
+function formatSyncFrequency(minutes: number) {
+  return `Every ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+}
+
+function formatArchiveRetention(days: number) {
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
@@ -249,8 +257,8 @@ function App() {
             <section className="metrics" aria-label="Synchronization details">
               <Metric label="Last sync" value={formatTime(snapshot.lastSync)} />
               <Metric label="Next sync" value={paused ? 'Paused' : formatTime(snapshot.nextSync)} />
-              <Metric label="Pending changes" value={String(snapshot.pendingActions)} />
-              <Metric label="Protected agents" value={`${enabledAgents} / ${snapshot.agents.length}`} />
+              <Metric label="Sync frequency" value={formatSyncFrequency(snapshot.intervalMinutes)} />
+              <Metric label="Archive retention" value={formatArchiveRetention(snapshot.trashGraceDays)} />
             </section>
 
             <ResultSummary progress={progress} />
@@ -458,20 +466,30 @@ function SettingsPanel({
           </label>
           <div className="field-grid">
             <label>
-              Sync every
-              <select value={intervalMinutes} onChange={(event) => setIntervalMinutes(Number(event.target.value))}>
-                {[5, 10, 15, 30, 60].map((minutes) => (
-                  <option key={minutes} value={minutes}>{minutes} minutes</option>
-                ))}
-              </select>
+              Sync frequency (minutes)
+              <input
+                required
+                type="number"
+                min={1}
+                max={1440}
+                step={1}
+                value={intervalMinutes}
+                onChange={(event) => setIntervalMinutes(Number(event.target.value))}
+              />
+              <small>Runs every 1–1440 minutes.</small>
             </label>
             <label>
-              Deleted-file recovery
-              <select value={trashGraceDays} onChange={(event) => setTrashGraceDays(Number(event.target.value))}>
-                {[7, 14, 30, 60, 90].map((days) => (
-                  <option key={days} value={days}>{days} days</option>
-                ))}
-              </select>
+              Archive retention (days)
+              <input
+                required
+                type="number"
+                min={1}
+                max={365}
+                step={1}
+                value={trashGraceDays}
+                onChange={(event) => setTrashGraceDays(Number(event.target.value))}
+              />
+              <small>Deleted files remain recoverable for 1–365 days.</small>
             </label>
           </div>
           <fieldset>
