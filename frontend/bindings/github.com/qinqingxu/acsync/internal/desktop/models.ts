@@ -92,6 +92,7 @@ export interface ResourceIssue {
 }
 
 export interface ResourcePreview {
+    "generatedAt": string;
     "resources": ResourceCategory[] | null;
     "files": number;
     "bytes": number;

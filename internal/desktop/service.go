@@ -64,6 +64,11 @@ func New(home, goos string) (*Service, error) {
 		stateObservers:    make(map[uint64]*stateObserver),
 		progressObservers: make(map[uint64]func(Progress)),
 	}
+	last, err := newSummaryStore(home).loadCycle()
+	if err != nil {
+		return nil, fmt.Errorf("load desktop cycle summary: %w", err)
+	}
+	service.last = last
 	if _, err := os.Stat(cli.ConfigPath(home)); err != nil {
 		if os.IsNotExist(err) {
 			return service, nil
@@ -140,9 +145,26 @@ func (s *Service) SubscribeProgress(callback func(Progress)) func() {
 }
 
 func (s *Service) recordCycle(result daemon.CycleResult) {
+	if err := newSummaryStore(s.home).saveCycle(result); err != nil {
+		result.Error = appendCycleError(
+			result.Error,
+			fmt.Errorf("save desktop cycle summary: %w", err),
+		)
+		result.NeedsAttention = true
+	}
 	s.mu.Lock()
 	s.last = result
 	s.mu.Unlock()
+}
+
+func appendCycleError(existing string, err error) string {
+	if err == nil {
+		return existing
+	}
+	if existing == "" {
+		return err.Error()
+	}
+	return errors.Join(errors.New(existing), err).Error()
 }
 
 // Daemon returns the configured daemon, or nil before onboarding.

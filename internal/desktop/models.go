@@ -36,6 +36,7 @@ type ResourceIssue struct {
 }
 
 type ResourcePreview struct {
+	GeneratedAt   time.Time          `json:"generatedAt"`
 	Resources     []ResourceCategory `json:"resources"`
 	Files         int                `json:"files"`
 	Bytes         int64              `json:"bytes"`
