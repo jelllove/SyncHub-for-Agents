@@ -4,7 +4,7 @@
 
 **Goal:** Size and center the AgentConfigSync main window from the primary display's DPI-aware work area so large screens show the complete dashboard and small screens keep the whole native window visible with scrollable content.
 
-**Architecture:** Add a pure sizing policy in the root desktop package, then use a small window-options factory to map that policy into Wails `WebviewWindowOptions`. The frontend retains its existing responsive layout but explicitly permits document-level vertical scrolling. No window geometry is persisted or synchronized.
+**Architecture:** Add a pure sizing policy in the root desktop package, create the window hidden, and apply the policy from Wails `Common.ApplicationStarted` after the platform has populated `ScreenManager`. The frontend retains its existing responsive layout but explicitly permits document-level vertical scrolling. No window geometry is persisted or synchronized.
 
 **Tech Stack:** Go, Wails v3 `application.Screen` and `WebviewWindowOptions`, React CSS, Go testing, Vite, NSIS
 
@@ -14,7 +14,7 @@
 
 - Create `window_size.go`: constants, result type, pure sizing calculation, and Wails main-window options factory.
 - Create `window_size_test.go`: table-driven sizing tests plus Wails option-mapping tests.
-- Modify `app.go`: obtain the primary screen, log invalid display information, and create the main window from the options factory.
+- Modify `app.go`: create the window hidden, then obtain the primary screen and apply/show the window from `Common.ApplicationStarted`.
 - Modify `frontend/src/style.css`: explicitly allow the document root to grow and scroll vertically in short windows.
 - Verify `scripts/smoke/windows.ps1`: reuse the existing clean install, launch, single-instance, and uninstall smoke workflow without modifying it.
 
@@ -169,140 +169,169 @@ git add window_size.go window_size_test.go
 git commit -m "feat: calculate adaptive window size" -m "Keep the preferred dashboard size on large displays and clamp initial and minimum dimensions to small display work areas." -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-### Task 2: Apply adaptive sizing to the Wails main window
+### Task 2: Apply adaptive sizing after Wails initializes displays
+
+Wails initializes its platform implementation and populates `ScreenManager` inside `App.Run`, after `guiApplication.configure` returns. The initial window must therefore stay hidden until `Common.ApplicationStarted`; reading `Screen.GetPrimary()` during `configure` always selects fallback dimensions.
 
 **Files:**
 - Modify: `window_size.go`
 - Modify: `window_size_test.go`
 - Modify: `app.go:103-112`
 
-- [ ] **Step 1: Write failing tests for Wails option mapping**
+- [ ] **Step 1: Write failing tests for deferred Wails layout**
 
 Append to `window_size_test.go`:
 
 ```go
-func TestMainWindowOptionsTargetsAndCentersPrimaryScreen(t *testing.T) {
-	screen := &application.Screen{
-		WorkArea: application.Rect{Width: 1366, Height: 728},
-	}
-
-	got := mainWindowOptions(true, screen)
-
-	if got.Width != 1200 || got.Height != 632 {
-		t.Fatalf("window size = %dx%d, want 1200x632", got.Width, got.Height)
-	}
-	if got.MinWidth != 640 || got.MinHeight != 480 {
-		t.Fatalf("minimum size = %dx%d, want 640x480", got.MinWidth, got.MinHeight)
-	}
-	if got.Screen != screen {
-		t.Fatal("window did not retain the selected primary screen")
-	}
-	if got.InitialPosition != application.WindowCentered {
-		t.Fatalf("initial position = %v, want WindowCentered", got.InitialPosition)
-	}
-	if !got.Hidden {
-		t.Fatal("hidden startup flag was not preserved")
+func TestInitialMainWindowOptionsStayHiddenUntilDisplayReady(t *testing.T) {
+	got := initialMainWindowOptions()
+	if got.Width != 1080 || got.Height != 720 || !got.Hidden {
+		t.Fatalf("initial options = %+v, want hidden fallback 1080x720", got)
 	}
 }
 
-func TestMainWindowOptionsFallsBackWithoutAValidScreen(t *testing.T) {
-	got := mainWindowOptions(false, nil)
+func TestApplyMainWindowLayoutTargetsScreenBeforeShowing(t *testing.T) {
+	screen := &application.Screen{WorkArea: application.Rect{Width: 1366, Height: 728}}
+	target := &recordingWindow{}
 
-	if got.Width != 1080 || got.Height != 720 {
-		t.Fatalf("fallback window size = %dx%d, want 1080x720", got.Width, got.Height)
+	applyMainWindowLayout(target, screen, false)
+
+	want := []string{"screen", "min:640x480", "size:1200x632", "center", "show", "restore", "focus"}
+	if !reflect.DeepEqual(target.calls, want) {
+		t.Fatalf("layout calls = %v, want %v", target.calls, want)
 	}
-	if got.MinWidth != 640 || got.MinHeight != 480 {
-		t.Fatalf("fallback minimum = %dx%d, want 640x480", got.MinWidth, got.MinHeight)
-	}
-	if got.Screen != nil {
-		t.Fatal("fallback options unexpectedly target a screen")
-	}
-	if got.Hidden {
-		t.Fatal("visible startup unexpectedly became hidden")
+}
+
+func TestApplyMainWindowLayoutKeepsAutostartWindowHidden(t *testing.T) {
+	screen := &application.Screen{WorkArea: application.Rect{Width: 1920, Height: 1040}}
+	target := &recordingWindow{}
+
+	applyMainWindowLayout(target, screen, true)
+
+	want := []string{"screen", "min:640x480", "size:1200x850", "center"}
+	if !reflect.DeepEqual(target.calls, want) {
+		t.Fatalf("hidden layout calls = %v, want %v", target.calls, want)
 	}
 }
 ```
 
-Add this import:
+Add this test double:
 
 ```go
-import (
-	"testing"
+type recordingWindow struct{ calls []string }
 
-	"github.com/wailsapp/wails/v3/pkg/application"
-)
+func (w *recordingWindow) SetScreen(*application.Screen) application.Window {
+	w.calls = append(w.calls, "screen")
+	return nil
+}
+func (w *recordingWindow) SetMinSize(width, height int) application.Window {
+	w.calls = append(w.calls, fmt.Sprintf("min:%dx%d", width, height))
+	return nil
+}
+func (w *recordingWindow) SetSize(width, height int) application.Window {
+	w.calls = append(w.calls, fmt.Sprintf("size:%dx%d", width, height))
+	return nil
+}
+func (w *recordingWindow) Center() { w.calls = append(w.calls, "center") }
+func (w *recordingWindow) Show() application.Window {
+	w.calls = append(w.calls, "show")
+	return nil
+}
+func (w *recordingWindow) Restore() { w.calls = append(w.calls, "restore") }
+func (w *recordingWindow) Focus()   { w.calls = append(w.calls, "focus") }
 ```
 
-- [ ] **Step 2: Run the option tests and verify RED**
+- [ ] **Step 2: Run the lifecycle tests and verify RED**
 
 Run:
 
 ```powershell
-go test . -run 'TestMainWindowOptions' -count=1
+go test . -run 'TestInitialMainWindowOptions|TestApplyMainWindowLayout' -count=1
 ```
 
-Expected: compilation fails because `mainWindowOptions` does not exist.
+Expected: compilation fails because `initialMainWindowOptions` and `applyMainWindowLayout` do not exist.
 
-- [ ] **Step 3: Implement the window-options factory**
+- [ ] **Step 3: Implement hidden initial options and deferred layout**
 
 Add to `window_size.go`:
 
 ```go
 import "github.com/wailsapp/wails/v3/pkg/application"
 
-func mainWindowOptions(hidden bool, screen *application.Screen) application.WebviewWindowOptions {
+func initialMainWindowOptions() application.WebviewWindowOptions {
+	size := calculateMainWindowSize(0, 0)
+	return application.WebviewWindowOptions{
+		Name: "main", Title: "AgentConfigSync", URL: "/",
+		Width: size.Width, Height: size.Height,
+		MinWidth: size.MinWidth, MinHeight: size.MinHeight,
+		Hidden: true,
+	}
+}
+
+type windowLayoutTarget interface {
+	SetScreen(*application.Screen) application.Window
+	SetMinSize(int, int) application.Window
+	SetSize(int, int) application.Window
+	Center()
+	Show() application.Window
+	Restore()
+	Focus()
+}
+
+func applyMainWindowLayout(target windowLayoutTarget, screen *application.Screen, hidden bool) {
 	workWidth, workHeight := 0, 0
 	if screen != nil {
 		workWidth = screen.WorkArea.Width
 		workHeight = screen.WorkArea.Height
+		target.SetScreen(screen)
 	}
 	size := calculateMainWindowSize(workWidth, workHeight)
-
-	return application.WebviewWindowOptions{
-		Name:            "main",
-		Title:           "AgentConfigSync",
-		URL:             "/",
-		Width:           size.Width,
-		Height:          size.Height,
-		MinWidth:        size.MinWidth,
-		MinHeight:       size.MinHeight,
-		InitialPosition: application.WindowCentered,
-		Screen:          screen,
-		Hidden:          hidden,
+	target.SetMinSize(size.MinWidth, size.MinHeight)
+	target.SetSize(size.Width, size.Height)
+	target.Center()
+	if !hidden {
+		target.Show()
+		target.Restore()
+		target.Focus()
 	}
 }
 ```
 
-- [ ] **Step 4: Run the option tests and verify GREEN**
+- [ ] **Step 4: Run the lifecycle tests and verify GREEN**
 
 Run:
 
 ```powershell
-go test . -run 'TestMainWindowOptions' -count=1
+go test . -run 'TestInitialMainWindowOptions|TestApplyMainWindowLayout' -count=1
 ```
 
 Expected: PASS.
 
-- [ ] **Step 5: Wire the factory into `guiApplication.configure`**
+- [ ] **Step 5: Wire deferred layout into `guiApplication.configure`**
 
 Replace the inline `WebviewWindowOptions` block in `app.go` with:
 
 ```go
-	screen := gui.app.Screen.GetPrimary()
-	if screen == nil || screen.WorkArea.Width <= 0 || screen.WorkArea.Height <= 0 {
-		log.Printf("primary screen work area unavailable; using default window size")
-	}
-	gui.window = gui.app.Window.NewWithOptions(mainWindowOptions(hidden, screen))
+	gui.window = gui.app.Window.NewWithOptions(initialMainWindowOptions())
+	gui.app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		screen := gui.app.Screen.GetPrimary()
+		if screen == nil || screen.WorkArea.Width <= 0 || screen.WorkArea.Height <= 0 {
+			log.Printf("primary screen work area unavailable; using default window size")
+			screen = nil
+		}
+		applyMainWindowLayout(gui.window, screen, hidden)
+		gui.activation.Ready(gui.showWindow)
+	})
 ```
 
-Do not change activation, close-to-tray, or single-instance hooks.
+Remove the earlier `gui.activation.Ready(gui.showWindow)` call from `configure`; activation requests must remain queued until layout is complete. Do not change close-to-tray or single-instance callbacks.
 
 - [ ] **Step 6: Run focused desktop tests**
 
 Run:
 
 ```powershell
-go test . -run 'TestCalculateMainWindowSize|TestMainWindowOptions|TestActivationQueue' -count=1
+go test . -run 'TestCalculateMainWindowSize|TestInitialMainWindowOptions|TestApplyMainWindowLayout|TestActivationQueue' -count=1
 ```
 
 Expected: PASS.

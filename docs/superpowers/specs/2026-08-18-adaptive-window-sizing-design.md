@@ -38,7 +38,7 @@ A pure sizing function accepts a work-area width and height and returns:
 - minimum width
 - minimum height
 
-`guiApplication.configure` obtains the primary screen, calls the sizing function, and supplies the result, target screen, and `WindowCentered` placement to `application.WebviewWindowOptions`.
+Wails does not populate `ScreenManager` until `App.Run` initializes the platform. `guiApplication.configure` therefore creates the window hidden with fallback dimensions and registers a `Common.ApplicationStarted` handler. That handler obtains the primary screen, applies the calculated size and minimum constraints, targets and centers the window on that screen, and only then shows it for a normal launch. Autostart launches remain hidden until opened from the tray or a second-instance activation.
 
 Window geometry is intentionally not saved. Every launch recalculates it for the current computer, display arrangement, taskbar, and DPI scale, preventing unsuitable geometry from being transferred between computers.
 
@@ -55,5 +55,7 @@ Unit tests cover:
 - A 1366 by 768-style work area reducing the height while keeping the window fully visible.
 - A work area smaller than 640 by 480 reducing both starting and minimum dimensions.
 - Invalid or missing work-area values using the fallback dimensions.
+- A normal launch applying screen, constraints, size, centering, and show operations in order.
+- An autostart launch applying the same layout without showing the window.
 
 Regression validation includes the frontend production build, full Go test suite, `go vet`, Windows packaging, and an installed startup smoke test. The smoke test must continue to prove single-instance handoff and profile preservation.

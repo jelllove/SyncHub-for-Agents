@@ -100,12 +100,16 @@ func (gui *guiApplication) configure(
 	gui.app.RegisterService(application.NewService(
 		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
 	))
-	screen := gui.app.Screen.GetPrimary()
-	if screen == nil || screen.WorkArea.Width <= 0 || screen.WorkArea.Height <= 0 {
-		log.Printf("primary screen work area unavailable; using default window size")
-	}
-	gui.window = gui.app.Window.NewWithOptions(mainWindowOptions(hidden, screen))
-	gui.activation.Ready(gui.showWindow)
+	gui.window = gui.app.Window.NewWithOptions(initialMainWindowOptions())
+	gui.app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		screen := gui.app.Screen.GetPrimary()
+		if screen == nil || screen.WorkArea.Width <= 0 || screen.WorkArea.Height <= 0 {
+			log.Printf("primary screen work area unavailable; using default window size")
+			screen = nil
+		}
+		applyMainWindowLayout(gui.window, screen, hidden)
+		gui.activation.Ready(gui.showWindow)
+	})
 	gui.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		gui.window.Hide()
 		event.Cancel()

@@ -47,24 +47,45 @@ func availableWindowDimension(workDimension, preferred int) int {
 	return min(preferred, available)
 }
 
-func mainWindowOptions(hidden bool, screen *application.Screen) application.WebviewWindowOptions {
+func initialMainWindowOptions() application.WebviewWindowOptions {
+	size := calculateMainWindowSize(0, 0)
+	return application.WebviewWindowOptions{
+		Name:      "main",
+		Title:     "AgentConfigSync",
+		URL:       "/",
+		Width:     size.Width,
+		Height:    size.Height,
+		MinWidth:  size.MinWidth,
+		MinHeight: size.MinHeight,
+		Hidden:    true,
+	}
+}
+
+type windowLayoutTarget interface {
+	SetScreen(*application.Screen) application.Window
+	SetMinSize(int, int) application.Window
+	SetSize(int, int) application.Window
+	Center()
+	Show() application.Window
+	Restore()
+	Focus()
+}
+
+func applyMainWindowLayout(target windowLayoutTarget, screen *application.Screen, hidden bool) {
 	workWidth, workHeight := 0, 0
 	if screen != nil {
 		workWidth = screen.WorkArea.Width
 		workHeight = screen.WorkArea.Height
+		target.SetScreen(screen)
 	}
 	size := calculateMainWindowSize(workWidth, workHeight)
+	target.SetMinSize(size.MinWidth, size.MinHeight)
+	target.SetSize(size.Width, size.Height)
+	target.Center()
 
-	return application.WebviewWindowOptions{
-		Name:            "main",
-		Title:           "AgentConfigSync",
-		URL:             "/",
-		Width:           size.Width,
-		Height:          size.Height,
-		MinWidth:        size.MinWidth,
-		MinHeight:       size.MinHeight,
-		InitialPosition: application.WindowCentered,
-		Screen:          screen,
-		Hidden:          hidden,
+	if !hidden {
+		target.Show()
+		target.Restore()
+		target.Focus()
 	}
 }
