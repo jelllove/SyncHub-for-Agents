@@ -11,6 +11,8 @@ import (
 
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/acsync/internal/daemon"
+	"github.com/qinqingxu/acsync/internal/provider"
 	"github.com/qinqingxu/acsync/internal/scheduler"
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
@@ -34,6 +36,72 @@ func configuredHome(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return home
+}
+
+func writeDesktopPreview(t *testing.T, home string, preview ResourcePreview) {
+	t.Helper()
+	if err := newSummaryStore(home).savePreview(preview); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSnapshotUsesPersistedSummariesWithoutCollectingResources(t *testing.T) {
+	home := configuredHome(t)
+	generatedAt := time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC)
+	finishedAt := generatedAt.Add(-time.Minute)
+	writeDesktopPreview(t, home, ResourcePreview{
+		GeneratedAt: generatedAt,
+		Files:       12,
+	})
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	service.recordCycle(daemon.CycleResult{
+		Blocked:    2,
+		FinishedAt: finishedAt,
+	})
+	service.recordProgress(syncengine.Progress{
+		CompletedActions: 3,
+		TotalActions:     8,
+	})
+	collectionCalled := false
+	service.previewCollector = func(config.Config, []provider.Provider) (ResourcePreview, error) {
+		collectionCalled = true
+		return ResourcePreview{}, errors.New("resource collection invoked by Snapshot")
+	}
+
+	done := make(chan struct{})
+	var snapshot Snapshot
+	var snapshotErr error
+	go func() {
+		snapshot, snapshotErr = service.Snapshot()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Snapshot() waited for resource collection")
+	}
+	if snapshotErr != nil {
+		t.Fatal(snapshotErr)
+	}
+	if collectionCalled {
+		t.Fatal("Snapshot() invoked resource collection")
+	}
+	if snapshot.Preview.Files != 12 || !snapshot.Preview.GeneratedAt.Equal(generatedAt) {
+		t.Fatalf("preview = %#v, want persisted summary", snapshot.Preview)
+	}
+	if !snapshot.LastSync.Equal(finishedAt) {
+		t.Fatalf("last sync = %v, want %v", snapshot.LastSync, finishedAt)
+	}
+	if snapshot.PendingActions != 5 {
+		t.Fatalf("pending actions = %d, want 5", snapshot.PendingActions)
+	}
+	if snapshot.BlockedFiles != 2 {
+		t.Fatalf("blocked files = %d, want 2", snapshot.BlockedFiles)
+	}
 }
 
 func TestSnapshotIncludesCurrentProgress(t *testing.T) {
@@ -60,6 +128,18 @@ func TestSnapshotIncludesCurrentProgress(t *testing.T) {
 		got.Progress.Percentage != 65 ||
 		got.Progress.TotalActions != 4 {
 		t.Fatalf("progress = %#v", got.Progress)
+	}
+
+	service.recordProgress(syncengine.Progress{
+		CompletedActions: 5,
+		TotalActions:     4,
+	})
+	got, err = service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PendingActions != 0 {
+		t.Fatalf("pending actions = %d, want clamped zero", got.PendingActions)
 	}
 }
 

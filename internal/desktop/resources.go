@@ -41,7 +41,14 @@ func (s *Service) PreviewCustomResource(input CustomResourceInput) (ResourcePrev
 	}, nil)
 }
 
-func (s *Service) preview(cfg config.Config, providers []provider.Provider) (result ResourcePreview, retErr error) {
+func (s *Service) preview(cfg config.Config, providers []provider.Provider) (ResourcePreview, error) {
+	if s.previewCollector == nil {
+		return ResourcePreview{}, fmt.Errorf("resource preview collector is not configured")
+	}
+	return s.previewCollector(cfg, providers)
+}
+
+func (s *Service) collectPreview(cfg config.Config, providers []provider.Provider) (result ResourcePreview, retErr error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return ResourcePreview{}, err

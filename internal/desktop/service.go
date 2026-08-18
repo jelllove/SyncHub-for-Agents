@@ -50,6 +50,7 @@ type Service struct {
 	stateObservers         map[uint64]*stateObserver
 	nextProgressObserverID uint64
 	progressObservers      map[uint64]func(Progress)
+	previewCollector       func(config.Config, []provider.Provider) (ResourcePreview, error)
 }
 
 // New creates a desktop service. A missing config is a valid first-run state.
@@ -64,6 +65,7 @@ func New(home, goos string) (*Service, error) {
 		stateObservers:    make(map[uint64]*stateObserver),
 		progressObservers: make(map[uint64]func(Progress)),
 	}
+	service.previewCollector = service.collectPreview
 	last, err := newSummaryStore(home).loadCycle()
 	if err != nil {
 		return nil, fmt.Errorf("load desktop cycle summary: %w", err)
@@ -225,13 +227,9 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	status, err := cli.RunStatus(s.home, s.goos)
+	preview, err := newSummaryStore(s.home).loadPreview()
 	if err != nil {
-		return Snapshot{}, err
-	}
-	preview, err := s.preview(cfg, providers)
-	if err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("load desktop preview summary: %w", err)
 	}
 	pending, err := installplan.NewStore(filepath.Join(s.home, "install")).Pending()
 	if err != nil {
@@ -250,9 +248,9 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	if d == nil {
 		return Snapshot{}, ErrNotConfigured
 	}
-	next := time.Time{}
-	if !last.FinishedAt.IsZero() {
-		next = last.FinishedAt.Add(d.Scheduler.IntervalDuration())
+	pendingActions := progress.TotalActions - progress.CompletedActions
+	if pendingActions < 0 {
+		pendingActions = 0
 	}
 	stateValue := d.Scheduler.State().String()
 	if last.NeedsAttention && (stateValue == "idle" || stateValue == "done") {
@@ -270,9 +268,9 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		IntervalMinutes:    cfg.SyncIntervalMinutes,
 		TrashGraceDays:     cfg.TrashGraceDays,
 		Agents:             agents,
-		LastSync:           status.LastSync,
-		NextSync:           next,
-		PendingActions:     status.PendingActions,
+		LastSync:           last.FinishedAt,
+		NextSync:           d.Scheduler.NextRun(),
+		PendingActions:     pendingActions,
 		BlockedFiles:       last.Blocked,
 		LastError:          last.Error,
 		Progress:           progress,
