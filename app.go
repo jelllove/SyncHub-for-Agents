@@ -100,16 +100,11 @@ func (gui *guiApplication) configure(
 	gui.app.RegisterService(application.NewService(
 		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
 	))
-	gui.window = gui.app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:      "main",
-		Title:     "AgentConfigSync",
-		URL:       "/",
-		Width:     1080,
-		Height:    720,
-		MinWidth:  820,
-		MinHeight: 560,
-		Hidden:    hidden,
-	})
+	screen := gui.app.Screen.GetPrimary()
+	if screen == nil || screen.WorkArea.Width <= 0 || screen.WorkArea.Height <= 0 {
+		log.Printf("primary screen work area unavailable; using default window size")
+	}
+	gui.window = gui.app.Window.NewWithOptions(mainWindowOptions(hidden, screen))
 	gui.activation.Ready(gui.showWindow)
 	gui.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		gui.window.Hide()

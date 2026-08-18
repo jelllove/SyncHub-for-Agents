@@ -1,5 +1,7 @@
 package main
 
+import "github.com/wailsapp/wails/v3/pkg/application"
+
 const (
 	preferredWindowWidth  = 1200
 	preferredWindowHeight = 850
@@ -43,4 +45,26 @@ func availableWindowDimension(workDimension, preferred int) int {
 		available = workDimension
 	}
 	return min(preferred, available)
+}
+
+func mainWindowOptions(hidden bool, screen *application.Screen) application.WebviewWindowOptions {
+	workWidth, workHeight := 0, 0
+	if screen != nil {
+		workWidth = screen.WorkArea.Width
+		workHeight = screen.WorkArea.Height
+	}
+	size := calculateMainWindowSize(workWidth, workHeight)
+
+	return application.WebviewWindowOptions{
+		Name:            "main",
+		Title:           "AgentConfigSync",
+		URL:             "/",
+		Width:           size.Width,
+		Height:          size.Height,
+		MinWidth:        size.MinWidth,
+		MinHeight:       size.MinHeight,
+		InitialPosition: application.WindowCentered,
+		Screen:          screen,
+		Hidden:          hidden,
+	}
 }
