@@ -4,12 +4,15 @@ export function InstallPlanPanel({
   plan,
   busy,
   approve,
+  retry,
 }: {
   plan: InstallPlan
   busy: boolean
   approve: (id: string) => Promise<unknown>
+  retry: (id: string) => Promise<unknown>
 }) {
   const operations = plan.operations ?? []
+  const hasFailures = operations.some((operation) => Boolean(operation.error))
   return (
     <section className="attention-panel install-panel" aria-live="polite">
       <div className="attention-heading">
@@ -34,10 +37,12 @@ export function InstallPlanPanel({
       </div>
       <button
         className="primary"
-        disabled={busy || plan.approved || operations.length === 0}
-        onClick={() => void approve(plan.id)}
+        disabled={busy || operations.length === 0 || (!hasFailures && plan.approved)}
+        onClick={() => void (hasFailures ? retry(plan.id) : approve(plan.id))}
       >
-        {plan.approved ? 'Approved; waiting for synchronization' : 'Approve and synchronize'}
+        {hasFailures
+          ? 'Retry failed operations'
+          : (plan.approved ? 'Approved; waiting for synchronization' : 'Approve and synchronize')}
       </button>
     </section>
   )

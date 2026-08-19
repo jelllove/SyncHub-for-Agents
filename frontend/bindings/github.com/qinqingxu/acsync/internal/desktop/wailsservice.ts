@@ -66,6 +66,10 @@ export function RetryConflictBatch(id: string): $CancellablePromise<void> {
     return $Call.ByID(1744848214, id);
 }
 
+export function RetryInstallPlan(id: string): $CancellablePromise<void> {
+    return $Call.ByID(900032308, id);
+}
+
 export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<void> {
     return $Call.ByID(3861930266, input);
 }

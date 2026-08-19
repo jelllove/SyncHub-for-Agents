@@ -5,6 +5,7 @@ import {
   Pause,
   NeedsOnboarding,
   QueueConflictBatch,
+  RetryInstallPlan,
   RetryConflictBatch,
   ResourcePreview,
   Resume,
@@ -298,6 +299,10 @@ function App() {
                 approve={(id) => perform(
                   () => ApproveInstallPlan(id),
                   'Install plan approved; synchronization queued',
+                )}
+                retry={(id) => perform(
+                  () => RetryInstallPlan(id),
+                  'Install operation retry queued',
                 )}
               />
             )}

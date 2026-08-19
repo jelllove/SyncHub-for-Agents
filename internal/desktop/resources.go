@@ -308,6 +308,24 @@ func (s *Service) ApproveInstallPlan(id string) error {
 	return s.Trigger()
 }
 
+func (s *Service) RetryInstallPlan(id string) error {
+	store := installplan.NewStore(filepath.Join(s.home, "install"))
+	pending, err := store.Pending()
+	if err != nil {
+		return err
+	}
+	if pending == nil {
+		return fmt.Errorf("no install plan is pending")
+	}
+	if pending.ID != id {
+		return fmt.Errorf("pending install plan is %q, not %q", pending.ID, id)
+	}
+	if len(pending.Errors) == 0 {
+		return fmt.Errorf("pending install plan has no failed operations")
+	}
+	return s.Trigger()
+}
+
 func (s *Service) ResolveConflict(input ConflictResolution) error {
 	if input.Choice != "local" &&
 		input.Choice != "remote" &&

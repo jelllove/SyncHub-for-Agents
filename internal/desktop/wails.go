@@ -118,6 +118,10 @@ func (s *WailsService) ApproveInstallPlan(id string) error {
 	return s.core.ApproveInstallPlan(id)
 }
 
+func (s *WailsService) RetryInstallPlan(id string) error {
+	return s.core.RetryInstallPlan(id)
+}
+
 func (s *WailsService) ResolveConflict(input ConflictResolution) error {
 	return s.core.ResolveConflict(input)
 }

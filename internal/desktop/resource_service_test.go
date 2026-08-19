@@ -352,6 +352,36 @@ func TestApproveInstallPlanRequiresCurrentID(t *testing.T) {
 	}
 }
 
+func TestRetryInstallPlanRequiresFailedPendingOperations(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+	if err := service.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	store := installplan.NewStore(filepath.Join(service.home, "install"))
+	pending, err := store.Pending()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending == nil {
+		t.Fatal("pending install plan is missing")
+	}
+	if err := service.RetryInstallPlan(pending.ID); err == nil {
+		t.Fatal("retry was accepted without failed operations")
+	}
+
+	pending.Errors = map[string]string{pending.Operations[0].ID: "access is denied"}
+	if err := store.SavePending(*pending); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.RetryInstallPlan("other"); err == nil {
+		t.Fatal("retry accepted a mismatched plan ID")
+	}
+	if err := service.RetryInstallPlan(pending.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestQueueConflictBatchValidatesAndQueues(t *testing.T) {
 	service := configuredResourceService(t)
 	defer service.Close()

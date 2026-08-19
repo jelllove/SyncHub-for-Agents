@@ -7,10 +7,10 @@ import type {
 
 type SelectionChoice = 'local' | 'remote' | 'merged'
 
-type ConflictSelections = Record<string, {
+type ConflictSelections = Partial<Record<string, {
   choice: SelectionChoice
   content: string
-}>
+}>>
 
 function selectionClass(active: boolean) {
   return active ? 'secondary active' : 'secondary'

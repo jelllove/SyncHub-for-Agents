@@ -22,6 +22,9 @@ func TestWailsResourceMethodsDelegateToCore(t *testing.T) {
 	if err := service.ApproveInstallPlan("other"); err == nil {
 		t.Fatal("wrong plan ID was accepted")
 	}
+	if err := service.RetryInstallPlan("other"); err == nil {
+		t.Fatal("wrong retry plan ID was accepted")
+	}
 	if err := service.ResolveConflict(ConflictResolution{
 		ID: "missing", Choice: "remote",
 	}); err == nil {
