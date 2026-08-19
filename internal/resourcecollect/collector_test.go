@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func writeCollectorFile(t *testing.T, filename string, data []byte) {

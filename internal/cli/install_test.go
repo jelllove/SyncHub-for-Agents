@@ -11,7 +11,7 @@ func TestRunInstallUninstallWindows(t *testing.T) {
 	userHome := t.TempDir()
 	t.Setenv("APPDATA", filepath.Join(userHome, "AppData", "Roaming"))
 
-	path, err := RunInstall("windows", userHome, `C:\Program Files\acsync\acsync.exe`)
+	path, err := RunInstall("windows", userHome, `C:\Program Files\synchub\synchub.exe`)
 	if err != nil {
 		t.Fatalf("RunInstall error: %v", err)
 	}
@@ -19,7 +19,7 @@ func TestRunInstallUninstallWindows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("entry not written: %v", err)
 	}
-	if !strings.Contains(string(data), `"C:\Program Files\acsync\acsync.exe" tray`) {
+	if !strings.Contains(string(data), `"C:\Program Files\synchub\synchub.exe" tray`) {
 		t.Errorf("entry body = %q", string(data))
 	}
 

@@ -91,7 +91,7 @@ func (p FilterPolicy) CheckDirectory(rel string) (bool, string) {
 	if err := validateRepoRelative(rel); err != nil {
 		return false, "invalid-path"
 	}
-	probe := strings.TrimSuffix(rel, "/") + "/.acsync-entry"
+	probe := strings.TrimSuffix(rel, "/") + "/.synchub-entry"
 	for _, pattern := range p.GeneratedGlobs {
 		normalized := strings.ReplaceAll(pattern, `\`, "/")
 		matched, err := doublestar.Match(normalized, rel)

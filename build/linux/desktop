@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=AgentConfigSync
+Name=SyncHub
 Comment=Synchronize AI agent configuration and sessions
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/agentconfigsync.exe %u
+Exec=/usr/local/bin/synchub.exe %u
 Terminal=false
 Type=Application
-Icon=agentconfigsync.exe
+Icon=synchub.exe
 Categories=Utility;
-StartupWMClass=agentconfigsync.exe
+StartupWMClass=synchub.exe
 
  

@@ -1,4 +1,4 @@
-import type { Progress } from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+import type { Progress } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 export function ResultSummary({ progress }: { progress: Progress }) {
   if (progress.stage !== 'complete' && !progress.needsAttention) return null

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/qinqingxu/acsync/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
 )
 
 func AuthMetadataPath(home string) string {

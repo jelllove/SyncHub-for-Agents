@@ -15,12 +15,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/conflict"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/secret"
-	"github.com/qinqingxu/acsync/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/conflict"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/secret"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
 const portablePrefix = "agents/_portable/"
@@ -435,7 +435,7 @@ func PrepareResourceActions(
 }
 
 func resourceRepoPrefix(spec resource.Spec) string {
-	const sentinel = "__acsync_resource_root__"
+	const sentinel = "__synchub_resource_root__"
 	repoRel, err := spec.RepoPath(sentinel)
 	if err != nil {
 		return ""

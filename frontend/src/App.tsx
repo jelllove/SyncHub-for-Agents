@@ -13,11 +13,11 @@ import {
   SetStartAtLogin,
   Snapshot as loadSnapshot,
   TriggerSync,
-} from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
+} from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice'
 import {
   type Progress,
   type Snapshot,
-} from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import './style.css'
 import { BrandMark } from './BrandMark'
 import {

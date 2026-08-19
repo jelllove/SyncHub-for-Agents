@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/secret"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/secret"
 )
 
 // PurgeBlockedTrash permanently removes trash files that are no longer allowed

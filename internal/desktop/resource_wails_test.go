@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
 )
 
 func TestWailsResourceMethodsDelegateToCore(t *testing.T) {

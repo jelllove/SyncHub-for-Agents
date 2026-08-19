@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 )
 
 func TestSummaryStoreRoundTripsOwnerOnlyState(t *testing.T) {

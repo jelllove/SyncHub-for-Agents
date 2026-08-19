@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/qinqingxu/acsync/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 )
 
 type summaryStore struct {

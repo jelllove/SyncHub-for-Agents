@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/daemon"
-	"github.com/qinqingxu/acsync/internal/provider"
-	"github.com/qinqingxu/acsync/internal/scheduler"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 func configuredHome(t *testing.T) string {
@@ -22,7 +22,7 @@ func configuredHome(t *testing.T) string {
 	userHome := t.TempDir()
 	t.Setenv("HOME", userHome)
 	t.Setenv("USERPROFILE", userHome)
-	home := filepath.Join(userHome, ".acsync")
+	home := filepath.Join(userHome, ".synchub")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestSnapshotPromotesDoneToErrorWhenLastCycleNeedsAttention(t *testing.T) {
 }
 
 func TestNewAllowsMissingConfiguration(t *testing.T) {
-	service, err := New(filepath.Join(t.TempDir(), ".acsync"), runtime.GOOS)
+	service, err := New(filepath.Join(t.TempDir(), ".synchub"), runtime.GOOS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestSaveSettingsRejectsTimingOutsideSupportedRanges(t *testing.T) {
 }
 
 func TestSubscribeStateAttachesWhenFirstRunConfigurationStartsDaemon(t *testing.T) {
-	service, err := New(filepath.Join(t.TempDir(), ".acsync"), runtime.GOOS)
+	service, err := New(filepath.Join(t.TempDir(), ".synchub"), runtime.GOOS)
 	if err != nil {
 		t.Fatal(err)
 	}

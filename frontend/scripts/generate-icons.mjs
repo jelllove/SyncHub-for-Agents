@@ -10,7 +10,7 @@ const trayOutput = path.join(root, 'internal', 'tray', 'assets')
 
 await mkdir(trayOutput, { recursive: true })
 
-await sharp(path.join(sources, 'agentconfigsync.svg'), { density: 384 })
+await sharp(path.join(sources, 'synchub.svg'), { density: 384 })
   .resize(1024, 1024)
   .png({ compressionLevel: 9 })
   .toFile(path.join(root, 'build', 'appicon.png'))

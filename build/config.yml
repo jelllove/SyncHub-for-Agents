@@ -7,7 +7,7 @@ version: '3'
 info:
   companyName: "SyncHub for Agents"
   productName: "SyncHub for Agents"
-  productIdentifier: "io.github.qinqingxu.agentconfigsync"
+  productIdentifier: "io.github.qinqingxu.synchub"
   description: "Synchronize AI agent configs and sessions across computers"
   copyright: "Copyright © 2026"
   comments: "Cross-platform AI agent config and session sync"

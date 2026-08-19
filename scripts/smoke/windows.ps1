@@ -4,14 +4,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$installDir = Join-Path $env:TEMP "AgentConfigSync-Smoke-$PID"
-$exe = Join-Path $installDir "AgentConfigSync.exe"
+$installDir = Join-Path $env:TEMP "SyncHub-Smoke-$PID"
+$exe = Join-Path $installDir "SyncHub.exe"
 $uninstaller = Join-Path $installDir "uninstall.exe"
-$shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\AgentConfigSync.lnk"
+$shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SyncHub for Agents.lnk"
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-$runName = "io.github.qinqingxu.agentconfigsync"
+$runName = "io.github.qinqingxu.synchub"
 $appProcess = $null
-$smokeProfile = Join-Path $env:TEMP "AgentConfigSync-Smoke-Profile-$PID"
+$smokeProfile = Join-Path $env:TEMP "SyncHub-Smoke-Profile-$PID"
 $originalUserProfile = $env:USERPROFILE
 $originalHome = $env:HOME
 

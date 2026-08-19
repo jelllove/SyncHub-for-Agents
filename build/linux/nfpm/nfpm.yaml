@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "agentconfigsync"
+name: "synchub"
 arch: ${GOARCH}
 platform: "linux"
 version: ${VERSION}
@@ -11,18 +11,18 @@ section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "Synchronize AI agent configuration and sessions"
-vendor: "AgentConfigSync"
-homepage: "https://github.com/qinqingxu/acsync"
+vendor: "SyncHub"
+homepage: "https://github.com/qinqingxu/synchub-for-agents"
 license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/AgentConfigSync"
-    dst: "/usr/bin/AgentConfigSync"
+  - src: "./bin/SyncHub"
+    dst: "/usr/bin/SyncHub"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/AgentConfigSync.png"
-  - src: "./build/linux/AgentConfigSync.desktop"
-    dst: "/usr/share/applications/AgentConfigSync.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/SyncHub.png"
+  - src: "./build/linux/SyncHub.desktop"
+    dst: "/usr/share/applications/SyncHub.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

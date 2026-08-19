@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,7 +43,7 @@ func TestRunSyncPushesConfig(t *testing.T) {
 		t.Skip("git not installed")
 	}
 
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	if err := os.MkdirAll(ProvidersDir(home), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestRunSyncUsesUserHomeForProviderPaths(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	userHome := t.TempDir()
-	dataHome := filepath.Join(userHome, ".acsync")
+	dataHome := filepath.Join(userHome, ".synchub")
 	if err := os.MkdirAll(ProvidersDir(dataHome), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { PreviewCustomResource } from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
+import { PreviewCustomResource } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice'
 import type {
   CustomResourceInput,
   ResourcePreview,
-} from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import { formatBytes } from './ResourceSettings'
 
 type Category = 'sessions' | 'config' | 'instructions' | 'skills' | 'plugins'

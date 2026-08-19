@@ -1,4 +1,4 @@
-// Package settings serves a local web page for editing acsync configuration.
+// Package settings serves a local web page for editing synchub configuration.
 package settings
 
 import (
@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 // AgentView is one agent row in the settings page.
@@ -96,7 +96,7 @@ func BuildViewModel(home string) (ViewModel, error) {
 	return vm, nil
 }
 
-// Handler returns the settings HTTP handler for the given acsync home.
+// Handler returns the settings HTTP handler for the given synchub home.
 func Handler(home string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -179,9 +179,9 @@ func saveForm(home string, r *http.Request) error {
 
 var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <html>
-<head><meta charset="utf-8"><title>acsync settings</title></head>
+<head><meta charset="utf-8"><title>synchub settings</title></head>
 <body>
-<h1>AgentConfigSync Settings</h1>
+<h1>SyncHub Settings</h1>
 <form method="POST" action="/save">
 <p><label>Repo URL: <input name="repo_url" value="{{.RepoURL}}" size="60"></label></p>
 <p><label>Sync interval (minutes): <input name="sync_interval_minutes" type="number" min="1" value="{{.SyncIntervalMinutes}}"></label></p>

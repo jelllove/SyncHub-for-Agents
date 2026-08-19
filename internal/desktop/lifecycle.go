@@ -3,8 +3,8 @@ package desktop
 import (
 	"context"
 
-	"github.com/qinqingxu/acsync/internal/daemon"
-	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 )
 
 // Run waits until configuration is ready, then runs the daemon until context

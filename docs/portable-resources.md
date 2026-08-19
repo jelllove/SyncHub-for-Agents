@@ -1,6 +1,6 @@
 # Portable agent resources
 
-AgentConfigSync synchronizes portable agent data through your private Git
+SyncHub synchronizes portable agent data through your private Git
 repository. It scans every file before staging it and keeps credentials and
 machine-specific state on the computer where they were created.
 
@@ -24,7 +24,7 @@ excluded content, and total portable data before saving changes.
 
 ## Content that never synchronizes
 
-AgentConfigSync excludes:
+SyncHub excludes:
 
 - access tokens, OAuth data, passwords, API keys, and credential files;
 - machine IDs and other machine-local configuration fields;
@@ -50,14 +50,14 @@ files appear as safety notices and remain local.
 
 ## A new computer
 
-1. Install AgentConfigSync and connect the same private repository.
+1. Install SyncHub and connect the same private repository.
 2. Review the restore preview and target paths.
 3. Save your agent and category choices.
 4. Review any Plugin or Skill dependency installation plan.
 5. Approve the plan only after checking every executable and argument.
 
 Safe files restore immediately. Existing credentials on the new computer are
-preserved. AgentConfigSync executes approved installers directly with fixed
+preserved. SyncHub executes approved installers directly with fixed
 argument lists; it does not construct shell command strings or request elevated
 permissions.
 
@@ -114,7 +114,7 @@ Recovery copies and `.trash` are not treated as portable agent resources.
 ### A file is blocked
 
 Open the safety notices in the restore preview. Remove credential content,
-select a safer include glob, or keep the file local. AgentConfigSync fails
+select a safer include glob, or keep the file local. SyncHub fails
 closed and never uploads a blocked file.
 
 ### A symbolic link is unavailable
@@ -127,7 +127,7 @@ or explicitly approve the target through a supported workflow.
 
 The exact executable, arguments, working directory, and error remain in the
 pending installation plan. Install or repair the required tool, then
-synchronize again. AgentConfigSync does not silently mark failed operations as
+synchronize again. SyncHub does not silently mark failed operations as
 complete.
 
 ### Synchronization says Needs attention

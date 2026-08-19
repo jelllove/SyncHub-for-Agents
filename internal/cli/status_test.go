@@ -6,13 +6,13 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
 	"gopkg.in/yaml.v3"
 )
 
 func TestRunStatusCountsPending(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	if err := os.MkdirAll(ProvidersDir(home), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestRunStatusCountsPending(t *testing.T) {
 
 func TestRunStatusUsesUserHomeForProviderPaths(t *testing.T) {
 	userHome := t.TempDir()
-	dataHome := filepath.Join(userHome, ".acsync")
+	dataHome := filepath.Join(userHome, ".synchub")
 	if err := os.MkdirAll(RepoDir(dataHome), 0o755); err != nil {
 		t.Fatal(err)
 	}

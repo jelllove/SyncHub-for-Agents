@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/desktop"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
 )
 
 func TestDefaultDesktopHomeUsesSharedCLIHome(t *testing.T) {

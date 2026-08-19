@@ -8,12 +8,12 @@ import {
   StartGitHubLogin,
   VerifySSH,
   WaitGitHubLogin,
-} from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
+} from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice'
 import {
   Step,
   type Agent,
   type State,
-} from '../../bindings/github.com/qinqingxu/acsync/internal/onboarding/models'
+} from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/onboarding/models'
 import { BrandMark } from '../BrandMark'
 
 type WizardState = Omit<State, 'agents'> & { agents: Agent[] }

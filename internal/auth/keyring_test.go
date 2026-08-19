@@ -39,3 +39,20 @@ func TestStoreKeepsTokenSeparateFromAccountMetadata(t *testing.T) {
 		t.Fatal("token leaked into account metadata")
 	}
 }
+
+func TestStoreTokenFallsBackToLegacyService(t *testing.T) {
+	backend := memoryBackend{}
+	account := Account{ID: 42}
+	if err := backend.Set(legacyKeyringService, accountKey(account.ID), "legacy-token"); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStore(backend)
+	token, err := store.Token(account.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "legacy-token" {
+		t.Fatalf("Token() = %q, want legacy-token", token)
+	}
+}

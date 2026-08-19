@@ -28,7 +28,7 @@ func TestServeRespondsThenShutsDown(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	if !strings.Contains(string(body), "AgentConfigSync Settings") {
+	if !strings.Contains(string(body), "SyncHub Settings") {
 		t.Error("body should contain the settings heading")
 	}
 

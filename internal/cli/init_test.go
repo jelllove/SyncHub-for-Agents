@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
 )
 
 type fakeInitializer struct{ called bool }
@@ -16,7 +16,7 @@ func (f *fakeInitializer) Initialize(url, dir string) error {
 }
 
 func TestRunInitScaffolds(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	fc := &fakeInitializer{}
 
 	if err := RunInit(home, "https://github.com/me/data", fc); err != nil {
@@ -50,7 +50,7 @@ func TestRunInitScaffolds(t *testing.T) {
 }
 
 func TestRunInitRejectsRepositoryURLWithEmbeddedCredential(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	initializer := &fakeInitializer{}
 	err := RunInit(home, "https://secret@github.com/me/data.git", initializer)
 	if err == nil {

@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/daemon"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/provider"
-	"github.com/qinqingxu/acsync/internal/scheduler"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 type stateObserver struct {
@@ -27,7 +27,7 @@ type stateObserver struct {
 
 // ErrNotConfigured indicates that onboarding must finish before sync controls
 // can be used.
-var ErrNotConfigured = errors.New("AgentConfigSync is not configured")
+var ErrNotConfigured = errors.New("SyncHub is not configured")
 
 const (
 	minSyncIntervalMinutes  = 1

@@ -1,12 +1,12 @@
-# Installing AgentConfigSync
+# Installing SyncHub
 
-AgentConfigSync is a tray application. It synchronizes supported AI-agent
+SyncHub is a tray application. It synchronizes supported AI-agent
 configuration and session files through a private GitHub repository.
 
 ## Before installing
 
 Create an empty **private** GitHub repository. Do not add a README or other
-files; AgentConfigSync can initialize the repository itself.
+files; SyncHub can initialize the repository itself.
 
 For SSH authentication, add an SSH key to GitHub and verify it:
 
@@ -18,44 +18,44 @@ GitHub should report that authentication succeeded.
 
 ## Windows
 
-1. Download `AgentConfigSync-amd64-installer.exe` from the latest release.
+1. Download `SyncHub-for-Agents-Setup-x64.exe` from the latest release.
 2. Run the installer. It installs for the current user and does not require
    administrator access.
-3. Start **AgentConfigSync** from the Start menu.
+3. Start **SyncHub** from the Start menu.
 
 Uninstall it from **Settings > Apps > Installed apps**. Your synchronized data
-and settings in `%USERPROFILE%\.acsync` are retained so an uninstall cannot
+and settings in `%USERPROFILE%\.synchub` are retained so an uninstall cannot
 delete your sessions accidentally.
 
 ## macOS
 
-1. Download and open `AgentConfigSync.dmg`.
-2. Drag AgentConfigSync to Applications.
+1. Download and open `SyncHub.dmg`.
+2. Drag SyncHub to Applications.
 3. Open it from Applications.
 
 Release builds are signed and notarized. To uninstall, quit the app from its
 menu-bar icon and move it from Applications to Trash. Settings remain in
-`~/.acsync`.
+`~/.synchub`.
 
 ## Linux
 
 ### Debian or Ubuntu
 
 ```bash
-sudo apt install ./agentconfigsync_*.deb
+sudo apt install ./synchub_*.deb
 ```
 
-Start AgentConfigSync from the application menu.
+Start SyncHub from the application menu.
 
 ### AppImage
 
 ```bash
-chmod +x AgentConfigSync-amd64.AppImage
-./AgentConfigSync-amd64.AppImage
+chmod +x SyncHub-amd64.AppImage
+./SyncHub-amd64.AppImage
 ```
 
 Keep the AppImage at a permanent path before enabling **Start at login**.
-AgentConfigSync records that stable path, not the temporary AppImage mount.
+SyncHub records that stable path, not the temporary AppImage mount.
 
 ## First launch
 
@@ -96,19 +96,19 @@ Open the dashboard from the tray icon. Settings let you:
 - enable or disable **Start at login**;
 - trigger a synchronization immediately.
 
-The installer migrates the legacy `acsync` startup entry when the desktop app
+The installer migrates the legacy `synchub` startup entry when the desktop app
 first launches. Existing configuration, repository checkout, and session data
-in `~/.acsync` are reused.
+in `~/.synchub` are reused.
 
 ## Advanced: headless CLI
 
-The `acsync` command remains available for servers and scripted environments.
+The `synchub` command remains available for servers and scripted environments.
 Desktop users normally do not need it.
 
 ```powershell
-acsync init --repo git@github.com:your-name/agent-sync.git
-acsync sync
-acsync status
+synchub init --repo git@github.com:your-name/agent-sync.git
+synchub sync
+synchub status
 ```
 
 Use the same private repository on each computer. Do not run the desktop app

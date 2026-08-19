@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/conflict"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/state"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/conflict"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 // RunSync loads settings from home and performs one sync pass for goos.

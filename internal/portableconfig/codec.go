@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/qinqingxu/acsync/internal/secret"
+	"github.com/qinqingxu/synchub-for-agents/internal/secret"
 )
 
 var genericSecretPatterns = []string{

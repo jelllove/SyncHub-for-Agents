@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Snapshot } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+import type { Snapshot } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import { SettingsPanel } from './SettingsPanel'
 import { normalizeSnapshot } from './desktopState'
 
 const startAtLogin = vi.fn()
 
-vi.mock('../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice', () => ({
+vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice', () => ({
   PreviewCustomResource: vi.fn(),
   StartAtLogin: () => startAtLogin(),
 }))

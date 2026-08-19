@@ -61,7 +61,7 @@ func (keygenRunner) Run(_ context.Context, name string, args ...string) (string,
 }
 
 func TestGenerateKeyReturnsOnlyPublicKey(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "id_acsync")
+	path := filepath.Join(t.TempDir(), "id_synchub")
 	publicKey, err := GenerateKey(context.Background(), keygenRunner{}, path, "alice@example.com")
 	if err != nil {
 		t.Fatal(err)

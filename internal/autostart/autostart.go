@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const label = "com.acsync.agent"
+const label = "io.github.qinqingxu.synchub.agent"
 
 // Runner executes an external command (launchctl/systemctl). Injectable for tests.
 type Runner func(name string, args ...string) error
@@ -33,14 +33,14 @@ func New(goos, home string) (*Manager, error) {
 			appData = filepath.Join(home, "AppData", "Roaming")
 		}
 		m.Dir = filepath.Join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
-		m.File = "acsync.cmd"
+		m.File = "synchub.cmd"
 		m.Run = nil
 	case "darwin":
 		m.Dir = filepath.Join(home, "Library", "LaunchAgents")
 		m.File = label + ".plist"
 	case "linux":
 		m.Dir = filepath.Join(home, ".config", "systemd", "user")
-		m.File = "acsync.service"
+		m.File = "synchub.service"
 	default:
 		return nil, fmt.Errorf("autostart: unsupported OS %q", goos)
 	}
@@ -79,7 +79,7 @@ func (m *Manager) Enable(execPath string) error {
 	case "darwin":
 		return m.Run("launchctl", "load", "-w", m.Path())
 	case "linux":
-		return m.Run("systemctl", "--user", "enable", "acsync.service")
+		return m.Run("systemctl", "--user", "enable", "synchub.service")
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func (m *Manager) Disable() error {
 		case "darwin":
 			_ = m.Run("launchctl", "unload", "-w", m.Path())
 		case "linux":
-			_ = m.Run("systemctl", "--user", "disable", "acsync.service")
+			_ = m.Run("systemctl", "--user", "disable", "synchub.service")
 		}
 	}
 	err := os.Remove(m.Path())
@@ -144,7 +144,7 @@ func launchAgentPlist(execPath string) string {
 
 func systemdUnit(execPath string) string {
 	return `[Unit]
-Description=AgentConfigSync daemon
+Description=SyncHub daemon
 After=network-online.target
 
 [Service]

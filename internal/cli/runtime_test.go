@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/provider"
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestBuildResourceSpecsSkipsDisabledCategoriesAndNormalizesV1(t *testing.T) {

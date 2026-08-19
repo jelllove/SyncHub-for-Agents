@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/qinqingxu/acsync/internal/auth"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/repository"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 )
 
 func NewGitClient(home, repositoryURL, dir string) (*gitclient.Client, error) {

@@ -9,15 +9,15 @@ import (
 	"sort"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/conflict"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/provider"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/resourcecollect"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/conflict"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 var errPreviewInvalidated = errors.New("resource preview invalidated by settings change")
@@ -116,7 +116,7 @@ func (s *Service) collectPreview(
 	if err != nil {
 		return ResourcePreview{}, err
 	}
-	stageParent, err := os.MkdirTemp("", "acsync-preview-*")
+	stageParent, err := os.MkdirTemp("", "synchub-preview-*")
 	if err != nil {
 		return ResourcePreview{}, err
 	}

@@ -217,7 +217,7 @@ func desktopEntry(executable string, arguments []string) []byte {
 		tokens = append(tokens, desktopToken(argument))
 	}
 	var body bytes.Buffer
-	body.WriteString("[Desktop Entry]\nType=Application\nName=AgentConfigSync\nExec=")
+	body.WriteString("[Desktop Entry]\nType=Application\nName=SyncHub for Agents\nExec=")
 	body.WriteString(strings.Join(tokens, " "))
 	body.WriteString("\nX-GNOME-Autostart-enabled=true\n")
 	return body.Bytes()

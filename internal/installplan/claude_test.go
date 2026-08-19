@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 var claudeListFixture = []byte(`[

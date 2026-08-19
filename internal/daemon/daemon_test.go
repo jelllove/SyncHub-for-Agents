@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 func writeConfig(t *testing.T, home string, cfg config.Config) {
@@ -28,7 +28,7 @@ func writeConfig(t *testing.T, home string, cfg config.Config) {
 }
 
 func TestDaemonPublishesCompleteOnlyAfterCleanup(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	writeConfig(t, home, config.Config{SyncIntervalMinutes: 60, Agents: map[string]bool{}})
 	d, err := New(home, runtime.GOOS)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestDaemonPublishesCompleteOnlyAfterCleanup(t *testing.T) {
 }
 
 func TestNewUsesConfiguredInterval(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	writeConfig(t, home, config.Config{SyncIntervalMinutes: 3, Agents: map[string]bool{}})
 
 	d, err := New(home, runtime.GOOS)
@@ -97,7 +97,7 @@ func TestNewUsesConfiguredInterval(t *testing.T) {
 }
 
 func TestNewDefaultsIntervalTo10m(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	writeConfig(t, home, config.Config{SyncIntervalMinutes: 0, Agents: map[string]bool{}})
 
 	d, err := New(home, runtime.GOOS)
@@ -111,7 +111,7 @@ func TestNewDefaultsIntervalTo10m(t *testing.T) {
 }
 
 func TestRunStopsOnContextCancelAndLogs(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	// Long interval so only the startup trigger fires; the sync job may error
 	// (no repo) — the lifecycle must still complete cleanly.
 	writeConfig(t, home, config.Config{SyncIntervalMinutes: 60, Agents: map[string]bool{}})
@@ -147,7 +147,7 @@ func TestRunStopsOnContextCancelAndLogs(t *testing.T) {
 }
 
 func TestDaemonPublishesCycleErrors(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	writeConfig(t, home, config.Config{
 		SyncIntervalMinutes: 60,
 		Agents:              map[string]bool{},
@@ -181,7 +181,7 @@ func TestDaemonPublishesCycleErrors(t *testing.T) {
 }
 
 func TestDaemonCompletesCleanupWhenSyncNeedsAttention(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	writeConfig(t, home, config.Config{SyncIntervalMinutes: 60, Agents: map[string]bool{}})
 	d, err := New(home, runtime.GOOS)
 	if err != nil {

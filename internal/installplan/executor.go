@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/processattr"
+	"github.com/qinqingxu/synchub-for-agents/internal/processattr"
 )
 
 type RunResult struct {

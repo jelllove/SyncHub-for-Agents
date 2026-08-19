@@ -20,7 +20,7 @@ func mustGit(t *testing.T, dir string, args ...string) {
 func TestOAuthNetworkCommandUsesScopedNoninteractiveCredentialHelper(t *testing.T) {
 	t.Setenv("GIT_TRACE", "1")
 	t.Setenv("GIT_CURL_VERBOSE", "1")
-	executable := filepath.Join(t.TempDir(), "AgentConfigSync.exe")
+	executable := filepath.Join(t.TempDir(), "SyncHub.exe")
 	client := &Client{
 		AuthMode:   AuthOAuth,
 		Executable: executable,

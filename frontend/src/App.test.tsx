@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ResourcePreview,
   Snapshot,
-} from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import App from './App'
 
 const api = vi.hoisted(() => ({
@@ -20,7 +20,7 @@ vi.mock('@wailsio/runtime', () => ({
   },
 }))
 
-vi.mock('../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice', () => ({
+vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice', () => ({
   ApproveInstallPlan: vi.fn(),
   NeedsOnboarding: () => api.needsOnboarding(),
   Pause: vi.fn(),

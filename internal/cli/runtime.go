@@ -1,4 +1,4 @@
-// Package cli implements acsync commands.
+// Package cli implements SyncHub commands.
 package cli
 
 import (
@@ -6,19 +6,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/pathresolver"
-	"github.com/qinqingxu/acsync/internal/provider"
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/pathresolver"
+	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
-// Home returns the acsync home directory (~/.acsync).
+// Home returns the SyncHub home directory (~/.synchub) and migrates legacy
+// home data on first access when needed.
 func Home() (string, error) {
-	h, err := os.UserHomeDir()
+	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(h, ".acsync"), nil
+	return ensureHome(userHome)
 }
 
 // ConfigPath returns the config file path for a given home.

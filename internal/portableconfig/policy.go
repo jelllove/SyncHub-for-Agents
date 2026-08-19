@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/qinqingxu/acsync/internal/pathresolver"
+	"github.com/qinqingxu/synchub-for-agents/internal/pathresolver"
 )
 
 type Policy struct {

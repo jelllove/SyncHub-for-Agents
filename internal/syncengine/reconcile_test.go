@@ -3,7 +3,7 @@ package syncengine
 import (
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
 func meta(hash string, mtime int64) state.FileMeta {

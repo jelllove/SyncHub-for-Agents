@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 )
 
 var iconSizes = []int{16, 20, 24, 32}

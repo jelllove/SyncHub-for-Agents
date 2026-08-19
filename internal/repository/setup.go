@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
 )
 
 type Setup struct {
@@ -79,7 +79,7 @@ func (s *Setup) Initialize(remote, dir string) error {
 	if err := s.Client.AddAll(); err != nil {
 		return err
 	}
-	if err := s.Client.Commit("chore: initialize AgentConfigSync repository"); err != nil {
+	if err := s.Client.Commit("chore: initialize SyncHub repository"); err != nil {
 		return err
 	}
 	if err := s.Client.PushUpstream("origin", "main"); err != nil {
@@ -100,11 +100,11 @@ func sameRemote(left, right string) bool {
 func (s *Setup) ensureIdentity() error {
 	name := s.Name
 	if name == "" {
-		name = "AgentConfigSync"
+		name = "SyncHub"
 	}
 	email := s.Email
 	if email == "" {
-		email = "acsync@users.noreply.github.com"
+		email = "synchub@users.noreply.github.com"
 	}
 	if _, exists, err := s.Client.LocalConfig("user.name"); err != nil {
 		return err

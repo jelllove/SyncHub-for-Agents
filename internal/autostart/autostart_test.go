@@ -17,7 +17,7 @@ func TestNewWindowsManager(t *testing.T) {
 	if m.Dir != wantDir {
 		t.Errorf("dir = %q, want %q", m.Dir, wantDir)
 	}
-	if m.File != "acsync.cmd" {
+	if m.File != "synchub.cmd" {
 		t.Errorf("file = %q", m.File)
 	}
 }
@@ -29,15 +29,15 @@ func TestNewUnsupportedOS(t *testing.T) {
 }
 
 func TestContentGenerators(t *testing.T) {
-	if got := windowsCmd(`C:\acsync.exe`); !strings.Contains(got, `start "" "C:\acsync.exe" tray`) {
+	if got := windowsCmd(`C:\synchub.exe`); !strings.Contains(got, `start "" "C:\synchub.exe" tray`) {
 		t.Errorf("windows cmd = %q", got)
 	}
-	plist := launchAgentPlist("/usr/local/bin/acsync")
-	if !strings.Contains(plist, "<string>/usr/local/bin/acsync</string>") || !strings.Contains(plist, "com.acsync.agent") {
+	plist := launchAgentPlist("/usr/local/bin/synchub")
+	if !strings.Contains(plist, "<string>/usr/local/bin/synchub</string>") || !strings.Contains(plist, "io.github.qinqingxu.synchub.agent") {
 		t.Errorf("plist = %q", plist)
 	}
-	unit := systemdUnit("/usr/local/bin/acsync")
-	if !strings.Contains(unit, "ExecStart=/usr/local/bin/acsync tray") {
+	unit := systemdUnit("/usr/local/bin/synchub")
+	if !strings.Contains(unit, "ExecStart=/usr/local/bin/synchub tray") {
 		t.Errorf("unit = %q", unit)
 	}
 }
@@ -54,14 +54,14 @@ func TestEnableDisableLinux(t *testing.T) {
 		return nil
 	}
 
-	if err := m.Enable("/opt/acsync"); err != nil {
+	if err := m.Enable("/opt/synchub"); err != nil {
 		t.Fatal(err)
 	}
 	if en, _ := m.IsEnabled(); !en {
 		t.Error("should be enabled")
 	}
 	data, _ := os.ReadFile(m.Path())
-	if !strings.Contains(string(data), "ExecStart=/opt/acsync tray") {
+	if !strings.Contains(string(data), "ExecStart=/opt/synchub tray") {
 		t.Errorf("unit body = %q", string(data))
 	}
 	if len(calls) != 1 || calls[0][0] != "systemctl" {
@@ -83,11 +83,11 @@ func TestEnableWindowsWritesCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := m.Enable(`C:\acsync.exe`); err != nil {
+	if err := m.Enable(`C:\synchub.exe`); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(m.Path())
-	if !strings.Contains(string(data), `"C:\acsync.exe" tray`) {
+	if !strings.Contains(string(data), `"C:\synchub.exe" tray`) {
 		t.Errorf("cmd body = %q", string(data))
 	}
 }

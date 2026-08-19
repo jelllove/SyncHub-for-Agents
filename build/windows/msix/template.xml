@@ -8,15 +8,15 @@
         AllowPromptForPassword="false">
     </Settings>
     <Installer
-        Path="agentconfigsync.exe"
+        Path="synchub.exe"
         Arguments=""
-        InstallLocation="C:\Program Files\AgentConfigSync\AgentConfigSync">
+        InstallLocation="C:\Program Files\SyncHub\SyncHub">
     </Installer>
     <PackageInformation
-        PackageName="AgentConfigSync"
-        PackageDisplayName="AgentConfigSync"
-        PublisherName="CN=AgentConfigSync"
-        PublisherDisplayName="AgentConfigSync"
+        PackageName="SyncHub"
+        PackageDisplayName="SyncHub"
+        PublisherName="CN=SyncHub"
+        PublisherDisplayName="SyncHub"
         Version="0.1.0.0"
         PackageDescription="Synchronize AI agent configuration and sessions">
         <Capabilities>
@@ -25,10 +25,10 @@
         </Capabilities>
         <Applications>
             <Application
-                Id="io.github.qinqingxu.agentconfigsync"
+                Id="io.github.qinqingxu.synchub"
                 Description="Synchronize AI agent configuration and sessions"
-                DisplayName="AgentConfigSync"
-                ExecutableName="agentconfigsync.exe"
+                DisplayName="SyncHub"
+                ExecutableName="synchub.exe"
                 EntryPoint="Windows.FullTrustApplication">
                 
             </Application>
@@ -41,13 +41,13 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>AgentConfigSync</DisplayName>
-            <PublisherDisplayName>AgentConfigSync</PublisherDisplayName>
+            <DisplayName>SyncHub</DisplayName>
+            <PublisherDisplayName>SyncHub</PublisherDisplayName>
             <Description>Synchronize AI agent configuration and sessions</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>
-    <SaveLocation PackagePath="agentconfigsync.msix" />
+    <SaveLocation PackagePath="synchub.msix" />
     <PackageIntegrity>
         <CertificatePath></CertificatePath>
     </PackageIntegrity>

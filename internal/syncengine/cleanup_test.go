@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestCleanupTrashRemovesExpired(t *testing.T) {

@@ -75,7 +75,7 @@ jobs:
       - name: Smoke test Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/smoke/windows.ps1 -Installer ./bin/AgentConfigSync-amd64-installer.exe
+        run: ./scripts/smoke/windows.ps1 -Installer ./bin/SyncHub-for-Agents-Setup-x64.exe
       - name: Package macOS
         if: runner.os == 'macOS'
         run: wails3 task darwin:package:dmg ARCH=${{ matrix.arch }}
@@ -90,7 +90,7 @@ jobs:
         run: ./scripts/smoke/linux.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: AgentConfigSync-${{ matrix.name }}
+          name: SyncHub-${{ matrix.name }}
           path: |
             bin/*.exe
             bin/*.dmg

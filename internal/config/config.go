@@ -1,4 +1,4 @@
-// Package config persists user settings for acsync.
+// Package config persists user settings for synchub.
 package config
 
 import (
@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"gopkg.in/yaml.v3"
 )
 

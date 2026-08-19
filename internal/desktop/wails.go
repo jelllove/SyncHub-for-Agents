@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/onboarding"
-	"github.com/qinqingxu/acsync/internal/startup"
+	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
+	"github.com/qinqingxu/synchub-for-agents/internal/startup"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 

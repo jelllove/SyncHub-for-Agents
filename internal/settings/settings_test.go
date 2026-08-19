@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
 )
 
 func setupHome(t *testing.T) string {
 	t.Helper()
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	if err := os.MkdirAll(cli.ProvidersDir(home), 0o755); err != nil {
 		t.Fatal(err)
 	}

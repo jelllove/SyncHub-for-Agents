@@ -3,7 +3,7 @@ package syncengine
 import (
 	"sort"
 
-	"github.com/qinqingxu/acsync/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
 // ActionType enumerates the operations a sync pass can perform on one path.

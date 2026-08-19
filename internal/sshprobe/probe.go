@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/processattr"
+	"github.com/qinqingxu/synchub-for-agents/internal/processattr"
 )
 
 type Runner interface {

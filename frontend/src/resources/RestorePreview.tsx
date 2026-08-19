@@ -1,4 +1,4 @@
-import type { ResourcePreview } from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+import type { ResourcePreview } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import { formatBytes } from './ResourceSettings'
 
 export function RestorePreview({ preview }: { preview: ResourcePreview }) {

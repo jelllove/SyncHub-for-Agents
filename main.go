@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/qinqingxu/acsync/internal/auth"
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/desktop"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/onboarding"
-	"github.com/qinqingxu/acsync/internal/repository"
-	"github.com/qinqingxu/acsync/internal/sshprobe"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
+	"github.com/qinqingxu/synchub-for-agents/internal/sshprobe"
 )
 
 var githubOAuthClientID string
@@ -86,6 +86,9 @@ func newOnboardingService(home string, core *desktop.Service) (*onboarding.Servi
 		})
 	}
 	clientID := githubOAuthClientID
+	if clientID == "" {
+		clientID = os.Getenv("SYNCHUB_GITHUB_CLIENT_ID")
+	}
 	if clientID == "" {
 		clientID = os.Getenv("ACSYNC_GITHUB_CLIENT_ID")
 	}

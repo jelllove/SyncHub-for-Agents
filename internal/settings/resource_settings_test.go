@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestLegacySettingsPreservesAndRendersResourceConfiguration(t *testing.T) {

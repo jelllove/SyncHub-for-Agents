@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/secret"
-	"github.com/qinqingxu/acsync/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/secret"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
 type Projector interface {
@@ -89,7 +89,7 @@ func (c *Collector) CollectContext(
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
-	stageRoot, err := os.MkdirTemp(c.options.StageParent, "acsync-resources-*")
+	stageRoot, err := os.MkdirTemp(c.options.StageParent, "synchub-resources-*")
 	if err != nil {
 		return Result{}, fmt.Errorf("create resource stage: %w", err)
 	}
@@ -310,7 +310,7 @@ func (c *Collector) skipDirectoryPath(
 	result *Result,
 ) bool {
 	if scanner.IsExcluded(logicalPath) ||
-		scanner.IsExcluded(path.Join(logicalPath, ".acsync-entry")) {
+		scanner.IsExcluded(path.Join(logicalPath, ".synchub-entry")) {
 		return true
 	}
 	if allowed, code := c.options.Filter.CheckDirectory(logicalPath); !allowed {

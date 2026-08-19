@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/qinqingxu/acsync/internal/autostart"
+import "github.com/qinqingxu/synchub-for-agents/internal/autostart"
 
 // RunInstall enables run-at-login for execPath and returns the entry path.
 func RunInstall(goos, userHome, execPath string) (string, error) {

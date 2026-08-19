@@ -6,7 +6,7 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 )
 
 func TestAssetPNGSupportsEveryStateAndSize(t *testing.T) {

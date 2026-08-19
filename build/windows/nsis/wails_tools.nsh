@@ -5,13 +5,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "AgentConfigSync"
+    !define INFO_PROJECTNAME "SyncHub"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "AgentConfigSync"
+    !define INFO_COMPANYNAME "SyncHub"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "AgentConfigSync"
+    !define INFO_PRODUCTNAME "SyncHub"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "0.1.0"

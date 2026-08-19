@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 type ClaudeAdapter struct {

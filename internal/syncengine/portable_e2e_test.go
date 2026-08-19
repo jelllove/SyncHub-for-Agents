@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestPortableCompatibilityPreservesLegacyAndUnknownProviders(t *testing.T) {

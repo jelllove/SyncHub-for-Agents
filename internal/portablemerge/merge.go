@@ -12,8 +12,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/processattr"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/processattr"
 )
 
 type Result struct {
@@ -98,7 +98,7 @@ type GitTextMerger struct {
 }
 
 func (m GitTextMerger) Merge(base, local, remote []byte) (Result, error) {
-	tempDir, err := os.MkdirTemp(m.TempParent, "acsync-merge-*")
+	tempDir, err := os.MkdirTemp(m.TempParent, "synchub-merge-*")
 	if err != nil {
 		return Result{}, fmt.Errorf("create text merge directory: %w", err)
 	}

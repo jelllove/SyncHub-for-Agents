@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 // RunCleanup purges expired trash from the repo and commits/pushes if anything

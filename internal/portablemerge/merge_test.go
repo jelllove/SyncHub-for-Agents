@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
 )
 
 func TestStructuredMergeCombinesIndependentKeys(t *testing.T) {

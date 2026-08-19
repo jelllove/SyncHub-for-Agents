@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/resourcecollect"
-	"github.com/qinqingxu/acsync/internal/state"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 type Status struct {
@@ -46,7 +46,7 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 	}
 	codecs := portableconfig.BuiltinRegistry()
 	inventory := installplan.NewBuiltinInventory(installplan.CommandRunner{})
-	stageParent := filepath.Join(RepoDir(home), ".git", "acsync-stage")
+	stageParent := filepath.Join(RepoDir(home), ".git", "synchub-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Status{}, fmt.Errorf("create status stage parent: %w", err)
 	}

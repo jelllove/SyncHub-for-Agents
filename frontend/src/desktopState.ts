@@ -7,7 +7,7 @@ import type {
   ResourceIssue,
   ResourcePreview,
   Snapshot,
-} from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 export type AppAgent = Omit<Agent, 'exclude' | 'resources'> & {
   exclude: string[]

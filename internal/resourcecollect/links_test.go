@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestResolveRootUsesCanonicalLinkTargetWithoutExposingItAsOriginal(t *testing.T) {

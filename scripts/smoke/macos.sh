@@ -2,8 +2,8 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-app_path="${1:-"$root_dir/bin/AgentConfigSync.app"}"
-binary="$app_path/Contents/MacOS/AgentConfigSync"
+app_path="${1:-"$root_dir/bin/SyncHub.app"}"
+binary="$app_path/Contents/MacOS/SyncHub"
 smoke_home="$(mktemp -d)"
 pid=""
 

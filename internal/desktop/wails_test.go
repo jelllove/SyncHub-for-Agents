@@ -10,7 +10,7 @@ import (
 )
 
 func TestWailsServiceDelegatesToDesktopCore(t *testing.T) {
-	core, err := New(filepath.Join(t.TempDir(), ".acsync"), runtime.GOOS)
+	core, err := New(filepath.Join(t.TempDir(), ".synchub"), runtime.GOOS)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,11 +7,11 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/qinqingxu/acsync/internal/desktop"
-	"github.com/qinqingxu/acsync/internal/onboarding"
-	"github.com/qinqingxu/acsync/internal/scheduler"
-	"github.com/qinqingxu/acsync/internal/startup"
-	"github.com/qinqingxu/acsync/internal/tray"
+	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
+	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/startup"
+	"github.com/qinqingxu/synchub-for-agents/internal/tray"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -70,10 +70,10 @@ func newGUIApplication() *guiApplication {
 		},
 		Linux: application.LinuxOptions{
 			DisableQuitOnLastWindowClosed: true,
-			ProgramName:                   "agentconfigsync",
+			ProgramName:                   "synchub",
 		},
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: "com.qinqingxu.agentconfigsync",
+			UniqueID: "com.qinqingxu.synchub",
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 				gui.show()
 			},
@@ -90,7 +90,7 @@ func (gui *guiApplication) configure(
 	gui.service = core
 	gui.startup = &startup.Manager{
 		Backend:    gui.app.Autostart,
-		Identifier: "io.github.qinqingxu.agentconfigsync",
+		Identifier: "io.github.qinqingxu.synchub",
 		Arguments:  []string{"--hidden"},
 		GOOS:       runtime.GOOS,
 	}

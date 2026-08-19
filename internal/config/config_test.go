@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestDefault(t *testing.T) {
@@ -25,7 +25,7 @@ func TestDefault(t *testing.T) {
 func TestSaveLoadRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	in := Config{
-		RepoURL:             "git@github.com:me/acsync-data.git",
+		RepoURL:             "git@github.com:me/synchub-data.git",
 		SyncIntervalMinutes: 15,
 		TrashGraceDays:      7,
 		Agents:              map[string]bool{"claude": true, "gemini": false},

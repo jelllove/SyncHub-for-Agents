@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/qinqingxu/acsync/internal/auth"
-	"github.com/qinqingxu/acsync/internal/repository"
-	"github.com/qinqingxu/acsync/internal/sshprobe"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
+	"github.com/qinqingxu/synchub-for-agents/internal/sshprobe"
 )
 
 type Step string
@@ -239,7 +239,7 @@ func (s *Service) Complete(ctx context.Context, enabled map[string]bool) error {
 		s.state.Agents[index].Enabled = enabled[s.state.Agents[index].Name]
 	}
 	s.state.Step = Ready
-	s.state.Message = "AgentConfigSync is ready"
+	s.state.Message = "SyncHub is ready"
 	s.mu.Unlock()
 	return nil
 }

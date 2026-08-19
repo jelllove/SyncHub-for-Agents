@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
 )
 
 type fakeOAuth struct {

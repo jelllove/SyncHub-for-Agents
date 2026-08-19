@@ -115,7 +115,7 @@ func TestRunPublishesStateTransitionsFromLightweightSnapshots(t *testing.T) {
 }
 
 func TestRunWaitsForConfigurationThenStarts(t *testing.T) {
-	service, err := New(filepath.Join(t.TempDir(), ".acsync"), runtime.GOOS)
+	service, err := New(filepath.Join(t.TempDir(), ".synchub"), runtime.GOOS)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>agentconfigsync.exe</string>
+    <string>synchub.exe</string>
     <key>CFBundleIdentifier</key>
-    <string>io.github.qinqingxu.agentconfigsync</string>
+    <string>io.github.qinqingxu.synchub</string>
     <key>CFBundleName</key>
-    <string>AgentConfigSync</string>
+    <string>SyncHub</string>
     <key>CFBundleDisplayName</key>
-    <string>AgentConfigSync</string>
+    <string>SyncHub</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

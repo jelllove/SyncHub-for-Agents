@@ -19,89 +19,89 @@ import * as onboarding$0 from "../onboarding/models.js";
 import * as $models from "./models.js";
 
 export function ApproveInstallPlan(id: string): $CancellablePromise<void> {
-    return $Call.ByID(542360153, id);
+    return $Call.ByID(1695820935, id);
 }
 
 export function CancelOnboarding(): $CancellablePromise<void> {
-    return $Call.ByID(1199327865);
+    return $Call.ByID(3153265431);
 }
 
 export function CompleteOnboarding(enabled: { [_ in string]?: boolean } | null): $CancellablePromise<void> {
-    return $Call.ByID(2279454804, enabled);
+    return $Call.ByID(367143950, enabled);
 }
 
 export function NeedsOnboarding(): $CancellablePromise<boolean> {
-    return $Call.ByID(1611883858);
+    return $Call.ByID(2131389736);
 }
 
 export function OnboardingState(): $CancellablePromise<onboarding$0.State> {
-    return $Call.ByID(1129236984);
+    return $Call.ByID(386154610);
 }
 
 export function Pause(): $CancellablePromise<void> {
-    return $Call.ByID(3233963532);
+    return $Call.ByID(2754654834);
 }
 
 export function PreviewCustomResource(input: $models.CustomResourceInput): $CancellablePromise<$models.ResourcePreview> {
-    return $Call.ByID(2936582605, input);
+    return $Call.ByID(3594254427, input);
 }
 
 export function QueueConflictBatch(selections: $models.ConflictSelection[] | null): $CancellablePromise<void> {
-    return $Call.ByID(1755916521, selections);
+    return $Call.ByID(2823790371, selections);
 }
 
 export function ResolveConflict(input: $models.ConflictResolution): $CancellablePromise<void> {
-    return $Call.ByID(3670949432, input);
+    return $Call.ByID(3976618230, input);
 }
 
 export function ResourcePreview(): $CancellablePromise<$models.ResourcePreview> {
-    return $Call.ByID(1033440782);
+    return $Call.ByID(2524841168);
 }
 
 export function Resume(): $CancellablePromise<void> {
-    return $Call.ByID(1167946741);
+    return $Call.ByID(209216979);
 }
 
 export function RetryConflictBatch(id: string): $CancellablePromise<void> {
-    return $Call.ByID(1744848214, id);
+    return $Call.ByID(2270072392, id);
 }
 
 export function RetryInstallPlan(id: string): $CancellablePromise<void> {
-    return $Call.ByID(900032308, id);
+    return $Call.ByID(829636702, id);
 }
 
 export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<void> {
-    return $Call.ByID(3861930266, input);
+    return $Call.ByID(3950727776, input);
 }
 
 export function SetRepository(raw: string): $CancellablePromise<void> {
-    return $Call.ByID(4273126394, raw);
+    return $Call.ByID(566394724, raw);
 }
 
 export function SetStartAtLogin(enabled: boolean): $CancellablePromise<void> {
-    return $Call.ByID(3527389948, enabled);
+    return $Call.ByID(3530873694, enabled);
 }
 
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
-    return $Call.ByID(2631033270);
+    return $Call.ByID(3816368756);
 }
 
 export function StartAtLogin(): $CancellablePromise<boolean> {
-    return $Call.ByID(861169660);
+    return $Call.ByID(2736855374);
 }
 
 export function StartGitHubLogin(): $CancellablePromise<onboarding$0.State> {
-    return $Call.ByID(3880308558);
+    return $Call.ByID(2111959360);
 }
 
 export function TriggerSync(): $CancellablePromise<void> {
-    return $Call.ByID(2713968177);
+    return $Call.ByID(1437252511);
 }
 
 export function VerifySSH(): $CancellablePromise<onboarding$0.State> {
-    return $Call.ByID(3405933299);
+    return $Call.ByID(1157161353);
 }
 
 export function WaitGitHubLogin(): $CancellablePromise<onboarding$0.State> {
-    return $Call.ByID(3070431217);
+    return $Call.ByID(562452083);
 }

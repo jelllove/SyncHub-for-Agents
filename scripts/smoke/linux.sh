@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-appimage="${1:-"$root_dir/bin/AgentConfigSync-x86_64.AppImage"}"
+appimage="${1:-"$root_dir/bin/SyncHub-x86_64.AppImage"}"
 deb="${2:-$(find "$root_dir/bin" -maxdepth 1 -name '*.deb' -print -quit)}"
 work_dir="$(mktemp -d)"
 pid=""
@@ -20,13 +20,13 @@ test -x "$appimage"
 test -n "$deb"
 test -f "$deb"
 dpkg-deb --info "$deb" >/dev/null
-dpkg-deb --contents "$deb" | grep -q 'usr/bin/AgentConfigSync'
+dpkg-deb --contents "$deb" | grep -q 'usr/bin/SyncHub'
 
 (
   cd "$work_dir"
   "$appimage" --appimage-extract >/dev/null
 )
-test -x "$work_dir/squashfs-root/usr/bin/AgentConfigSync"
+test -x "$work_dir/squashfs-root/usr/bin/SyncHub"
 
 HOME="$work_dir/home" XDG_CONFIG_HOME="$work_dir/config" \
   xvfb-run -a "$work_dir/squashfs-root/AppRun" --hidden &

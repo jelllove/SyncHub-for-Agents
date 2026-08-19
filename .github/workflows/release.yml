@@ -45,18 +45,18 @@ jobs:
           wails3 task windows:build ARCH=amd64 GITHUB_OAUTH_CLIENT_ID=$env:OAUTH_CLIENT_ID
           $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
             Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\AgentConfigSync.exe
+          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\SyncHub.exe
           wails3 generate webview2bootstrapper -dir build\windows\nsis
           Push-Location build\windows\nsis
-          makensis -DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user "-DARG_WAILS_AMD64_BINARY=$env:GITHUB_WORKSPACE\bin\AgentConfigSync.exe" project.nsi
+          makensis -DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user "-DARG_WAILS_AMD64_BINARY=$env:GITHUB_WORKSPACE\bin\SyncHub.exe" project.nsi
           Pop-Location
-          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\AgentConfigSync-amd64-installer.exe
-          & $signTool verify /pa /all bin\AgentConfigSync.exe
-          & $signTool verify /pa /all bin\AgentConfigSync-amd64-installer.exe
+          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\SyncHub-for-Agents-Setup-x64.exe
+          & $signTool verify /pa /all bin\SyncHub.exe
+          & $signTool verify /pa /all bin\SyncHub-for-Agents-Setup-x64.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-windows
-          path: bin/AgentConfigSync-amd64-installer.exe
+          path: bin/SyncHub-for-Agents-Setup-x64.exe
           if-no-files-found: error
 
   macos:
@@ -104,18 +104,18 @@ jobs:
           wails3 task darwin:package:universal GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
           codesign --force --deep --options runtime --timestamp \
             --entitlements build/darwin/entitlements.plist \
-            --sign "$SIGNING_IDENTITY" bin/AgentConfigSync.app
-          codesign --verify --deep --strict --verbose=2 bin/AgentConfigSync.app
+            --sign "$SIGNING_IDENTITY" bin/SyncHub.app
+          codesign --verify --deep --strict --verbose=2 bin/SyncHub.app
           wails3 task darwin:create:dmg
-          codesign --force --timestamp --sign "$SIGNING_IDENTITY" bin/AgentConfigSync.dmg
-          xcrun notarytool submit bin/AgentConfigSync.dmg --wait \
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" bin/SyncHub.dmg
+          xcrun notarytool submit bin/SyncHub.dmg --wait \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
-          xcrun stapler staple bin/AgentConfigSync.dmg
-          xcrun stapler validate bin/AgentConfigSync.dmg
+          xcrun stapler staple bin/SyncHub.dmg
+          xcrun stapler validate bin/SyncHub.dmg
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-macos
-          path: bin/AgentConfigSync.dmg
+          path: bin/SyncHub.dmg
           if-no-files-found: error
 
   linux:

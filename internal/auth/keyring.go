@@ -9,7 +9,10 @@ import (
 	keyring "github.com/zalando/go-keyring"
 )
 
-const keyringService = "io.github.qinqingxu.acsync/github-oauth"
+const (
+	keyringService       = "io.github.qinqingxu.synchub/github-oauth"
+	legacyKeyringService = "io.github.qinqingxu.acsync/github-oauth"
+)
 
 var ErrNotFound = errors.New("credential not found")
 
@@ -74,7 +77,15 @@ func (s *Store) Token(id int64) (string, error) {
 	if id == 0 {
 		return "", errors.New("account ID is required")
 	}
-	return s.backend.Get(keyringService, accountKey(id))
+	key := accountKey(id)
+	value, err := s.backend.Get(keyringService, key)
+	if err == nil {
+		return value, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return "", err
+	}
+	return s.backend.Get(legacyKeyringService, key)
 }
 
 func (s *Store) Delete(id int64) error {

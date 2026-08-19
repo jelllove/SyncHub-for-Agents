@@ -6,11 +6,11 @@ import (
 
 	"fyne.io/systray"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/daemon"
-	"github.com/qinqingxu/acsync/internal/scheduler"
-	"github.com/qinqingxu/acsync/internal/settings"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/settings"
 )
 
 // App binds a daemon to a system-tray UI.
@@ -41,8 +41,8 @@ func Run(home, goos string) error {
 }
 
 func (a *App) onReady() {
-	systray.SetTitle("acsync")
-	systray.SetTooltip("AgentConfigSync")
+	systray.SetTitle("synchub")
+	systray.SetTooltip("SyncHub")
 	systray.SetIcon(Icon(scheduler.StateIdle, a.GOOS))
 
 	// Repaint the icon (and keep logging) on every state change.
@@ -65,7 +65,7 @@ func (a *App) onReady() {
 	systray.AddSeparator()
 	agents := a.addAgentItems()
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("Quit", "Stop acsync")
+	mQuit := systray.AddMenuItem("Quit", "Stop synchub")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel

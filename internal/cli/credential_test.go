@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/auth"
-	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/auth"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
 )
 
 type credentialBackend map[string]string
@@ -36,7 +36,7 @@ func (b credentialBackend) Delete(service, user string) error {
 }
 
 func TestRunCredentialLoadsMetadataAndKeepsUnsupportedHostsSecret(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	account := auth.Account{ID: 42, Login: "alice", Scopes: []string{"repo"}}
 	if err := auth.SaveMetadata(AuthMetadataPath(home), auth.Metadata{Active: account}); err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestRunCredentialLoadsMetadataAndKeepsUnsupportedHostsSecret(t *testing.T) 
 }
 
 func TestNewGitClientUsesOAuthHelperWhenMetadataExists(t *testing.T) {
-	home := filepath.Join(t.TempDir(), ".acsync")
+	home := filepath.Join(t.TempDir(), ".synchub")
 	account := auth.Account{ID: 42, Login: "alice", Scopes: []string{"repo"}}
 	if err := auth.SaveMetadata(AuthMetadataPath(home), auth.Metadata{Active: account}); err != nil {
 		t.Fatal(err)

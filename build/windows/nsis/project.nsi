@@ -19,9 +19,9 @@ Unicode true
 ####
 ## The following information is taken from the wails_tools.nsh file, but they can be overwritten here.
 ####
-## !define INFO_PROJECTNAME    "my-project" # Default "AgentConfigSync"
-## !define INFO_COMPANYNAME    "My Company" # Default "AgentConfigSync"
-## !define INFO_PRODUCTNAME    "My Product Name" # Default "AgentConfigSync"
+## !define INFO_PROJECTNAME    "my-project" # Default "SyncHub"
+## !define INFO_COMPANYNAME    "My Company" # Default "SyncHub"
+## !define INFO_PRODUCTNAME    "My Product Name" # Default "SyncHub"
 ## !define INFO_PRODUCTVERSION "1.0.0"     # Default "0.1.0"
 ## !define INFO_COPYRIGHT      "(c) Now, My Company" # Default "© 2026, My Company"
 ###
@@ -33,6 +33,10 @@ Unicode true
 ####
 ## Include the wails tools
 ####
+!define INFO_PROJECTNAME "SyncHub"
+!define INFO_COMPANYNAME "SyncHub for Agents"
+!define INFO_PRODUCTNAME "SyncHub for Agents"
+!define PRODUCT_EXECUTABLE "SyncHub.exe"
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
@@ -74,7 +78,7 @@ ManifestDPIAware true
 #!finalize 'signtool --file "%1"'
 
 Name "${INFO_PRODUCTNAME}"
-OutFile "..\..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
+OutFile "..\..\..\bin\SyncHub-for-Agents-Setup-x64.exe" # Name of the installer's file.
 !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
 !else
@@ -106,7 +110,7 @@ SectionEnd
 
 Section "uninstall" 
     !insertmacro wails.setShellContext
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.qinqingxu.agentconfigsync"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.qinqingxu.synchub"
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 

@@ -3,7 +3,7 @@ import type {
   ConflictResolutionStatus,
   ConflictSelection,
   ConflictSummary,
-} from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 type SelectionChoice = 'local' | 'remote' | 'merged'
 

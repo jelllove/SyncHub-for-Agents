@@ -6,24 +6,29 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/daemon"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/repository"
-	"github.com/qinqingxu/acsync/internal/tray"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
+	"github.com/qinqingxu/synchub-for-agents/internal/tray"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	root := &cobra.Command{
-		Use:   "acsync",
-		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
-	}
-	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd(), credentialCmd())
+	root := newRootCommand()
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
+}
+
+func newRootCommand() *cobra.Command {
+	root := &cobra.Command{
+		Use:   "synchub",
+		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
+	}
+	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd(), credentialCmd())
+	return root
 }
 
 func credentialCmd() *cobra.Command {
@@ -41,7 +46,7 @@ func initCmd() *cobra.Command {
 	var repo string
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize acsync: bind a private repo, clone it, detect agents",
+		Short: "Initialize SyncHub: bind a private repo, clone it, detect agents",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			home, err := cli.Home()
 			if err != nil {
@@ -51,7 +56,7 @@ func initCmd() *cobra.Command {
 			if err := cli.RunInit(home, repo, setup); err != nil {
 				return err
 			}
-			fmt.Printf("Initialized acsync at %s (repo: %s)\n", home, repo)
+			fmt.Printf("Initialized SyncHub at %s (repo: %s)\n", home, repo)
 			return nil
 		},
 	}
@@ -123,7 +128,7 @@ func daemonCmd() *cobra.Command {
 func trayCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "tray",
-		Short: "Run acsync with a system-tray icon (daemon + UI)",
+		Short: "Run SyncHub with a system-tray icon (daemon + UI)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			home, err := cli.Home()
 			if err != nil {
@@ -137,7 +142,7 @@ func trayCmd() *cobra.Command {
 func installCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "install",
-		Short: "Enable acsync to start automatically at login",
+		Short: "Enable SyncHub to start automatically at login",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			exe, err := os.Executable()
 			if err != nil {
@@ -160,7 +165,7 @@ func installCmd() *cobra.Command {
 func uninstallCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
-		Short: "Disable acsync autostart",
+		Short: "Disable SyncHub autostart",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			userHome, err := os.UserHomeDir()
 			if err != nil {

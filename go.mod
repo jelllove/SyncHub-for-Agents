@@ -1,4 +1,4 @@
-module github.com/qinqingxu/acsync
+module github.com/qinqingxu/synchub-for-agents
 
 go 1.26.5
 

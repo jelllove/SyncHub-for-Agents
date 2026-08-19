@@ -1,4 +1,4 @@
-import type { InstallPlan } from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+import type { InstallPlan } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 export function InstallPlanPanel({
   plan,

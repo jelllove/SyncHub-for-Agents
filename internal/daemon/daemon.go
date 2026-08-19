@@ -1,4 +1,4 @@
-// Package daemon runs the acsync sync scheduler as a long-lived service.
+// Package daemon runs the synchub sync scheduler as a long-lived service.
 package daemon
 
 import (
@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/cli"
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/scheduler"
-	"github.com/qinqingxu/acsync/internal/syncengine"
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
+	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 // CycleResult describes one completed sync and cleanup cycle.
@@ -30,7 +30,7 @@ type CycleResult struct {
 	FinishedAt      time.Time
 }
 
-// Daemon runs the sync scheduler for a given acsync home.
+// Daemon runs the sync scheduler for a given synchub home.
 type Daemon struct {
 	Home       string
 	GOOS       string

@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/conflict"
-	"github.com/qinqingxu/acsync/internal/gitclient"
-	"github.com/qinqingxu/acsync/internal/installplan"
-	"github.com/qinqingxu/acsync/internal/portableconfig"
-	"github.com/qinqingxu/acsync/internal/portablemerge"
-	"github.com/qinqingxu/acsync/internal/resource"
-	"github.com/qinqingxu/acsync/internal/resourcecollect"
-	"github.com/qinqingxu/acsync/internal/state"
+	"github.com/qinqingxu/synchub-for-agents/internal/conflict"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/portablemerge"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
+	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
 type Result struct {
@@ -91,7 +91,7 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	textMerger := e.TextMerger
 	if textMerger == nil {
 		textMerger = portablemerge.GitTextMerger{
-			TempParent: filepath.Join(e.RepoDir, ".git", "acsync-stage"),
+			TempParent: filepath.Join(e.RepoDir, ".git", "synchub-stage"),
 		}
 	}
 	if err := conflicts.RecoverTransactions(); err != nil {
@@ -107,7 +107,7 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		return Result{}, fmt.Errorf("pull: %w", err)
 	}
 
-	stageParent := filepath.Join(e.RepoDir, ".git", "acsync-stage")
+	stageParent := filepath.Join(e.RepoDir, ".git", "synchub-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Result{}, fmt.Errorf("create resource stage parent: %w", err)
 	}

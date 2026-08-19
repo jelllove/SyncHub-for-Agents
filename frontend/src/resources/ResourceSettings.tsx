@@ -1,4 +1,4 @@
-import type { Agent } from '../../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+import type { Agent } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 export type CategorySettings = Record<string, Record<string, boolean>>
 

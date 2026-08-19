@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/qinqingxu/acsync/internal/config"
-	"github.com/qinqingxu/acsync/internal/repository"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 )
 
 // RepositoryInitializer prepares a local sync repository from a remote.
@@ -13,7 +13,7 @@ type RepositoryInitializer interface {
 	Initialize(remote, dir string) error
 }
 
-// RunInit scaffolds the acsync home, clones the data repo, detects agents, and
+// RunInit scaffolds the synchub home, clones the data repo, detects agents, and
 // writes a default config.
 func RunInit(home, repoURL string, initializer RepositoryInitializer) error {
 	parsed, err := repository.ParseGitHubURL(repoURL)
@@ -53,7 +53,7 @@ func RunInit(home, repoURL string, initializer RepositoryInitializer) error {
 
 // ensureGitAttributes writes a `.gitattributes` into the data repo (if the repo
 // directory exists) so git treats every stored file as binary and never
-// rewrites CRLF/LF. acsync copies agent files byte-for-byte, so git must not
+// rewrites CRLF/LF. synchub copies agent files byte-for-byte, so git must not
 // touch their bytes. Idempotent: a no-op if the file already exists.
 func ensureGitAttributes(repo string) error {
 	if _, err := os.Stat(repo); err != nil {

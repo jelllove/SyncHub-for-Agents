@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/qinqingxu/acsync/internal/processattr"
+	"github.com/qinqingxu/synchub-for-agents/internal/processattr"
 )
 
 type AuthMode string

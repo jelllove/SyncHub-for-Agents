@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 func TestBuiltinsLoaded(t *testing.T) {

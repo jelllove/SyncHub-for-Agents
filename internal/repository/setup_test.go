@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qinqingxu/acsync/internal/gitclient"
+	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
 )
 
 func runGit(t *testing.T, dir string, args ...string) string {
@@ -31,7 +31,7 @@ func TestSetupInitializesEmptyRemoteAndIsIdempotent(t *testing.T) {
 	work := filepath.Join(root, "work")
 	setup := &Setup{
 		Client: &gitclient.Client{},
-		Name:   "AgentConfigSync Test",
+		Name:   "SyncHub Test",
 		Email:  "test@example.com",
 	}
 

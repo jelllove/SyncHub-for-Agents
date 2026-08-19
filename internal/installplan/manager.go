@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qinqingxu/acsync/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 )
 
 const skillDependencyManifest = "agents/_portable/config/install/skill-dependencies.json"

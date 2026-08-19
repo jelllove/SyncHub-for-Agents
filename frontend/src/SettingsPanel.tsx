@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { StartAtLogin } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
+import { StartAtLogin } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice'
 import type {
   CustomResourceInput,
   SettingsInput,
-} from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
+} from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import type { AppSnapshot } from './desktopState'
 import { hasGeneratedPreview } from './desktopState'
 import { CustomResourceEditor } from './resources/CustomResourceEditor'

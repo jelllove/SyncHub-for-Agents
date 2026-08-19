@@ -37,7 +37,7 @@ See [docs/portable-resources.md](docs/portable-resources.md) for detailed rules.
 
 1. Create an empty private GitHub repository.
 2. Download the installer from the latest release:
-   - `AgentConfigSync-amd64-installer.exe`
+   - `SyncHub-for-Agents-Setup-x64.exe`
 3. Install and launch **SyncHub for Agents**.
 4. Complete onboarding:
    - connect your private repository,
@@ -69,4 +69,4 @@ wails3 package GOOS=windows ARCH=amd64 INSTALL_SCOPE=user
 ## Project notes
 
 - Product brand: **SyncHub for Agents**
-- Some internal identifiers and file names still use `AgentConfigSync`/`acsync` for compatibility with existing installs and startup registrations.
+- Some internal identifiers and file names still use `SyncHub`/`synchub` for compatibility with existing installs and startup registrations.

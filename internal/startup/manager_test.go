@@ -16,7 +16,7 @@ type fakeBackend struct {
 
 func TestManagerUsesStableAppImagePath(t *testing.T) {
 	home := t.TempDir()
-	appImage := filepath.Join(home, "Applications", "AgentConfigSync.AppImage")
+	appImage := filepath.Join(home, "Applications", "SyncHub.AppImage")
 	if err := os.MkdirAll(filepath.Dir(appImage), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestManagerUsesStableAppImagePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := &Manager{
-		Identifier: "io.github.qinqingxu.agentconfigsync",
+		Identifier: "io.github.qinqingxu.synchub",
 		Arguments:  []string{"--hidden"},
 		GOOS:       "linux",
 		HomeDir:    func() (string, error) { return home, nil },
@@ -55,11 +55,11 @@ func TestManagerUsesStableAppImagePath(t *testing.T) {
 func TestManagerCreatesHiddenMacLaunchAgent(t *testing.T) {
 	home := t.TempDir()
 	manager := &Manager{
-		Identifier: "io.github.qinqingxu.agentconfigsync",
+		Identifier: "io.github.qinqingxu.synchub",
 		Arguments:  []string{"--hidden"},
 		GOOS:       "darwin",
 		HomeDir:    func() (string, error) { return home, nil },
-		Executable: func() (string, error) { return "/Applications/AgentConfigSync.app/Contents/MacOS/AgentConfigSync", nil },
+		Executable: func() (string, error) { return "/Applications/SyncHub.app/Contents/MacOS/SyncHub", nil },
 	}
 	if err := manager.Enable(); err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestManagerControlsNativeAutostart(t *testing.T) {
 	backend := &fakeBackend{}
 	manager := &Manager{
 		Backend:    backend,
-		Identifier: "io.github.qinqingxu.agentconfigsync",
+		Identifier: "io.github.qinqingxu.synchub",
 		Arguments:  []string{"--hidden"},
 	}
 	if err := manager.Enable(); err != nil {
