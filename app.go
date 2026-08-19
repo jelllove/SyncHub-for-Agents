@@ -57,8 +57,8 @@ func (q *activationQueue) Ready(show func()) {
 func newGUIApplication() *guiApplication {
 	gui := &guiApplication{}
 	gui.app = application.New(application.Options{
-		Name:        "AgentConfigSync",
-		Description: "Synchronize AI agent settings and sessions across computers",
+		Name:        "SyncHub for Agents",
+		Description: "Synchronize AI agent configs and sessions across computers",
 		Assets: application.AssetOptions{
 			Handler: application.BundledAssetFileServer(frontendAssets),
 		},
@@ -142,10 +142,10 @@ func (g *guiApplication) migrateLegacyStartup() error {
 func (g *guiApplication) configureTray() {
 	g.tray = g.app.SystemTray.New()
 	g.tray.SetIcon(tray.Icon(scheduler.StateIdle, runtime.GOOS))
-	g.tray.SetTooltip("AgentConfigSync")
+	g.tray.SetTooltip("SyncHub for Agents")
 
 	menu := g.app.NewMenu()
-	menu.Add("Open AgentConfigSync").OnClick(func(*application.Context) {
+	menu.Add("Open SyncHub for Agents").OnClick(func(*application.Context) {
 		g.show()
 	})
 	menu.AddSeparator()

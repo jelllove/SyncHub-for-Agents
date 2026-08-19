@@ -22,7 +22,7 @@ export function InstallPlanPanel({
         </div>
         <span className="count-badge">{operations.length}</span>
       </div>
-      <p>Review the exact commands AgentConfigSync will run. No shell command strings are used.</p>
+      <p>Review the exact commands SyncHub for Agents will run. No shell command strings are used.</p>
       <div className="operation-list scroll-list">
         {operations.map((operation) => (
           <article key={operation.id}>

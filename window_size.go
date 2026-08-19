@@ -51,7 +51,7 @@ func initialMainWindowOptions() application.WebviewWindowOptions {
 	size := calculateMainWindowSize(0, 0)
 	return application.WebviewWindowOptions{
 		Name:      "main",
-		Title:     "AgentConfigSync",
+		Title:     "SyncHub for Agents",
 		URL:       "/",
 		Width:     size.Width,
 		Height:    size.Height,

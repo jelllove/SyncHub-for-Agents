@@ -5,11 +5,11 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "AgentConfigSync",
-			"FileDescription": "Synchronize AI agent configuration and sessions",
+			"CompanyName": "SyncHub for Agents",
+			"FileDescription": "Synchronize AI agent configs and sessions across computers",
 			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "AgentConfigSync",
-			"Comments": "This is a comment"
+			"ProductName": "SyncHub for Agents",
+			"Comments": "Cross-platform AI agent config and session sync"
 		}
 	}
 }

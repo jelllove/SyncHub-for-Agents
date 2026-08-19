@@ -179,7 +179,7 @@ export function SettingsPanel({
             <label className="toggle-row">
               <span>
                 <strong>Start at login</strong>
-                <small>Starts AgentConfigSync the next time you sign in. It does not restart the app now.</small>
+                <small>Starts SyncHub for Agents the next time you sign in. It does not restart the app now.</small>
               </span>
               <input
                 type="checkbox"

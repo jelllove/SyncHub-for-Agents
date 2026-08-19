@@ -39,7 +39,7 @@ func main() {
 		newOnboarding: newOnboardingService,
 	})
 	if err != nil {
-		log.Printf("run AgentConfigSync: %v", err)
+		log.Printf("run SyncHub for Agents: %v", err)
 		os.Exit(1)
 	}
 }
@@ -48,11 +48,11 @@ func runDesktop(hidden bool, bootstrap desktopBootstrap) error {
 	gui := bootstrap.newGUI()
 	home, err := bootstrap.home()
 	if err != nil {
-		return fmt.Errorf("resolve AgentConfigSync home: %w", err)
+		return fmt.Errorf("resolve SyncHub for Agents home: %w", err)
 	}
 	core, err := bootstrap.newService(home, "")
 	if err != nil {
-		return fmt.Errorf("initialize AgentConfigSync: %w", err)
+		return fmt.Errorf("initialize SyncHub for Agents: %w", err)
 	}
 	onboardingService, err := bootstrap.newOnboarding(home, core)
 	if err != nil {

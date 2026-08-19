@@ -5,12 +5,12 @@ version: '3'
 
 # This information is used to generate the build assets.
 info:
-  companyName: "AgentConfigSync"
-  productName: "AgentConfigSync"
+  companyName: "SyncHub for Agents"
+  productName: "SyncHub for Agents"
   productIdentifier: "io.github.qinqingxu.agentconfigsync"
-  description: "Synchronize AI agent configuration and sessions"
+  description: "Synchronize AI agent configs and sessions across computers"
   copyright: "Copyright © 2026"
-  comments: "Cross-platform AI agent configuration and session sync"
+  comments: "Cross-platform AI agent config and session sync"
   version: "0.1.0"
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension

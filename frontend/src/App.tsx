@@ -207,8 +207,8 @@ function App() {
   if (needsOnboarding === undefined || !snapshot) {
     return (
       <main className="loading">
-        <BrandMark label="AgentConfigSync" />
-        <p>{error || 'Opening AgentConfigSync…'}</p>
+        <BrandMark label="SyncHub for Agents" />
+        <p>{error || 'Opening SyncHub for Agents…'}</p>
       </main>
     )
   }
@@ -226,9 +226,9 @@ function App() {
     <div className="app-shell">
       <header>
         <div className="brand">
-          <BrandMark label="AgentConfigSync" />
+          <BrandMark label="SyncHub for Agents" />
           <div>
-            <strong>AgentConfigSync</strong>
+            <strong>SyncHub for Agents</strong>
             <span>Desktop</span>
           </div>
         </div>
@@ -243,7 +243,7 @@ function App() {
             <span className="eyebrow">WELCOME</span>
             <h1>Keep every AI workspace in sync.</h1>
             <p>
-              Connect a private Git repository once, then AgentConfigSync will safely synchronize
+              Connect a private Git repository once, then SyncHub for Agents will safely synchronize
               your agent settings and sessions in the background.
             </p>
             <button className="primary" onClick={() => setSettingsOpen(true)}>

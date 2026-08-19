@@ -95,15 +95,15 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   }
 
   if (!state) {
-    return <main className="loading"><BrandMark label="AgentConfigSync" /><p>{error || 'Preparing setup…'}</p></main>
+    return <main className="loading"><BrandMark label="SyncHub for Agents" /><p>{error || 'Preparing setup…'}</p></main>
   }
 
   if (state.step === Step.Welcome && !showRepository) {
     return (
       <div className="onboarding-shell">
         <section className="onboarding-card welcome-card">
-          <BrandMark className="large" label="AgentConfigSync" />
-          <span className="eyebrow">WELCOME TO AGENTCONFIGSYNC</span>
+          <BrandMark className="large" label="SyncHub for Agents" />
+          <span className="eyebrow">WELCOME TO SYNCHUB FOR AGENTS</span>
           <h1>One workspace.<br />Every computer.</h1>
           <p>Synchronize Claude, Copilot, Gemini, Cursor, and their sessions through a private repository you control.</p>
           <button className="primary wide" onClick={() => setShowRepository(true)}>Get started</button>
@@ -115,7 +115,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
 
   if (state.step === Step.Welcome || state.step === Step.Repository) {
     return (
-      <WizardFrame step={1} title="Connect your private repository" subtitle="AgentConfigSync uses this repository as an encrypted-in-transit bridge between your computers." error={error}>
+      <WizardFrame step={1} title="Connect your private repository" subtitle="SyncHub for Agents uses this repository as an encrypted-in-transit bridge between your computers." error={error}>
         <form className="wizard-form" onSubmit={(event) => void submitRepository(event)}>
           <label>
             GitHub repository URL
@@ -140,7 +140,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   if (state.step === Step.Authentication || state.step === Step.Verification) {
     const isSSH = state.authMode === 'ssh'
     return (
-      <WizardFrame step={2} title={isSSH ? 'Verify SSH access' : 'Sign in with GitHub'} subtitle={isSSH ? 'We will check your SSH agent and verify access to the actual repository without opening a terminal.' : 'Authorize AgentConfigSync using GitHub Device Flow. Your token is stored only in the system keyring.'} error={error}>
+      <WizardFrame step={2} title={isSSH ? 'Verify SSH access' : 'Sign in with GitHub'} subtitle={isSSH ? 'We will check your SSH agent and verify access to the actual repository without opening a terminal.' : 'Authorize SyncHub for Agents using GitHub Device Flow. Your token is stored only in the system keyring.'} error={error}>
         <div className="auth-summary">
           <span>Repository</span>
           <strong>{state.repositoryUrl}</strong>
@@ -191,14 +191,14 @@ export default function Onboarding({ complete }: { complete: () => void }) {
     )
   }
 
-  return <main className="loading"><BrandMark label="AgentConfigSync" /><p>Setup complete</p></main>
+  return <main className="loading"><BrandMark label="SyncHub for Agents" /><p>Setup complete</p></main>
 }
 
 function WizardFrame({ step, title, subtitle, error, children }: { step: number; title: string; subtitle: string; error: string; children: React.ReactNode }) {
   const cancel = () => void CancelOnboarding()
   return (
     <div className="onboarding-shell">
-      <button className="onboarding-brand" onClick={cancel}><BrandMark /> AgentConfigSync</button>
+      <button className="onboarding-brand" onClick={cancel}><BrandMark /> SyncHub for Agents</button>
       <section className="onboarding-card">
         <div className="stepper"><span className={step >= 1 ? 'done' : ''}>1</span><i /><span className={step >= 2 ? 'done' : ''}>2</span><i /><span className={step >= 3 ? 'done' : ''}>3</span></div>
         <h1>{title}</h1>
