@@ -240,7 +240,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	conflictRecords, err := conflictStore(s.home, nil).List()
+	conflictRecords, resolution, err := conflictStore(s.home, nil).VisibleConflicts()
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -283,6 +283,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		CustomResources:    desktopCustomResources(cfg.CustomResources),
 		PendingInstallPlan: desktopInstallPlan(pending),
 		Conflicts:          desktopConflicts(conflictRecords),
+		ConflictResolution: desktopConflictResolution(resolution),
 	}, nil
 }
 

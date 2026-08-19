@@ -370,15 +370,29 @@ func desktopInstallPlan(plan *installplan.Plan) *InstallPlan {
 	return result
 }
 
-func desktopConflicts(records []conflict.Record) []ConflictSummary {
+func desktopConflicts(records []conflict.VisibleConflict) []ConflictSummary {
 	result := make([]ConflictSummary, 0, len(records))
-	for _, record := range records {
+	for _, visible := range records {
+		record := visible.Record
 		result = append(result, ConflictSummary{
 			ID:          record.ID,
+			Revision:    visible.Revision,
 			ResourceKey: record.ResourceKey,
 			Path:        record.RepoRel,
 			CreatedAt:   record.CreatedAt,
 		})
 	}
 	return result
+}
+
+func desktopConflictResolution(batch *conflict.ResolutionBatch) *ConflictResolutionStatus {
+	if batch == nil {
+		return nil
+	}
+	return &ConflictResolutionStatus{
+		ID:       batch.ID,
+		Status:   batch.Status,
+		Selected: len(batch.Selections),
+		Error:    batch.Error,
+	}
 }

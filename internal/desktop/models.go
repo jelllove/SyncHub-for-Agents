@@ -64,9 +64,17 @@ type InstallPlan struct {
 
 type ConflictSummary struct {
 	ID          string    `json:"id"`
+	Revision    string    `json:"revision"`
 	ResourceKey string    `json:"resourceKey"`
 	Path        string    `json:"path"`
 	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type ConflictResolutionStatus struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Selected int    `json:"selected"`
+	Error    string `json:"error,omitempty"`
 }
 
 type ConflictResolution struct {
@@ -93,23 +101,24 @@ type Progress struct {
 
 // Snapshot is the current desktop-visible sync state.
 type Snapshot struct {
-	Configured         bool                  `json:"configured"`
-	State              string                `json:"state"`
-	RepositoryURL      string                `json:"repositoryUrl"`
-	Platform           string                `json:"platform"`
-	IntervalMinutes    int                   `json:"intervalMinutes"`
-	TrashGraceDays     int                   `json:"trashGraceDays"`
-	Agents             []Agent               `json:"agents"`
-	LastSync           time.Time             `json:"lastSync"`
-	NextSync           time.Time             `json:"nextSync"`
-	PendingActions     int                   `json:"pendingActions"`
-	BlockedFiles       int                   `json:"blockedFiles"`
-	LastError          string                `json:"lastError"`
-	Progress           Progress              `json:"progress"`
-	Preview            ResourcePreview       `json:"preview"`
-	CustomResources    []CustomResourceInput `json:"customResources"`
-	PendingInstallPlan *InstallPlan          `json:"pendingInstallPlan,omitempty"`
-	Conflicts          []ConflictSummary     `json:"conflicts"`
+	Configured         bool                      `json:"configured"`
+	State              string                    `json:"state"`
+	RepositoryURL      string                    `json:"repositoryUrl"`
+	Platform           string                    `json:"platform"`
+	IntervalMinutes    int                       `json:"intervalMinutes"`
+	TrashGraceDays     int                       `json:"trashGraceDays"`
+	Agents             []Agent                   `json:"agents"`
+	LastSync           time.Time                 `json:"lastSync"`
+	NextSync           time.Time                 `json:"nextSync"`
+	PendingActions     int                       `json:"pendingActions"`
+	BlockedFiles       int                       `json:"blockedFiles"`
+	LastError          string                    `json:"lastError"`
+	Progress           Progress                  `json:"progress"`
+	Preview            ResourcePreview           `json:"preview"`
+	CustomResources    []CustomResourceInput     `json:"customResources"`
+	PendingInstallPlan *InstallPlan              `json:"pendingInstallPlan,omitempty"`
+	Conflicts          []ConflictSummary         `json:"conflicts"`
+	ConflictResolution *ConflictResolutionStatus `json:"conflictResolution,omitempty"`
 }
 
 // SettingsInput contains editable desktop settings.

@@ -75,8 +75,84 @@ func TestSnapshotIncludesResourceCategoriesAndPendingWork(t *testing.T) {
 	if got.PendingInstallPlan == nil || len(got.Conflicts) != 1 {
 		t.Fatalf("pending state = %#v", got)
 	}
+	if got.Conflicts[0].Revision == "" {
+		t.Fatal("conflict revision is missing")
+	}
 	if got.Platform != runtime.GOOS {
 		t.Fatalf("platform = %q", got.Platform)
+	}
+}
+
+func TestSnapshotIncludesPendingConflictResolutionStatus(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+
+	store := conflictStore(service.home, nil)
+	visible, _, err := store.VisibleConflicts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.QueueBatch([]conflict.ResolutionSelection{{
+		ID: visible[0].Record.ID, Revision: visible[0].Revision,
+		Choice: conflict.ChoiceLocal,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.ConflictResolution == nil ||
+		snapshot.ConflictResolution.ID != batch.ID ||
+		snapshot.ConflictResolution.Status != "queued" ||
+		snapshot.ConflictResolution.Selected != 1 {
+		t.Fatalf("conflict resolution = %#v", snapshot.ConflictResolution)
+	}
+}
+
+func TestSnapshotIncludesFailedConflictResolutionStatus(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+
+	metadata := filepath.Join(service.home, "conflict-resolution")
+	if err := os.MkdirAll(metadata, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(metadata, "failed.json"), []byte(`{
+			"id": "failed-batch",
+			"status": "failed",
+			"error": "stale revision",
+			"selections": [{"id": "conflict-1", "revision": "old", "choice": "local"}]
+		}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.ConflictResolution == nil ||
+		snapshot.ConflictResolution.ID != "failed-batch" ||
+		snapshot.ConflictResolution.Status != "failed" ||
+		snapshot.ConflictResolution.Selected != 1 ||
+		snapshot.ConflictResolution.Error != "stale revision" {
+		t.Fatalf("conflict resolution = %#v", snapshot.ConflictResolution)
+	}
+}
+
+func TestSnapshotPropagatesMalformedConflictResolutionMetadata(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+
+	metadata := filepath.Join(service.home, "conflict-resolution")
+	if err := os.MkdirAll(metadata, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(metadata, "pending.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Snapshot(); err == nil {
+		t.Fatal("malformed conflict resolution metadata was ignored")
 	}
 }
 
