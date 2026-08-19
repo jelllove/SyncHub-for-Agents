@@ -26,13 +26,16 @@ type Store struct {
 	localRoot string
 	repoDir   string
 	scanner   Scanner
+	locks     *resolutionLockSet
 }
 
 func NewStore(localRoot, repoDir string, scanner Scanner) *Store {
-	return &Store{localRoot: localRoot, repoDir: repoDir, scanner: scanner}
+	return &Store{localRoot: localRoot, repoDir: repoDir, scanner: scanner, locks: sharedResolutionLocks(localRoot)}
 }
 
 func (s *Store) Create(record Record, base, local, remote []byte) error {
+	s.locks.transaction.Lock()
+	defer s.locks.transaction.Unlock()
 	if record.CreatedAt.IsZero() {
 		record.CreatedAt = time.Now().UTC()
 	}
@@ -86,6 +89,12 @@ func (s *Store) Create(record Record, base, local, remote []byte) error {
 }
 
 func (s *Store) List() ([]Record, error) {
+	s.locks.transaction.RLock()
+	defer s.locks.transaction.RUnlock()
+	return s.listUnlocked()
+}
+
+func (s *Store) listUnlocked() ([]Record, error) {
 	entries, err := os.ReadDir(s.localRoot)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -114,6 +123,12 @@ func (s *Store) List() ([]Record, error) {
 }
 
 func (s *Store) MirrorFromRepo(preserveLocal map[string]struct{}) error {
+	s.locks.transaction.Lock()
+	defer s.locks.transaction.Unlock()
+	return s.mirrorFromRepoUnlocked(preserveLocal)
+}
+
+func (s *Store) mirrorFromRepoUnlocked(preserveLocal map[string]struct{}) error {
 	repoRoot := s.repoConflictRoot()
 	entries, err := os.ReadDir(repoRoot)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -250,6 +265,12 @@ func sameVariants(
 }
 
 func (s *Store) Resolve(id string, merged []byte) error {
+	s.locks.transaction.Lock()
+	defer s.locks.transaction.Unlock()
+	return s.resolveUnlocked(id, merged)
+}
+
+func (s *Store) resolveUnlocked(id string, merged []byte) error {
 	if err := validateSegment("conflict id", id); err != nil {
 		return err
 	}
