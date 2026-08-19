@@ -42,6 +42,17 @@ type VisibleConflict struct {
 	Revision string `json:"revision"`
 }
 
+type transactionEntry struct {
+	Path   string `json:"path"`
+	Exists bool   `json:"exists"`
+	Data   []byte `json:"data,omitempty"`
+}
+
+type transactionJournal struct {
+	BatchID string             `json:"batchId"`
+	Entries []transactionEntry `json:"entries"`
+}
+
 var ErrResolutionActive = errors.New("a conflict resolution batch is already active")
 
 type resolutionLockSet struct {
@@ -296,4 +307,175 @@ func writeJSONAtomic(filename string, value any) error {
 	}
 	data = append(data, '\n')
 	return writeAtomic(filename, data, 0o600)
+}
+
+// ApplyPendingBatch applies the queued batch as one recoverable transaction.
+func (s *Store) ApplyPendingBatch() error {
+	s.locks.transaction.Lock()
+	defer s.locks.transaction.Unlock()
+	s.locks.metadata.Lock()
+	defer s.locks.metadata.Unlock()
+	batch, err := s.readBatchUnlocked("pending.json")
+	if err != nil || batch == nil {
+		return err
+	}
+	if batch.Status != "queued" {
+		return fmt.Errorf("resolution batch %q has invalid status %q", batch.ID, batch.Status)
+	}
+	view, err := s.listVisibleUnlocked()
+	if err != nil {
+		return fmt.Errorf("snapshot conflicts for batch %s: %w", batch.ID, err)
+	}
+	if err := writeJSONAtomic(s.metadataPath("applying-view.json"), view); err != nil {
+		return fmt.Errorf("publish applying conflict view: %w", err)
+	}
+	batch.Status = "applying"
+	if err := writeJSONAtomic(s.metadataPath("pending.json"), batch); err != nil {
+		return fmt.Errorf("mark resolution batch applying: %w", err)
+	}
+	journal := transactionJournal{BatchID: batch.ID}
+	fail := func(cause error) error {
+		rollbackErr := rollbackEntries(journal.Entries)
+		batch.Status = "failed"
+		batch.Error = errors.Join(cause, rollbackErr).Error()
+		writeErr := writeJSONAtomic(s.metadataPath("failed.json"), batch)
+		clearErr := clearResolutionMetadata(
+			s.metadataPath("pending.json"),
+			s.metadataPath("applying-view.json"),
+			s.metadataPath("transaction.json"),
+		)
+		return errors.Join(cause, rollbackErr, writeErr, clearErr)
+	}
+	for _, selection := range batch.Selections {
+		record, err := s.readRecord(selection.ID)
+		if err != nil {
+			return fail(fmt.Errorf("load conflict %s: %w", selection.ID, err))
+		}
+		current, err := s.revisionUnlocked(selection.ID)
+		if err != nil || current != selection.Revision {
+			if err == nil {
+				err = fmt.Errorf("stale revision")
+			}
+			return fail(fmt.Errorf("conflict %s revision changed: %w", selection.ID, err))
+		}
+		var data []byte
+		if selection.Choice == ChoiceMerged {
+			data = selection.Content
+		} else {
+			data, err = os.ReadFile(filepath.Join(s.localRoot, selection.ID, string(selection.Choice)))
+			if err != nil {
+				return fail(fmt.Errorf("read conflict %s %s variant: %w", selection.ID, selection.Choice, err))
+			}
+		}
+		if s.scanner != nil {
+			if err := s.scanner(record, string(selection.Choice), data); err != nil {
+				return fail(fmt.Errorf("scan conflict %s %s: %w", selection.ID, selection.Choice, err))
+			}
+		}
+		canonical := filepath.Join(s.repoDir, filepath.FromSlash(record.RepoRel))
+		entry := transactionEntry{Path: canonical}
+		original, readErr := os.ReadFile(canonical)
+		if readErr == nil {
+			entry.Exists, entry.Data = true, original
+		} else if !errors.Is(readErr, os.ErrNotExist) {
+			return fail(fmt.Errorf("read canonical %s: %w", record.RepoRel, readErr))
+		}
+		journal.Entries = append(journal.Entries, entry)
+		if err := writeJSONAtomic(s.metadataPath("transaction.json"), journal); err != nil {
+			return fail(fmt.Errorf("journal canonical %s: %w", record.RepoRel, err))
+		}
+		if err := writeAtomic(canonical, data, 0o600); err != nil {
+			return fail(fmt.Errorf("write resolved conflict %s: %w", selection.ID, err))
+		}
+	}
+	for _, selection := range batch.Selections {
+		if err := os.RemoveAll(filepath.Join(s.localRoot, selection.ID)); err != nil {
+			return fail(fmt.Errorf("remove local conflict %s: %w", selection.ID, err))
+		}
+		if err := os.RemoveAll(filepath.Join(s.repoConflictRoot(), selection.ID)); err != nil {
+			return fail(fmt.Errorf("remove repository conflict %s: %w", selection.ID, err))
+		}
+	}
+	if err := os.Remove(s.metadataPath("pending.json")); err != nil {
+		return fail(fmt.Errorf("clear pending resolution batch: %w", err))
+	}
+	if err := clearResolutionMetadata(
+		s.metadataPath("failed.json"),
+		s.metadataPath("applying-view.json"),
+		s.metadataPath("transaction.json"),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+// RecoverTransactions rolls back an interrupted applying batch.
+func (s *Store) RecoverTransactions() error {
+	s.locks.transaction.Lock()
+	defer s.locks.transaction.Unlock()
+	s.locks.metadata.Lock()
+	defer s.locks.metadata.Unlock()
+	batch, err := s.readBatchUnlocked("pending.json")
+	if err != nil || batch == nil || batch.Status != "applying" {
+		return err
+	}
+	data, err := os.ReadFile(s.metadataPath("transaction.json"))
+	if err != nil {
+		batch.Status = "failed"
+		batch.Error = fmt.Errorf("read resolution transaction journal: %w", err).Error()
+		writeErr := writeJSONAtomic(s.metadataPath("failed.json"), batch)
+		clearErr := clearResolutionMetadata(
+			s.metadataPath("pending.json"),
+			s.metadataPath("applying-view.json"),
+			s.metadataPath("transaction.json"),
+		)
+		return errors.Join(fmt.Errorf("read resolution transaction journal: %w", err), writeErr, clearErr)
+	}
+	var journal transactionJournal
+	if err := json.Unmarshal(data, &journal); err != nil {
+		return fmt.Errorf("parse resolution transaction journal: %w", err)
+	}
+	if err := rollbackEntries(journal.Entries); err != nil {
+		return fmt.Errorf("rollback resolution batch %s: %w", batch.ID, err)
+	}
+	batch.Status = "failed"
+	batch.Error = "recovered interrupted resolution transaction"
+	if err := writeJSONAtomic(s.metadataPath("failed.json"), batch); err != nil {
+		return err
+	}
+	return clearResolutionMetadata(
+		s.metadataPath("pending.json"),
+		s.metadataPath("applying-view.json"),
+		s.metadataPath("transaction.json"),
+	)
+}
+
+func rollbackEntries(entries []transactionEntry) error {
+	var joined error
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		var err error
+		if entry.Exists {
+			err = writeAtomic(entry.Path, entry.Data, 0o600)
+		} else {
+			err = os.Remove(entry.Path)
+			if errors.Is(err, os.ErrNotExist) {
+				err = nil
+			}
+		}
+		joined = errors.Join(joined, err)
+	}
+	return joined
+}
+
+func clearResolutionMetadata(paths ...string) error {
+	var joined error
+	for _, metadataPath := range paths {
+		err := os.Remove(metadataPath)
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		joined = errors.Join(joined, err)
+	}
+	return joined
 }

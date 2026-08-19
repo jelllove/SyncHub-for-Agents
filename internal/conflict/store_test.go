@@ -181,3 +181,110 @@ func TestStoreMirrorsRepositoryBundlesAndRemoteResolution(t *testing.T) {
 		t.Fatalf("resolved remote conflict remains locally: %#v, %v", records, err)
 	}
 }
+
+func TestStoreApplyPendingBatchCommitsAllSelections(t *testing.T) {
+	localRoot, repoDir := t.TempDir(), t.TempDir()
+	store := NewStore(localRoot, repoDir, nil)
+	records := []Record{
+		{ID: "one", ResourceKey: "demo/one", RepoRel: "agents/demo/config/one.json"},
+		{ID: "two", ResourceKey: "demo/two", RepoRel: "agents/demo/config/two.json"},
+	}
+	for _, record := range records {
+		if err := store.Create(record, []byte("base"), []byte("local-"+record.ID), []byte("remote")); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeAtomic(filepath.Join(repoDir, filepath.FromSlash(record.RepoRel)), []byte("old-"+record.ID), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	visible, _, err := store.VisibleConflicts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.QueueBatch([]ResolutionSelection{
+		{ID: visible[0].Record.ID, Revision: visible[0].Revision, Choice: ChoiceLocal},
+		{ID: visible[1].Record.ID, Revision: visible[1].Revision, Choice: ChoiceMerged, Content: []byte("merged-two")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ApplyPendingBatch(); err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		data, err := os.ReadFile(filepath.Join(repoDir, filepath.FromSlash(record.RepoRel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := "local-" + record.ID
+		if record.ID == "two" {
+			want = "merged-two"
+		}
+		if string(data) != want {
+			t.Fatalf("%s = %q, want %q", record.ID, data, want)
+		}
+	}
+	if pending, _ := store.PendingBatch(); pending != nil {
+		t.Fatalf("pending batch remains: %#v", pending)
+	}
+	if _, err := os.Stat(store.metadataPath("applying-view.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("applying view remains: %v", err)
+	}
+	if batch.ID == "" {
+		t.Fatal("batch ID is empty")
+	}
+}
+
+func TestStoreApplyPendingBatchRollsBackAndRecovers(t *testing.T) {
+	localRoot, repoDir := t.TempDir(), t.TempDir()
+	fail := false
+	store := NewStore(localRoot, repoDir, func(_ Record, variant string, data []byte) error {
+		if fail && variant == "merged" && string(data) == "bad" {
+			return errors.New("scanner rejected")
+		}
+		return nil
+	})
+	records := []Record{
+		{ID: "one", ResourceKey: "demo/one", RepoRel: "agents/demo/config/one.json"},
+		{ID: "two", ResourceKey: "demo/two", RepoRel: "agents/demo/config/two.json"},
+	}
+	for _, record := range records {
+		if err := store.Create(record, []byte("base"), []byte("local"), []byte("remote")); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeAtomic(filepath.Join(repoDir, filepath.FromSlash(record.RepoRel)), []byte("original"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	visible, _, err := store.VisibleConflicts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.QueueBatch([]ResolutionSelection{
+		{ID: visible[0].Record.ID, Revision: visible[0].Revision, Choice: ChoiceLocal},
+		{ID: visible[1].Record.ID, Revision: visible[1].Revision, Choice: ChoiceMerged, Content: []byte("bad")},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fail = true
+	if err := store.ApplyPendingBatch(); err == nil {
+		t.Fatal("ApplyPendingBatch() error = nil")
+	}
+	data, err := os.ReadFile(filepath.Join(repoDir, filepath.FromSlash(records[0].RepoRel)))
+	if err != nil || string(data) != "original" {
+		t.Fatalf("first canonical = %q, %v", data, err)
+	}
+	failed, err := store.FailedBatch()
+	if err != nil || failed == nil || failed.Status != "failed" {
+		t.Fatalf("failed batch = %#v, %v", failed, err)
+	}
+	if pending, err := store.PendingBatch(); err != nil || pending != nil {
+		t.Fatalf("pending batch = %#v, %v", pending, err)
+	}
+	if err := store.RecoverTransactions(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(localRoot, records[0].ID)); err != nil {
+		t.Fatalf("first conflict bundle was lost: %v", err)
+	}
+}

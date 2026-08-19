@@ -94,6 +94,9 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 			TempParent: filepath.Join(e.RepoDir, ".git", "acsync-stage"),
 		}
 	}
+	if err := conflicts.RecoverTransactions(); err != nil {
+		return Result{}, fmt.Errorf("recover conflict transaction: %w", err)
+	}
 
 	e.publish(Progress{
 		Stage:      StagePulling,
@@ -155,6 +158,13 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		conflictIDsForIssues(append(ownershipBlocked, validationBlocked...)),
 	); err != nil {
 		return Result{}, fmt.Errorf("mirror conflicts: %w", err)
+	}
+	if pending, err := conflicts.PendingBatch(); err != nil {
+		return Result{}, fmt.Errorf("load pending conflict batch: %w", err)
+	} else if pending != nil && pending.Status == "queued" {
+		if err := conflicts.ApplyPendingBatch(); err != nil {
+			return Result{}, fmt.Errorf("apply pending conflict batch: %w", err)
+		}
 	}
 
 	e.publish(Progress{
