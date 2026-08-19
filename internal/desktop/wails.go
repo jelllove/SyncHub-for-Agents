@@ -103,12 +103,15 @@ func (s *WailsService) SaveSettings(input SettingsInput) error {
 	return s.core.SaveSettings(input)
 }
 
-func (s *WailsService) ResourcePreview() (ResourcePreview, error) {
-	return s.core.ResourcePreview()
+func (s *WailsService) ResourcePreview(ctx context.Context) (ResourcePreview, error) {
+	return s.core.ResourcePreview(ctx)
 }
 
-func (s *WailsService) PreviewCustomResource(input CustomResourceInput) (ResourcePreview, error) {
-	return s.core.PreviewCustomResource(input)
+func (s *WailsService) PreviewCustomResource(
+	ctx context.Context,
+	input CustomResourceInput,
+) (ResourcePreview, error) {
+	return s.core.PreviewCustomResource(ctx, input)
 }
 
 func (s *WailsService) ApproveInstallPlan(id string) error {

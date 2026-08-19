@@ -1,6 +1,7 @@
 package resourcecollect
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -336,6 +337,61 @@ func TestCollectorUsesInstallInventoryAndScansReturnedBytes(t *testing.T) {
 	}
 }
 
+func TestCollectorCancellationStopsInventoryAndCleansStage(t *testing.T) {
+	spec := resource.Spec{
+		Key:       "claude/plugins",
+		Provider:  "claude",
+		ID:        "plugins",
+		Category:  resource.CategoryPlugins,
+		Strategy:  resource.StrategyInstallManifest,
+		Layout:    resource.LayoutPortable,
+		Root:      t.TempDir(),
+		Targets:   []string{t.TempDir()},
+		Include:   []string{"**"},
+		Installer: "claude-plugin",
+	}
+	started := make(chan struct{})
+	stageParent := t.TempDir()
+	collector := New(Options{
+		StageParent: stageParent,
+		Inventory: fakeInventory{inventoryContext: func(
+			ctx context.Context,
+			_ resource.Spec,
+		) (map[string][]byte, error) {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	type collectionResult struct {
+		result Result
+		err    error
+	}
+	done := make(chan collectionResult, 1)
+	go func() {
+		result, err := collector.CollectContext(ctx, []resource.Spec{spec})
+		done <- collectionResult{result: result, err: err}
+	}()
+
+	<-started
+	cancel()
+	collected := <-done
+	if !errors.Is(collected.err, context.Canceled) {
+		t.Fatalf("CollectContext() error = %v, want context canceled", collected.err)
+	}
+	if collected.result.StageRoot != "" || len(collected.result.Artifacts) != 0 {
+		t.Fatalf("canceled collection returned partial result: %#v", collected.result)
+	}
+	entries, err := os.ReadDir(stageParent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("canceled collection left stage entries: %#v", entries)
+	}
+}
+
 func sourceSpec(root string) resource.Spec {
 	return resource.Spec{
 		Key:      "common/common-skills",
@@ -360,11 +416,22 @@ func (f fakeProjector) Project(transformer, rel, goos, home string, data []byte)
 }
 
 type fakeInventory struct {
-	files map[string][]byte
-	err   error
+	files            map[string][]byte
+	err              error
+	inventoryContext func(context.Context, resource.Spec) (map[string][]byte, error)
 }
 
 func (f fakeInventory) Inventory(resource.Spec) (map[string][]byte, error) {
+	return f.files, f.err
+}
+
+func (f fakeInventory) InventoryContext(
+	ctx context.Context,
+	spec resource.Spec,
+) (map[string][]byte, error) {
+	if f.inventoryContext != nil {
+		return f.inventoryContext(ctx, spec)
+	}
 	return f.files, f.err
 }
 

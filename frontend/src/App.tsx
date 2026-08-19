@@ -1,50 +1,34 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Events } from '@wailsio/runtime'
 import {
   ApproveInstallPlan,
   Pause,
   NeedsOnboarding,
   ResolveConflict,
+  ResourcePreview,
   Resume,
   SaveSettings,
   SetStartAtLogin,
   Snapshot as loadSnapshot,
-  StartAtLogin,
   TriggerSync,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/wailsservice'
 import {
-  type Agent,
-  type CustomResourceInput,
   type Progress,
-  type ResourceCategory,
-  type ResourceIssue,
-  type SettingsInput,
   type Snapshot,
 } from '../bindings/github.com/qinqingxu/acsync/internal/desktop/models'
 import './style.css'
 import { BrandMark } from './BrandMark'
+import {
+  type AppSnapshot,
+  hasGeneratedPreview,
+  normalizePreview,
+  normalizeSnapshot,
+} from './desktopState'
 import Onboarding from './onboarding/Onboarding'
+import { SettingsPanel } from './SettingsPanel'
 import { ConflictPanel } from './resources/ConflictPanel'
-import { CustomResourceEditor } from './resources/CustomResourceEditor'
 import { InstallPlanPanel } from './resources/InstallPlanPanel'
-import { ResourceSettings, type CategorySettings } from './resources/ResourceSettings'
-import { RestorePreview } from './resources/RestorePreview'
 import { ResultSummary } from './resources/ResultSummary'
-
-type AppAgent = Omit<Agent, 'exclude' | 'resources'> & {
-  exclude: string[]
-  resources: ResourceCategory[]
-}
-type AppPreview = Omit<Snapshot['preview'], 'resources' | 'issues'> & {
-  resources: ResourceCategory[]
-  issues: ResourceIssue[]
-}
-type AppSnapshot = Omit<Snapshot, 'agents' | 'preview' | 'conflicts' | 'customResources'> & {
-  agents: AppAgent[]
-  preview: AppPreview
-  conflicts: NonNullable<Snapshot['conflicts']>
-  customResources: CustomResourceInput[]
-}
 
 const stateLabels: Record<string, string> = {
   idle: 'Ready',
@@ -77,24 +61,6 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
-  return {
-    ...snapshot,
-    agents: (snapshot.agents ?? []).map((agent) => ({
-      ...agent,
-      exclude: agent.exclude ?? [],
-      resources: agent.resources ?? [],
-    })),
-    preview: {
-      ...snapshot.preview,
-      resources: snapshot.preview.resources ?? [],
-      issues: snapshot.preview.issues ?? [],
-    },
-    conflicts: snapshot.conflicts ?? [],
-    customResources: snapshot.customResources ?? [],
-  }
-}
-
 function completionMessage(progress: Progress) {
   if (progress.needsAttention) return 'Synchronization completed with items that need attention'
   if (progress.restored + progress.reinstalled > 0) {
@@ -109,8 +75,13 @@ function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const previewRefresh = useRef<{
+    request: ReturnType<typeof ResourcePreview>
+    task: Promise<void>
+  } | null>(null)
 
   const refresh = async () => {
     try {
@@ -119,6 +90,47 @@ function App() {
     } catch (cause) {
       setError(errorMessage(cause))
     }
+  }
+
+  const cancelPreviewRequest = () => {
+    const active = previewRefresh.current
+    previewRefresh.current = null
+    active?.request.cancel()
+  }
+
+  const cancelPreviewRefresh = () => {
+    cancelPreviewRequest()
+    setPreviewLoading(false)
+  }
+
+  const refreshResourcePreview = (): Promise<void> => {
+    const active = previewRefresh.current
+    if (active) return active.task
+
+    const request = ResourcePreview()
+    setPreviewLoading(true)
+    const task = (async () => {
+      try {
+        const preview = await request
+        if (previewRefresh.current?.request !== request) return
+        setSnapshot((current) => current ? {
+          ...current,
+          preview: normalizePreview(preview),
+        } : current)
+        setError('')
+      } catch (cause) {
+        if (previewRefresh.current?.request === request) {
+          setError(errorMessage(cause))
+        }
+      } finally {
+        if (previewRefresh.current?.request === request) {
+          previewRefresh.current = null
+          setPreviewLoading(false)
+        }
+      }
+    })()
+    previewRefresh.current = { request, task }
+    return task
   }
 
   useEffect(() => {
@@ -146,6 +158,16 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!settingsOpen || !snapshot?.configured) {
+      return
+    }
+    if (!hasGeneratedPreview(snapshot.preview.generatedAt)) {
+      void refreshResourcePreview()
+    }
+    return cancelPreviewRefresh
+  }, [settingsOpen, snapshot?.configured, snapshot?.preview.generatedAt])
+
   const enabledAgents = useMemo(
     () => snapshot?.agents.filter((agent) => agent.enabled).length ?? 0,
     [snapshot],
@@ -166,6 +188,11 @@ function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const closeSettings = () => {
+    cancelPreviewRefresh()
+    setSettingsOpen(false)
   }
 
   if (needsOnboarding) {
@@ -320,7 +347,9 @@ function App() {
         <SettingsPanel
           snapshot={snapshot}
           busy={busy}
-          close={() => setSettingsOpen(false)}
+          previewLoading={previewLoading}
+          close={closeSettings}
+          refreshPreview={refreshResourcePreview}
           save={(input, startAtLogin, startAtLoginChanged) => perform(async () => {
             await SaveSettings(input)
             if (startAtLoginChanged) await SetStartAtLogin(startAtLogin)
@@ -390,157 +419,6 @@ function StatusMark({ state }: { state: string }) {
           </>
         )}
       </svg>
-    </div>
-  )
-}
-
-function SettingsPanel({
-  snapshot,
-  busy,
-  close,
-  save,
-}: {
-  snapshot: AppSnapshot
-  busy: boolean
-  close: () => void
-  save: (
-    input: SettingsInput,
-    startAtLogin: boolean,
-    startAtLoginChanged: boolean,
-  ) => Promise<boolean>
-}) {
-  const [repositoryUrl, setRepositoryUrl] = useState(snapshot.repositoryUrl)
-  const [intervalMinutes, setIntervalMinutes] = useState(snapshot.intervalMinutes)
-  const [trashGraceDays, setTrashGraceDays] = useState(snapshot.trashGraceDays)
-  const [agents, setAgents] = useState<Record<string, boolean>>(
-    Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
-  )
-  const [categories, setCategories] = useState<CategorySettings>(
-    Object.fromEntries(snapshot.agents.map((agent) => [
-      agent.name,
-      Object.fromEntries(agent.resources.map((resource) => [resource.category, resource.enabled])),
-    ])),
-  )
-  const [customResources, setCustomResources] = useState<CustomResourceInput[]>(snapshot.customResources)
-  const [startAtLogin, setStartAtLogin] = useState(false)
-  const [initialStartAtLogin, setInitialStartAtLogin] = useState(false)
-  const [startAtLoginError, setStartAtLoginError] = useState('')
-
-  useEffect(() => {
-    void StartAtLogin().then((enabled) => {
-      setStartAtLogin(enabled)
-      setInitialStartAtLogin(enabled)
-    }).catch((cause) => setStartAtLoginError(errorMessage(cause)))
-  }, [])
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const saved = await save(
-      { repositoryUrl, intervalMinutes, trashGraceDays, agents, categories, customResources },
-      startAtLogin,
-      startAtLogin !== initialStartAtLogin,
-    )
-    if (saved) close()
-  }
-
-  return (
-    <div className="drawer-backdrop" onMouseDown={close}>
-      <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="drawer-title">
-          <div>
-            <span className="eyebrow">{snapshot.configured ? 'PREFERENCES' : 'GET STARTED'}</span>
-            <h2>{snapshot.configured ? 'Sync settings' : 'Connect your repository'}</h2>
-          </div>
-          <button className="icon-button" onClick={close} aria-label="Close settings">×</button>
-        </div>
-        <form onSubmit={(event) => void submit(event)}>
-          <label>
-            Private Git repository
-            <input
-              required
-              value={repositoryUrl}
-              onChange={(event) => setRepositoryUrl(event.target.value)}
-              placeholder="git@github.com:your-name/agent-sync.git"
-            />
-            <small>SSH and HTTPS repositories are supported.</small>
-          </label>
-          <div className="field-grid">
-            <label>
-              Sync frequency (minutes)
-              <input
-                required
-                type="number"
-                min={1}
-                max={1440}
-                step={1}
-                value={intervalMinutes}
-                onChange={(event) => setIntervalMinutes(Number(event.target.value))}
-              />
-              <small>Runs every 1–1440 minutes.</small>
-            </label>
-            <label>
-              Archive retention (days)
-              <input
-                required
-                type="number"
-                min={1}
-                max={365}
-                step={1}
-                value={trashGraceDays}
-                onChange={(event) => setTrashGraceDays(Number(event.target.value))}
-              />
-              <small>Deleted files remain recoverable for 1–365 days.</small>
-            </label>
-          </div>
-          <fieldset>
-            <legend>Agents to synchronize</legend>
-            {snapshot.agents.map((agent) => (
-              <label className="toggle-row" key={agent.name}>
-                <span>
-                  <strong>{agent.name}</strong>
-                  <small>{agent.exclude.length} safety exclusions</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={agents[agent.name] ?? false}
-                  onChange={(event) => setAgents({ ...agents, [agent.name]: event.target.checked })}
-                />
-              </label>
-            ))}
-          </fieldset>
-          <fieldset>
-            <legend>Resource categories</legend>
-            <ResourceSettings agents={snapshot.agents} categories={categories} onChange={setCategories} />
-          </fieldset>
-          <RestorePreview preview={snapshot.preview} />
-          <CustomResourceEditor
-            platform={snapshot.platform}
-            resources={customResources}
-            onChange={setCustomResources}
-          />
-          <fieldset>
-            <legend>Desktop application</legend>
-            <label className="toggle-row">
-              <span>
-                <strong>Start at login</strong>
-                <small>Starts AgentConfigSync the next time you sign in. It does not restart the app now.</small>
-              </span>
-              <input
-                type="checkbox"
-                checked={startAtLogin}
-                onChange={(event) => setStartAtLogin(event.target.checked)}
-              />
-            </label>
-            {startAtLoginError && <div className="inline-error">{startAtLoginError}</div>}
-          </fieldset>
-          <div className="form-actions">
-            <button type="button" className="secondary" onClick={close}>Cancel</button>
-            <button type="submit" className="primary" disabled={busy}>
-              {snapshot.configured ? 'Save settings' : 'Continue'}
-            </button>
-          </div>
-        </form>
-      </aside>
     </div>
   )
 }

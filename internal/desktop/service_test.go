@@ -67,7 +67,11 @@ func TestSnapshotUsesPersistedSummariesWithoutCollectingResources(t *testing.T) 
 		TotalActions:     8,
 	})
 	collectionCalled := false
-	service.previewCollector = func(config.Config, []provider.Provider) (ResourcePreview, error) {
+	service.previewCollector = func(
+		context.Context,
+		config.Config,
+		[]provider.Provider,
+	) (ResourcePreview, error) {
 		collectionCalled = true
 		return ResourcePreview{}, errors.New("resource collection invoked by Snapshot")
 	}

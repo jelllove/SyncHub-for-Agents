@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -50,7 +51,10 @@ type Service struct {
 	stateObservers         map[uint64]*stateObserver
 	nextProgressObserverID uint64
 	progressObservers      map[uint64]func(Progress)
-	previewCollector       func(config.Config, []provider.Provider) (ResourcePreview, error)
+	previewCollector       func(context.Context, config.Config, []provider.Provider) (ResourcePreview, error)
+	previewCoordinator     *previewCoordinator
+	previewMu              sync.Mutex
+	previewGeneration      uint64
 }
 
 // New creates a desktop service. A missing config is a valid first-run state.
@@ -66,6 +70,7 @@ func New(home, goos string) (*Service, error) {
 		progressObservers: make(map[uint64]func(Progress)),
 	}
 	service.previewCollector = service.collectPreview
+	service.previewCoordinator = newPreviewCoordinator(service.refreshPreview)
 	last, err := newSummaryStore(home).loadCycle()
 	if err != nil {
 		return nil, fmt.Errorf("load desktop cycle summary: %w", err)
@@ -416,11 +421,14 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 	if err := config.Save(cli.ConfigPath(s.home), cfg); err != nil {
 		return err
 	}
+	if err := s.invalidatePreview(); err != nil {
+		return err
+	}
 	if err := s.StartConfigured(); err != nil {
 		return err
 	}
 	s.Daemon().Scheduler.SetInterval(time.Duration(input.IntervalMinutes) * time.Minute)
-	return nil
+	return s.Trigger()
 }
 
 func validateTimingSettings(intervalMinutes, retentionDays int) error {

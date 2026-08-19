@@ -1,9 +1,12 @@
 package desktop
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/qinqingxu/acsync/internal/config"
 	"github.com/qinqingxu/acsync/internal/conflict"
 	"github.com/qinqingxu/acsync/internal/installplan"
+	"github.com/qinqingxu/acsync/internal/provider"
 	"github.com/qinqingxu/acsync/internal/resource"
 )
 
@@ -121,6 +125,137 @@ func TestSaveSettingsPersistsCategoriesAndCustomResources(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsClearsPreviewWithoutCollecting(t *testing.T) {
+	home := configuredHome(t)
+	oldPreview := ResourcePreview{
+		GeneratedAt: time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC),
+		Files:       4,
+	}
+	writeDesktopPreview(t, home, oldPreview)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	var collectionCalls atomic.Int32
+	service.previewCollector = func(
+		context.Context,
+		config.Config,
+		[]provider.Provider,
+	) (ResourcePreview, error) {
+		collectionCalls.Add(1)
+		return ResourcePreview{}, nil
+	}
+
+	if err := service.SaveSettings(SettingsInput{
+		RepositoryURL:   "git@github.com:owner/repo.git",
+		IntervalMinutes: 15,
+		TrashGraceDays:  45,
+		Agents:          map[string]bool{"claude": true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	preview, err := newSummaryStore(home).loadPreview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.GeneratedAt.IsZero() || preview.Files != 0 || len(preview.Resources) != 0 {
+		t.Fatalf("preview after settings save = %#v, want empty", preview)
+	}
+	if collectionCalls.Load() != 0 {
+		t.Fatalf("settings save collected preview %d times", collectionCalls.Load())
+	}
+}
+
+func TestSaveSettingsRejectsInFlightPreviewFromPreviousConfig(t *testing.T) {
+	home := configuredHome(t)
+	writeDesktopPreview(t, home, ResourcePreview{
+		GeneratedAt: time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC),
+		Files:       4,
+	})
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	service.previewCollector = func(
+		ctx context.Context,
+		_ config.Config,
+		_ []provider.Provider,
+	) (ResourcePreview, error) {
+		close(started)
+		select {
+		case <-release:
+			return ResourcePreview{Files: 9}, nil
+		case <-ctx.Done():
+			return ResourcePreview{}, ctx.Err()
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	previewDone := make(chan error, 1)
+	go func() {
+		_, err := service.ResourcePreview(ctx)
+		previewDone <- err
+	}()
+	<-started
+
+	if err := service.SaveSettings(SettingsInput{
+		RepositoryURL:   "git@github.com:owner/changed.git",
+		IntervalMinutes: 15,
+		TrashGraceDays:  45,
+		Agents:          map[string]bool{"claude": true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-previewDone; err == nil {
+		t.Fatal("in-flight preview from previous settings was accepted")
+	}
+
+	preview, err := newSummaryStore(home).loadPreview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.GeneratedAt.IsZero() || preview.Files != 0 {
+		t.Fatalf("preview after stale collection = %#v, want empty", preview)
+	}
+}
+
+func TestRejectedSettingsKeepPersistedPreview(t *testing.T) {
+	home := configuredHome(t)
+	oldPreview := ResourcePreview{
+		GeneratedAt: time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC),
+		Files:       4,
+	}
+	writeDesktopPreview(t, home, oldPreview)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	err = service.SaveSettings(SettingsInput{
+		RepositoryURL:   "git@github.com:owner/repo.git",
+		IntervalMinutes: 0,
+		TrashGraceDays:  45,
+		Agents:          map[string]bool{"claude": true},
+	})
+	if err == nil {
+		t.Fatal("invalid settings were accepted")
+	}
+	preview, loadErr := newSummaryStore(home).loadPreview()
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if !preview.GeneratedAt.Equal(oldPreview.GeneratedAt) || preview.Files != oldPreview.Files {
+		t.Fatalf("preview after rejected settings = %#v", preview)
+	}
+}
+
 func TestApproveInstallPlanRequiresCurrentID(t *testing.T) {
 	service := configuredResourceService(t)
 	defer service.Close()
@@ -187,7 +322,7 @@ func TestPreviewCustomResourceDoesNotSaveCandidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer service.Close()
-	preview, err := service.PreviewCustomResource(CustomResourceInput{
+	preview, err := service.PreviewCustomResource(context.Background(), CustomResourceInput{
 		ID: "notes", Category: "instructions",
 		Paths:   map[string]string{runtime.GOOS: source},
 		Targets: map[string]string{runtime.GOOS: t.TempDir()},
@@ -205,6 +340,120 @@ func TestPreviewCustomResourceDoesNotSaveCandidate(t *testing.T) {
 	}
 	if len(cfg.CustomResources) != 0 {
 		t.Fatalf("preview saved candidate: %#v", cfg.CustomResources)
+	}
+}
+
+func TestPreviewCustomResourceForwardsCancellation(t *testing.T) {
+	home := configuredHome(t)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	started := make(chan struct{})
+	service.previewCollector = func(
+		ctx context.Context,
+		_ config.Config,
+		_ []provider.Provider,
+	) (ResourcePreview, error) {
+		close(started)
+		<-ctx.Done()
+		return ResourcePreview{}, ctx.Err()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	source := t.TempDir()
+	target := t.TempDir()
+	go func() {
+		_, err := service.PreviewCustomResource(ctx, CustomResourceInput{
+			ID:       "notes",
+			Category: "instructions",
+			Paths:    map[string]string{runtime.GOOS: source},
+			Targets:  map[string]string{runtime.GOOS: target},
+			Include:  []string{"**"},
+			Strategy: "text-tree",
+		})
+		done <- err
+	}()
+
+	<-started
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("PreviewCustomResource() error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("custom preview did not receive cancellation")
+	}
+}
+
+func TestResourcePreviewPersistsSuccessfulSummary(t *testing.T) {
+	home := configuredHome(t)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	service.previewCollector = func(
+		context.Context,
+		config.Config,
+		[]provider.Provider,
+	) (ResourcePreview, error) {
+		return ResourcePreview{Files: 7}, nil
+	}
+
+	before := time.Now().UTC()
+	preview, err := service.ResourcePreview(context.Background())
+	after := time.Now().UTC()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Files != 7 ||
+		preview.GeneratedAt.Before(before) ||
+		preview.GeneratedAt.After(after) ||
+		preview.GeneratedAt.Location() != time.UTC {
+		t.Fatalf("generated preview = %#v", preview)
+	}
+	persisted, err := newSummaryStore(home).loadPreview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !persisted.GeneratedAt.Equal(preview.GeneratedAt) || persisted.Files != 7 {
+		t.Fatalf("persisted preview = %#v, want %#v", persisted, preview)
+	}
+}
+
+func TestResourcePreviewCollectionErrorKeepsPreviousSummary(t *testing.T) {
+	home := configuredHome(t)
+	oldPreview := ResourcePreview{
+		GeneratedAt: time.Date(2026, 8, 18, 9, 0, 0, 0, time.UTC),
+		Files:       4,
+	}
+	writeDesktopPreview(t, home, oldPreview)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	collectionErr := errors.New("collection failed")
+	service.previewCollector = func(
+		context.Context,
+		config.Config,
+		[]provider.Provider,
+	) (ResourcePreview, error) {
+		return ResourcePreview{}, collectionErr
+	}
+
+	if _, err := service.ResourcePreview(context.Background()); !errors.Is(err, collectionErr) {
+		t.Fatalf("ResourcePreview() error = %v, want collection failure", err)
+	}
+	persisted, err := newSummaryStore(home).loadPreview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !persisted.GeneratedAt.Equal(oldPreview.GeneratedAt) || persisted.Files != oldPreview.Files {
+		t.Fatalf("persisted preview after failure = %#v", persisted)
 	}
 }
 
@@ -256,7 +505,7 @@ func TestPreviewKeepsCountsForMultipleResourcesAndProviders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer service.Close()
-	got, err := service.ResourcePreview()
+	got, err := service.ResourcePreview(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

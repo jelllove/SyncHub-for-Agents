@@ -1,11 +1,13 @@
 package desktop
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/qinqingxu/acsync/internal/cli"
 	"github.com/qinqingxu/acsync/internal/config"
@@ -18,7 +20,17 @@ import (
 	"github.com/qinqingxu/acsync/internal/syncengine"
 )
 
-func (s *Service) ResourcePreview() (ResourcePreview, error) {
+var errPreviewInvalidated = errors.New("resource preview invalidated by settings change")
+
+func (s *Service) ResourcePreview(ctx context.Context) (ResourcePreview, error) {
+	if s.previewCoordinator == nil {
+		return ResourcePreview{}, fmt.Errorf("resource preview coordinator is not configured")
+	}
+	return s.previewCoordinator.refresh(ctx)
+}
+
+func (s *Service) refreshPreview(ctx context.Context) (ResourcePreview, error) {
+	generation := s.currentPreviewGeneration()
 	cfg, err := config.Load(cli.ConfigPath(s.home))
 	if err != nil {
 		return ResourcePreview{}, err
@@ -27,28 +39,75 @@ func (s *Service) ResourcePreview() (ResourcePreview, error) {
 	if err != nil {
 		return ResourcePreview{}, err
 	}
-	return s.preview(cfg, providers)
+	preview, err := s.preview(ctx, cfg, providers)
+	if err != nil {
+		return ResourcePreview{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return ResourcePreview{}, err
+	}
+	preview.GeneratedAt = time.Now().UTC()
+	if err := s.commitPreview(generation, preview); err != nil {
+		if errors.Is(err, errPreviewInvalidated) {
+			return ResourcePreview{}, err
+		}
+		return ResourcePreview{}, fmt.Errorf("save desktop preview summary: %w", err)
+	}
+	return preview, nil
 }
 
-func (s *Service) PreviewCustomResource(input CustomResourceInput) (ResourcePreview, error) {
+func (s *Service) currentPreviewGeneration() uint64 {
+	s.previewMu.Lock()
+	defer s.previewMu.Unlock()
+	return s.previewGeneration
+}
+
+func (s *Service) commitPreview(generation uint64, preview ResourcePreview) error {
+	s.previewMu.Lock()
+	defer s.previewMu.Unlock()
+	if generation != s.previewGeneration {
+		return errPreviewInvalidated
+	}
+	return newSummaryStore(s.home).savePreview(preview)
+}
+
+func (s *Service) invalidatePreview() error {
+	s.previewMu.Lock()
+	defer s.previewMu.Unlock()
+	s.previewGeneration++
+	return newSummaryStore(s.home).clearPreview()
+}
+
+func (s *Service) PreviewCustomResource(
+	ctx context.Context,
+	input CustomResourceInput,
+) (ResourcePreview, error) {
 	custom := input.toConfig()
 	if err := config.ValidateCustomResources([]config.CustomResource{custom}); err != nil {
 		return ResourcePreview{}, err
 	}
-	return s.preview(config.Config{
+	return s.preview(ctx, config.Config{
 		CustomResources: []config.CustomResource{custom},
 		Agents:          map[string]bool{},
 	}, nil)
 }
 
-func (s *Service) preview(cfg config.Config, providers []provider.Provider) (ResourcePreview, error) {
+func (s *Service) preview(
+	ctx context.Context,
+	cfg config.Config,
+	providers []provider.Provider,
+) (ResourcePreview, error) {
 	if s.previewCollector == nil {
 		return ResourcePreview{}, fmt.Errorf("resource preview collector is not configured")
 	}
-	return s.previewCollector(cfg, providers)
+	return s.previewCollector(ctx, cfg, providers)
 }
 
-func (s *Service) collectPreview(cfg config.Config, providers []provider.Provider) (result ResourcePreview, retErr error) {
+func (s *Service) collectPreview(
+	ctx context.Context,
+	cfg config.Config,
+	providers []provider.Provider,
+) (result ResourcePreview, retErr error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return ResourcePreview{}, err
@@ -73,7 +132,7 @@ func (s *Service) collectPreview(cfg config.Config, providers []provider.Provide
 			installplan.CommandRunner{},
 		),
 	})
-	collected, err := collector.Collect(sortedSpecs(specs))
+	collected, err := collector.CollectContext(ctx, sortedSpecs(specs))
 	if err != nil {
 		return ResourcePreview{}, err
 	}
@@ -83,6 +142,9 @@ func (s *Service) collectPreview(cfg config.Config, providers []provider.Provide
 
 	byKey := make(map[string][]int, len(specs))
 	for _, key := range sortedSpecKeys(specs) {
+		if err := ctx.Err(); err != nil {
+			return ResourcePreview{}, err
+		}
 		spec := specs[key]
 		target := ""
 		if len(spec.Targets) > 0 {
@@ -105,6 +167,9 @@ func (s *Service) collectPreview(cfg config.Config, providers []provider.Provide
 		byKey[collectionKey] = append(byKey[collectionKey], len(result.Resources)-1)
 	}
 	for _, artifact := range collected.Artifacts {
+		if err := ctx.Err(); err != nil {
+			return ResourcePreview{}, err
+		}
 		indexes := byKey[artifact.ResourceKey]
 		if len(indexes) == 0 {
 			continue
@@ -118,6 +183,9 @@ func (s *Service) collectPreview(cfg config.Config, providers []provider.Provide
 	}
 	issues := append(append([]resource.Issue{}, collected.Blocked...), collected.Skipped...)
 	for _, issue := range issues {
+		if err := ctx.Err(); err != nil {
+			return ResourcePreview{}, err
+		}
 		result.Issues = append(result.Issues, ResourceIssue{
 			ResourceKey: issue.ResourceKey,
 			Path:        issue.Path,

@@ -3,6 +3,7 @@ package installplan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,6 +98,36 @@ func TestInventoryRegistryEmitsDeclarationsOnly(t *testing.T) {
 		if containsString(data, forbidden) {
 			t.Fatalf("inventory contains %q: %s", forbidden, data)
 		}
+	}
+}
+
+func TestInventoryRegistryForwardsCancellationToAdapter(t *testing.T) {
+	started := make(chan struct{})
+	registry := NewInventoryRegistry()
+	registry.Register("blocking", blockingInventoryAdapter{discover: func(
+		ctx context.Context,
+		_ resource.Spec,
+	) ([]Declaration, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := registry.InventoryContext(ctx, resource.Spec{Installer: "blocking"})
+		done <- err
+	}()
+
+	<-started
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("InventoryContext() error = %v, want context canceled", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("adapter did not receive inventory cancellation")
 	}
 }
 
@@ -224,4 +255,22 @@ func containsString(data []byte, value string) bool {
 		}
 	}
 	return false
+}
+
+type blockingInventoryAdapter struct {
+	discover func(context.Context, resource.Spec) ([]Declaration, error)
+}
+
+func (a blockingInventoryAdapter) Discover(
+	ctx context.Context,
+	spec resource.Spec,
+) ([]Declaration, error) {
+	return a.discover(ctx, spec)
+}
+
+func (blockingInventoryAdapter) Operations(
+	[]Declaration,
+	[]Declaration,
+) ([]Operation, error) {
+	return nil, nil
 }

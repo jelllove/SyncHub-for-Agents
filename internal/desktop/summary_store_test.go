@@ -50,6 +50,24 @@ func TestSummaryStoreRoundTripsOwnerOnlyState(t *testing.T) {
 	}
 }
 
+func TestSummaryStoreAtomicallyReplacesExistingPreview(t *testing.T) {
+	store := newSummaryStore(t.TempDir())
+	if err := store.savePreview(ResourcePreview{Files: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.savePreview(ResourcePreview{Files: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := store.loadPreview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Files != 2 {
+		t.Fatalf("loadPreview().Files = %d, want 2", preview.Files)
+	}
+}
+
 func TestSummaryStoreRejectsMalformedJSON(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "desktop", "cycle.json")

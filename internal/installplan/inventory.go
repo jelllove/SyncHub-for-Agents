@@ -38,11 +38,18 @@ func (r *InventoryRegistry) Adapter(name string) (Adapter, bool) {
 }
 
 func (r *InventoryRegistry) Inventory(spec resource.Spec) (map[string][]byte, error) {
+	return r.InventoryContext(context.Background(), spec)
+}
+
+func (r *InventoryRegistry) InventoryContext(
+	ctx context.Context,
+	spec resource.Spec,
+) (map[string][]byte, error) {
 	adapter, ok := r.adapters[spec.Installer]
 	if !ok {
 		return nil, fmt.Errorf("installer adapter %q is unavailable", spec.Installer)
 	}
-	declarations, err := adapter.Discover(context.Background(), spec)
+	declarations, err := adapter.Discover(ctx, spec)
 	if err != nil {
 		return nil, err
 	}

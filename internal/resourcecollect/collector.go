@@ -1,6 +1,7 @@
 package resourcecollect
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -22,7 +23,7 @@ type Projector interface {
 }
 
 type InventoryProvider interface {
-	Inventory(spec resource.Spec) (map[string][]byte, error)
+	InventoryContext(context.Context, resource.Spec) (map[string][]byte, error)
 }
 
 type Options struct {
@@ -78,6 +79,16 @@ func (r *Result) Close() error {
 }
 
 func (c *Collector) Collect(specs []resource.Spec) (Result, error) {
+	return c.CollectContext(context.Background(), specs)
+}
+
+func (c *Collector) CollectContext(
+	ctx context.Context,
+	specs []resource.Spec,
+) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
 	stageRoot, err := os.MkdirTemp(c.options.StageParent, "acsync-resources-*")
 	if err != nil {
 		return Result{}, fmt.Errorf("create resource stage: %w", err)
@@ -87,10 +98,16 @@ func (c *Collector) Collect(specs []resource.Spec) (Result, error) {
 		Artifacts: map[string]Artifact{},
 		StageRoot: stageRoot,
 	}
-	coalesced, issues := c.coalesce(specs)
+	coalesced, issues, err := c.coalesce(ctx, specs)
+	if err != nil {
+		return Result{}, closeAfterError(&result, err)
+	}
 	result.Skipped = append(result.Skipped, issues...)
 	for _, item := range coalesced {
-		if err := c.collectSpec(item, &result); err != nil {
+		if err := ctx.Err(); err != nil {
+			return Result{}, closeAfterError(&result, err)
+		}
+		if err := c.collectSpec(ctx, item, &result); err != nil {
 			return Result{}, closeAfterError(&result, err)
 		}
 	}
@@ -101,11 +118,17 @@ func closeAfterError(result *Result, cause error) error {
 	return errors.Join(cause, result.Close())
 }
 
-func (c *Collector) coalesce(specs []resource.Spec) ([]resource.Spec, []resource.Issue) {
+func (c *Collector) coalesce(
+	ctx context.Context,
+	specs []resource.Spec,
+) ([]resource.Spec, []resource.Issue, error) {
 	byKey := make(map[string]resource.Spec, len(specs))
 	order := make([]string, 0, len(specs))
 	var issues []resource.Issue
 	for _, spec := range specs {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		key := spec.Key
 		if spec.SharedAs != "" {
 			key = "common/" + spec.SharedAs
@@ -139,19 +162,33 @@ func (c *Collector) coalesce(specs []resource.Spec) ([]resource.Spec, []resource
 	for _, key := range order {
 		out = append(out, byKey[key])
 	}
-	return out, issues
+	return out, issues, nil
 }
 
-func (c *Collector) collectSpec(spec resource.Spec, result *Result) error {
+func (c *Collector) collectSpec(
+	ctx context.Context,
+	spec resource.Spec,
+	result *Result,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if spec.Strategy == resource.StrategyInstallManifest {
-		return c.collectInventory(spec, result)
+		return c.collectInventory(ctx, spec, result)
 	}
 	scanner := secret.NewScanner(spec.Exclude, spec.KeyPatterns)
 	ancestors := map[string]struct{}{canonicalLinkPath(spec.Root): {}}
-	return c.walkDirectory(spec, spec.Root, "", ancestors, scanner, result)
+	return c.walkDirectory(ctx, spec, spec.Root, "", ancestors, scanner, result)
 }
 
-func (c *Collector) collectInventory(spec resource.Spec, result *Result) error {
+func (c *Collector) collectInventory(
+	ctx context.Context,
+	spec resource.Spec,
+	result *Result,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.options.Inventory == nil {
 		result.Skipped = append(result.Skipped, resource.Issue{
 			ResourceKey: spec.Key,
@@ -160,13 +197,25 @@ func (c *Collector) collectInventory(spec resource.Spec, result *Result) error {
 		})
 		return nil
 	}
-	files, err := c.options.Inventory.Inventory(spec)
+	files, err := c.options.Inventory.InventoryContext(ctx, spec)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
 		result.Skipped = append(result.Skipped, issue(spec, "", "inventory-failed", err))
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	scanner := secret.NewScanner(spec.Exclude, spec.KeyPatterns)
 	for rel, data := range files {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if allowed, code := c.options.Filter.Check(rel, int64(len(data)), spec.Strategy); !allowed {
 			result.Skipped = append(result.Skipped, resource.Issue{
 				ResourceKey: spec.Key,
@@ -182,11 +231,14 @@ func (c *Collector) collectInventory(spec resource.Spec, result *Result) error {
 			result.Blocked = append(result.Blocked, issue(spec, rel, "scan-failed", scanErr))
 			continue
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if blocked {
 			result.Blocked = append(result.Blocked, blockedIssue(spec, rel, int64(len(data))))
 			continue
 		}
-		if err := c.stage(spec, rel, data, 0, result); err != nil {
+		if err := c.stage(ctx, spec, rel, data, 0, result); err != nil {
 			return err
 		}
 	}
@@ -194,6 +246,7 @@ func (c *Collector) collectInventory(spec resource.Spec, result *Result) error {
 }
 
 func (c *Collector) walkDirectory(
+	ctx context.Context,
 	spec resource.Spec,
 	physicalDir string,
 	logicalDir string,
@@ -201,19 +254,25 @@ func (c *Collector) walkDirectory(
 	scanner *secret.Scanner,
 	result *Result,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	entries, err := os.ReadDir(physicalDir)
 	if err != nil {
 		result.Skipped = append(result.Skipped, issue(spec, logicalDir, "walk-failed", err))
 		return nil
 	}
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		physicalPath := filepath.Join(physicalDir, entry.Name())
 		logicalPath := path.Join(logicalDir, entry.Name())
 		if entry.Type()&os.ModeSymlink != 0 {
 			if c.skipDirectoryPath(spec, logicalPath, scanner, result) {
 				continue
 			}
-			if err := c.walkLink(spec, physicalPath, logicalPath, ancestors, scanner, result); err != nil {
+			if err := c.walkLink(ctx, spec, physicalPath, logicalPath, ancestors, scanner, result); err != nil {
 				return err
 			}
 			continue
@@ -224,17 +283,20 @@ func (c *Collector) walkDirectory(
 			}
 			nextAncestors := cloneAncestors(ancestors)
 			nextAncestors[canonicalLinkPath(physicalPath)] = struct{}{}
-			if err := c.walkDirectory(spec, physicalPath, logicalPath, nextAncestors, scanner, result); err != nil {
+			if err := c.walkDirectory(ctx, spec, physicalPath, logicalPath, nextAncestors, scanner, result); err != nil {
 				return err
 			}
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		info, err := entry.Info()
 		if err != nil {
 			result.Skipped = append(result.Skipped, issue(spec, logicalPath, "stat-failed", err))
 			continue
 		}
-		if err := c.collectFile(spec, physicalPath, logicalPath, info, scanner, result); err != nil {
+		if err := c.collectFile(ctx, spec, physicalPath, logicalPath, info, scanner, result); err != nil {
 			return err
 		}
 	}
@@ -264,6 +326,7 @@ func (c *Collector) skipDirectoryPath(
 }
 
 func (c *Collector) walkLink(
+	ctx context.Context,
 	spec resource.Spec,
 	linkPath string,
 	logicalPath string,
@@ -271,6 +334,9 @@ func (c *Collector) walkLink(
 	scanner *secret.Scanner,
 	result *Result,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	target, err := filepath.EvalSymlinks(linkPath)
 	if err != nil {
 		result.Skipped = append(result.Skipped, issue(spec, logicalPath, "link-unavailable", err))
@@ -292,13 +358,16 @@ func (c *Collector) walkLink(
 		})
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	info, err := os.Stat(target)
 	if err != nil {
 		result.Skipped = append(result.Skipped, issue(spec, logicalPath, "link-unavailable", err))
 		return nil
 	}
 	if !info.IsDir() {
-		return c.collectFile(spec, target, logicalPath, info, scanner, result)
+		return c.collectFile(ctx, spec, target, logicalPath, info, scanner, result)
 	}
 	canonical := canonicalLinkPath(target)
 	if _, exists := ancestors[canonical]; exists {
@@ -312,10 +381,11 @@ func (c *Collector) walkLink(
 	}
 	nextAncestors := cloneAncestors(ancestors)
 	nextAncestors[canonical] = struct{}{}
-	return c.walkDirectory(spec, target, logicalPath, nextAncestors, scanner, result)
+	return c.walkDirectory(ctx, spec, target, logicalPath, nextAncestors, scanner, result)
 }
 
 func (c *Collector) collectFile(
+	ctx context.Context,
 	spec resource.Spec,
 	physicalPath string,
 	rel string,
@@ -323,6 +393,9 @@ func (c *Collector) collectFile(
 	scanner *secret.Scanner,
 	result *Result,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if !matchesAny(spec.Include, rel) || scanner.IsExcluded(rel) {
 		return nil
 	}
@@ -336,10 +409,16 @@ func (c *Collector) collectFile(
 		})
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	data, err := os.ReadFile(physicalPath)
 	if err != nil {
 		result.Skipped = append(result.Skipped, issue(spec, rel, "read-failed", err))
 		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if spec.Transformer != "" {
 		if c.options.Projector == nil {
@@ -351,10 +430,16 @@ func (c *Collector) collectFile(
 			})
 			return nil
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		data, err = c.options.Projector.Project(spec.Transformer, rel, c.options.GOOS, c.options.UserHome, data)
 		if err != nil {
 			result.Blocked = append(result.Blocked, issue(spec, rel, "projection-failed", err))
 			return nil
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 	}
 	if allowed, code := c.options.Filter.Check(rel, int64(len(data)), spec.Strategy); !allowed {
@@ -372,14 +457,30 @@ func (c *Collector) collectFile(
 		result.Blocked = append(result.Blocked, issue(spec, rel, "scan-failed", err))
 		return nil
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if blocked {
 		result.Blocked = append(result.Blocked, blockedIssue(spec, rel, int64(len(data))))
 		return nil
 	}
-	return c.stage(spec, rel, data, info.ModTime().Unix(), result)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return c.stage(ctx, spec, rel, data, info.ModTime().Unix(), result)
 }
 
-func (c *Collector) stage(spec resource.Spec, rel string, data []byte, modTime int64, result *Result) error {
+func (c *Collector) stage(
+	ctx context.Context,
+	spec resource.Spec,
+	rel string,
+	data []byte,
+	modTime int64,
+	result *Result,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	repoRel, err := spec.RepoPath(rel)
 	if err != nil {
 		result.Skipped = append(result.Skipped, issue(spec, rel, "repo-path-invalid", err))
@@ -389,10 +490,19 @@ func (c *Collector) stage(spec resource.Spec, rel string, data []byte, modTime i
 	if err := os.MkdirAll(filepath.Dir(stagePath), 0o755); err != nil {
 		return fmt.Errorf("create stage directory: %w", err)
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := os.WriteFile(stagePath, data, 0o600); err != nil {
 		return fmt.Errorf("write stage artifact: %w", err)
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	sum := sha256.Sum256(data)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	hash := hex.EncodeToString(sum[:])
 	size := int64(len(data))
 	result.Snapshot[repoRel] = state.FileMeta{Hash: hash, ModTime: modTime, Size: size}
