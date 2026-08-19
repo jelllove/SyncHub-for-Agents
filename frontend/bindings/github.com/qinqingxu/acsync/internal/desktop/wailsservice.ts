@@ -46,6 +46,10 @@ export function PreviewCustomResource(input: $models.CustomResourceInput): $Canc
     return $Call.ByID(2936582605, input);
 }
 
+export function QueueConflictBatch(selections: $models.ConflictSelection[] | null): $CancellablePromise<void> {
+    return $Call.ByID(1755916521, selections);
+}
+
 export function ResolveConflict(input: $models.ConflictResolution): $CancellablePromise<void> {
     return $Call.ByID(3670949432, input);
 }
@@ -56,6 +60,10 @@ export function ResourcePreview(): $CancellablePromise<$models.ResourcePreview> 
 
 export function Resume(): $CancellablePromise<void> {
     return $Call.ByID(1167946741);
+}
+
+export function RetryConflictBatch(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1744848214, id);
 }
 
 export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<void> {

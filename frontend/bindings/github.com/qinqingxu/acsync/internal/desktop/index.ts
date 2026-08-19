@@ -9,6 +9,8 @@ export {
 export type {
     Agent,
     ConflictResolution,
+    ConflictResolutionStatus,
+    ConflictSelection,
     ConflictSummary,
     CustomResourceInput,
     InstallOperation,

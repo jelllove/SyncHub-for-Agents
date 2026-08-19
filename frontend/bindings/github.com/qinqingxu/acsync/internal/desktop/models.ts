@@ -17,8 +17,23 @@ export interface ConflictResolution {
     "content"?: string;
 }
 
+export interface ConflictResolutionStatus {
+    "id": string;
+    "status": string;
+    "selected": number;
+    "error"?: string;
+}
+
+export interface ConflictSelection {
+    "id": string;
+    "revision": string;
+    "choice": string;
+    "content"?: string;
+}
+
 export interface ConflictSummary {
     "id": string;
+    "revision": string;
     "resourceKey": string;
     "path": string;
     "createdAt": string;
@@ -134,4 +149,5 @@ export interface Snapshot {
     "customResources": CustomResourceInput[] | null;
     "pendingInstallPlan"?: InstallPlan | null;
     "conflicts": ConflictSummary[] | null;
+    "conflictResolution"?: ConflictResolutionStatus | null;
 }

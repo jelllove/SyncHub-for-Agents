@@ -122,6 +122,14 @@ func (s *WailsService) ResolveConflict(input ConflictResolution) error {
 	return s.core.ResolveConflict(input)
 }
 
+func (s *WailsService) QueueConflictBatch(selections []ConflictSelection) error {
+	return s.core.QueueConflictBatch(selections)
+}
+
+func (s *WailsService) RetryConflictBatch(id string) error {
+	return s.core.RetryConflictBatch(id)
+}
+
 func (s *WailsService) SetStartAtLogin(enabled bool) error {
 	if enabled {
 		return s.startup.Enable()

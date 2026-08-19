@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -348,6 +349,91 @@ func TestApproveInstallPlanRequiresCurrentID(t *testing.T) {
 	}
 	if pending == nil || !store.IsApproved(pending.Operations[0]) {
 		t.Fatalf("approval was not saved: %#v", pending)
+	}
+}
+
+func TestQueueConflictBatchValidatesAndQueues(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+	if err := service.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := snapshot.Conflicts[0]
+	if err := service.QueueConflictBatch([]ConflictSelection{{
+		ID: entry.ID, Revision: entry.Revision, Choice: "invalid",
+	}}); err == nil {
+		t.Fatal("invalid queue choice was accepted")
+	}
+	if err := service.QueueConflictBatch([]ConflictSelection{{
+		ID: entry.ID, Revision: entry.Revision, Choice: "local",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := conflictStore(service.home, nil).PendingBatch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending == nil || pending.Status != "queued" || len(pending.Selections) != 1 {
+		t.Fatalf("pending conflict batch = %#v", pending)
+	}
+}
+
+func TestRetryConflictBatchRequeuesFailedSelectionSet(t *testing.T) {
+	service := configuredResourceService(t)
+	defer service.Close()
+	if err := service.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := snapshot.Conflicts[0]
+	store := conflictStore(service.home, nil)
+	failed := conflict.ResolutionBatch{
+		ID:     "failed-1",
+		Status: "failed",
+		Selections: []conflict.ResolutionSelection{{
+			ID: entry.ID, Revision: entry.Revision, Choice: conflict.ChoiceLocal,
+		}},
+		Error: "transient error",
+	}
+	metadataRoot := filepath.Join(service.home, "conflict-resolution")
+	if err := os.MkdirAll(metadataRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.MarshalIndent(failed, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(filepath.Join(metadataRoot, "failed.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.RetryConflictBatch("other"); err == nil {
+		t.Fatal("mismatched failed batch ID was accepted")
+	}
+	if err := service.RetryConflictBatch("failed-1"); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := store.PendingBatch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending == nil || pending.Status != "queued" || len(pending.Selections) != 1 {
+		t.Fatalf("pending conflict retry batch = %#v", pending)
+	}
+	failedAfterRetry, err := store.FailedBatch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failedAfterRetry != nil {
+		t.Fatalf("failed batch remained after retry: %#v", failedAfterRetry)
 	}
 }
 

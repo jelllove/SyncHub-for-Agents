@@ -314,23 +314,10 @@ func (s *Service) ResolveConflict(input ConflictResolution) error {
 		input.Choice != "merged" {
 		return fmt.Errorf("conflict choice %q is not supported", input.Choice)
 	}
-	cfg, err := config.Load(cli.ConfigPath(s.home))
+	store, err := s.conflictStoreWithScanner()
 	if err != nil {
 		return err
 	}
-	providers, err := cli.LoadProviders(s.home)
-	if err != nil {
-		return err
-	}
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	specs, err := cli.BuildResourceSpecs(cfg, providers, s.goos, userHome)
-	if err != nil {
-		return err
-	}
-	store := conflictStore(s.home, syncengine.ConflictScanner(specs))
 	if input.Choice == "merged" {
 		err = store.Resolve(input.ID, []byte(input.Content))
 	} else {
@@ -340,6 +327,70 @@ func (s *Service) ResolveConflict(input ConflictResolution) error {
 		return err
 	}
 	return s.Trigger()
+}
+
+func (s *Service) QueueConflictBatch(selections []ConflictSelection) error {
+	if len(selections) == 0 {
+		return fmt.Errorf("at least one conflict selection is required")
+	}
+	store, err := s.conflictStoreWithScanner()
+	if err != nil {
+		return err
+	}
+	queue := make([]conflict.ResolutionSelection, 0, len(selections))
+	for _, selection := range selections {
+		queue = append(queue, conflict.ResolutionSelection{
+			ID:       selection.ID,
+			Revision: selection.Revision,
+			Choice:   conflict.Choice(selection.Choice),
+			Content:  []byte(selection.Content),
+		})
+	}
+	if _, err := store.QueueBatch(queue); err != nil {
+		return err
+	}
+	return s.Trigger()
+}
+
+func (s *Service) RetryConflictBatch(id string) error {
+	store, err := s.conflictStoreWithScanner()
+	if err != nil {
+		return err
+	}
+	failed, err := store.FailedBatch()
+	if err != nil {
+		return err
+	}
+	if failed == nil {
+		return fmt.Errorf("no failed conflict batch is available")
+	}
+	if failed.ID != id {
+		return fmt.Errorf("failed conflict batch is %q, not %q", failed.ID, id)
+	}
+	if _, err := store.QueueBatch(failed.Selections); err != nil {
+		return err
+	}
+	return s.Trigger()
+}
+
+func (s *Service) conflictStoreWithScanner() (*conflict.Store, error) {
+	cfg, err := config.Load(cli.ConfigPath(s.home))
+	if err != nil {
+		return nil, err
+	}
+	providers, err := cli.LoadProviders(s.home)
+	if err != nil {
+		return nil, err
+	}
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	specs, err := cli.BuildResourceSpecs(cfg, providers, s.goos, userHome)
+	if err != nil {
+		return nil, err
+	}
+	return conflictStore(s.home, syncengine.ConflictScanner(specs)), nil
 }
 
 func conflictStore(home string, scanner conflict.Scanner) *conflict.Store {

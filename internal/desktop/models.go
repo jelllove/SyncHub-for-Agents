@@ -83,6 +83,13 @@ type ConflictResolution struct {
 	Content string `json:"content,omitempty"`
 }
 
+type ConflictSelection struct {
+	ID       string `json:"id"`
+	Revision string `json:"revision"`
+	Choice   string `json:"choice"`
+	Content  string `json:"content,omitempty"`
+}
+
 type Progress struct {
 	Stage            string `json:"stage"`
 	Label            string `json:"label"`

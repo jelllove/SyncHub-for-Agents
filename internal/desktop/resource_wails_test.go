@@ -27,6 +27,14 @@ func TestWailsResourceMethodsDelegateToCore(t *testing.T) {
 	}); err == nil {
 		t.Fatal("missing conflict ID was accepted")
 	}
+	if err := service.QueueConflictBatch([]ConflictSelection{{
+		ID: "missing", Revision: "stale", Choice: "local",
+	}}); err == nil {
+		t.Fatal("invalid conflict batch was accepted")
+	}
+	if err := service.RetryConflictBatch("missing"); err == nil {
+		t.Fatal("missing failed conflict batch was accepted")
+	}
 	if _, err := service.PreviewCustomResource(context.Background(), CustomResourceInput{
 		ID: "notes", Category: "instructions",
 		Paths:   map[string]string{runtime.GOOS: t.TempDir()},

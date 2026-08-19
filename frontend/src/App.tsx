@@ -4,7 +4,8 @@ import {
   ApproveInstallPlan,
   Pause,
   NeedsOnboarding,
-  ResolveConflict,
+  QueueConflictBatch,
+  RetryConflictBatch,
   ResourcePreview,
   Resume,
   SaveSettings,
@@ -301,13 +302,18 @@ function App() {
               />
             )}
 
-            {snapshot.conflicts.length > 0 && (
+            {(snapshot.conflicts.length > 0 || snapshot.conflictResolution) && (
               <ConflictPanel
                 conflicts={snapshot.conflicts}
+                resolution={snapshot.conflictResolution ?? null}
                 busy={busy}
-                resolve={(input) => perform(
-                  () => ResolveConflict(input),
-                  'Conflict resolved; synchronization queued',
+                applyBatch={(selections) => perform(
+                  () => QueueConflictBatch(selections),
+                  'Conflict resolution batch queued',
+                )}
+                retryBatch={(id) => perform(
+                  () => RetryConflictBatch(id),
+                  'Conflict resolution batch retried',
                 )}
               />
             )}
