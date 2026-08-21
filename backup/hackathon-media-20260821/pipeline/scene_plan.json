@@ -1,0 +1,64 @@
+{
+  "fps": 30,
+  "size": [1920, 1080],
+  "transition_seconds": 0.0,
+  "music_volume": 0.05,
+  "voice_volume": 1.0,
+  "show_subtitles": false,
+  "enable_motion": false,
+  "bg_music_path": "C:/Users/qinqiangxu/Downloads/Future-Technology(chosic.com).mp3",
+  "output": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/hackathon-demo-90s.mp4",
+  "poster_output": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/hackathon-poster.png",
+  "scenes": [
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/1.png",
+      "duration": 10.0,
+      "subtitle": "SyncHub keeps AI configs and sessions in sync across devices."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/2.png",
+      "duration": 9.5,
+      "subtitle": "No more missing context when switching computers."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/3.png",
+      "duration": 9.5,
+      "subtitle": "A private-repo relay gives one secure source of truth."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/4.png",
+      "duration": 9.5,
+      "subtitle": "Scheduled and manual sync keep agent workflows up to date."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/5.png",
+      "duration": 9.0,
+      "subtitle": "You choose exactly what is portable and what stays local."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/6.png",
+      "duration": 9.0,
+      "subtitle": "Safety filters protect secrets and machine-specific state."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/7.png",
+      "duration": 8.5,
+      "subtitle": "Dashboard gives live sync status and operational visibility."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/8.png",
+      "duration": 8.5,
+      "subtitle": "Settings control cadence, retention, and included agents."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/9.png",
+      "duration": 8.5,
+      "subtitle": "Custom resources map your local folders to portable IDs."
+    },
+    {
+      "image": "C:/xqq/AgentConfigSync/hackathon-media/upload/v4-20260820-171247/final/10.png",
+      "duration": 8.5,
+      "subtitle": "Conflict resolution supports safe merge decisions at scale."
+    }
+  ]
+}

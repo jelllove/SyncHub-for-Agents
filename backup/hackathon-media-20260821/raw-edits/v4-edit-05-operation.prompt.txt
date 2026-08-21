@@ -1,0 +1,6 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep style consistent.
+- Focus on operation UI concepts: tray states, sync interval, agent folder toggles, and private repo sync settings.
+- Keep people very few and small; prioritize UI elements and readable labels.

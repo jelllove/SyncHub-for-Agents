@@ -1,0 +1,6 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep style consistent.
+- Show final outcome: same agent data (skills/sessions/plugins/config/.md) available on multiple computers after private GitHub-based sync.
+- Keep scene clean, with minimal characters and more whitespace.

@@ -1,0 +1,8 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep overall illustration style and composition quality.
+- In the AI agents area, replace repeated identical icons with three clearly different agent badges labeled Claude, Copilot, and Gemini (distinct symbols, not duplicates).
+- Reflect the real problem clearly: after chatting with different agents on computer A, files like skills, sessions, plugins, config, and .md are missing on computer B.
+- Show private GitHub repo as the sync relay between computers with clear arrows.
+- Keep people fewer/smaller and focus on diagram and file-sync information.
