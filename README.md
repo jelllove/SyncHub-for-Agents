@@ -1,21 +1,8 @@
 # SyncHub for Agents
 
-![SyncHub for Agents Hackathon Poster](./backup/hackathon-media-20260821/final/hackathon-poster.png)
-
 SyncHub for Agents is a desktop tray app that keeps AI agent configuration and session data synchronized across multiple computers.
 
 It uses a private Git repository you control as the synchronization bridge, with strict safety filters so credentials and machine-specific state stay local.
-
-## Hackathon media backup
-
-Hackathon images, video, prompts, and pipeline materials are backed up in:
-
-- `backup/hackathon-media-20260821/final`
-- `backup/hackathon-media-20260821/raw-edits`
-- `backup/hackathon-media-20260821/local-screen-captures`
-- `backup/hackathon-media-20260821/pipeline`
-
-Includes the generated poster/video, raw edit prompts, local captures, and the selected background music source used in video v2.
 
 ## Core capabilities
 
