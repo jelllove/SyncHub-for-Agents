@@ -1,0 +1,6 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep style consistent.
+- Show workflow for this exact tool: local changes in agent files -> push to private GitHub repo -> pull on another computer -> apply synced files.
+- Keep labels short and fully visible; avoid clipped text.

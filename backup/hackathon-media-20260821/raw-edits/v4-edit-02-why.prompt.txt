@@ -1,0 +1,6 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep same bright flat illustration style.
+- Make the message precise: this tool syncs skills, sessions, plugins, config, and .md files across different computers via a private GitHub repository.
+- Keep icons and flow clear, with more whitespace and minimal characters.

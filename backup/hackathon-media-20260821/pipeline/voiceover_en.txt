@@ -1,0 +1,9 @@
+SyncHub for Agents keeps your AI workspace portable across devices.
+If you use Claude, Copilot, and Gemini, losing config and session context across machines is a daily pain.
+SyncHub solves that with a secure private-repo relay, scheduled sync, and conflict-safe merges.
+You choose exactly what to sync: sessions, safe config, instructions, skills, and shared resources.
+Secrets and machine-local credentials stay local by design.
+The dashboard shows progress in real time, while settings let you control cadence, retention, and included agents.
+When conflicts happen, SyncHub provides clear local, remote, and merged choices with batch apply.
+The result is simple: less setup time, fewer surprises, and consistent agent behavior everywhere.
+SyncHub for Agents. Cross-device config and session sync you can trust.

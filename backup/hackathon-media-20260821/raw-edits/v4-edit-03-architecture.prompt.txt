@@ -1,0 +1,6 @@
+Edit the provided poster image.
+Required changes:
+- Remove the top title banner and remove all top headline text completely.
+- Keep style consistent.
+- Make architecture explicit: Computer A <-> private GitHub repo <-> Computer B, bidirectional sync, with file types skills/sessions/plugins/config/.md represented.
+- Keep text minimal and complete, no clipped words.
