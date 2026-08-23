@@ -21,7 +21,10 @@ func RunCleanup(home string, now time.Time) ([]string, error) {
 		grace = 30
 	}
 
-	repo := RepoDir(home)
+	repo, err := ResolveRepoDirForCurrentOS(home, cfg)
+	if err != nil {
+		return nil, err
+	}
 	purged, err := syncengine.CleanupTrash(repo, now, grace)
 	if err != nil {
 		return nil, err

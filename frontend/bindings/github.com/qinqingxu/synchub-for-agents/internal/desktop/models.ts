@@ -82,6 +82,19 @@ export interface Progress {
     "needsAttention": boolean;
 }
 
+export interface SyncDiagnostic {
+    "code": string;
+    "summary": string;
+    "repoPath": string;
+    "steps": SyncFixStep[] | null;
+}
+
+export interface SyncFixStep {
+    "title": string;
+    "command": string;
+    "warning"?: string;
+}
+
 export interface ResourceCategory {
     "provider": string;
     "id": string;
@@ -121,6 +134,10 @@ export interface ResourcePreview {
  */
 export interface SettingsInput {
     "repositoryUrl": string;
+    "repositoryDir"?: string;
+    "repoPathMode"?: string;
+    "firstSyncStrategy"?: string;
+    "firstSyncChoiceRequired"?: boolean;
     "intervalMinutes": number;
     "trashGraceDays": number;
     "agents": { [_ in string]?: boolean } | null;
@@ -144,6 +161,9 @@ export interface Snapshot {
     "pendingActions": number;
     "blockedFiles": number;
     "lastError": string;
+    "repoPath": string;
+    "firstSyncRequired": boolean;
+    "syncDiagnostic"?: SyncDiagnostic | null;
     "progress": Progress;
     "preview": ResourcePreview;
     "customResources": CustomResourceInput[] | null;

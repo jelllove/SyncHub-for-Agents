@@ -106,6 +106,19 @@ type Progress struct {
 	NeedsAttention   bool   `json:"needsAttention"`
 }
 
+type SyncFixStep struct {
+	Title   string `json:"title"`
+	Command string `json:"command"`
+	Warning string `json:"warning,omitempty"`
+}
+
+type SyncDiagnostic struct {
+	Code     string        `json:"code"`
+	Summary  string        `json:"summary"`
+	RepoPath string        `json:"repoPath"`
+	Steps    []SyncFixStep `json:"steps"`
+}
+
 // Snapshot is the current desktop-visible sync state.
 type Snapshot struct {
 	Configured         bool                      `json:"configured"`
@@ -120,6 +133,9 @@ type Snapshot struct {
 	PendingActions     int                       `json:"pendingActions"`
 	BlockedFiles       int                       `json:"blockedFiles"`
 	LastError          string                    `json:"lastError"`
+	RepoPath           string                    `json:"repoPath"`
+	FirstSyncRequired  bool                      `json:"firstSyncRequired"`
+	SyncDiagnostic     *SyncDiagnostic           `json:"syncDiagnostic,omitempty"`
 	Progress           Progress                  `json:"progress"`
 	Preview            ResourcePreview           `json:"preview"`
 	CustomResources    []CustomResourceInput     `json:"customResources"`
@@ -130,12 +146,16 @@ type Snapshot struct {
 
 // SettingsInput contains editable desktop settings.
 type SettingsInput struct {
-	RepositoryURL   string                     `json:"repositoryUrl"`
-	IntervalMinutes int                        `json:"intervalMinutes"`
-	TrashGraceDays  int                        `json:"trashGraceDays"`
-	Agents          map[string]bool            `json:"agents"`
-	Categories      map[string]map[string]bool `json:"categories"`
-	CustomResources []CustomResourceInput      `json:"customResources"`
+	RepositoryURL           string                     `json:"repositoryUrl"`
+	RepositoryDir           string                     `json:"repositoryDir,omitempty"`
+	RepoPathMode            string                     `json:"repoPathMode,omitempty"`
+	FirstSyncStrategy       string                     `json:"firstSyncStrategy,omitempty"`
+	FirstSyncChoiceRequired bool                       `json:"firstSyncChoiceRequired,omitempty"`
+	IntervalMinutes         int                        `json:"intervalMinutes"`
+	TrashGraceDays          int                        `json:"trashGraceDays"`
+	Agents                  map[string]bool            `json:"agents"`
+	Categories              map[string]map[string]bool `json:"categories"`
+	CustomResources         []CustomResourceInput      `json:"customResources"`
 }
 
 type CustomResourceInput struct {

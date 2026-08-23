@@ -6,6 +6,7 @@ import type {
 } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 type SelectionChoice = 'local' | 'remote' | 'merged'
+type BulkSelectionChoice = Exclude<SelectionChoice, 'merged'>
 
 type ConflictSelections = Partial<Record<string, {
   choice: SelectionChoice
@@ -69,6 +70,16 @@ export function ConflictPanel({
     }))
   }
 
+  const setAllChoice = (choice: BulkSelectionChoice) => {
+    setSelections(
+      Object.fromEntries(conflicts.map((conflict) => [conflict.id, { choice, content: '' }])),
+    )
+  }
+
+  const clearAllChoices = () => {
+    setSelections({})
+  }
+
   return (
     <section className="attention-panel conflict-panel" aria-live="polite">
       <div className="attention-heading">
@@ -79,6 +90,32 @@ export function ConflictPanel({
         <span className="count-badge">{conflicts.length}</span>
       </div>
       <p>Choose a decision for every conflict, then apply them together in one transaction.</p>
+      <div className="inline-actions">
+        <button
+          className="secondary"
+          disabled={busy || conflicts.length === 0}
+          onClick={() => setAllChoice('local')}
+          type="button"
+        >
+          Use local for all
+        </button>
+        <button
+          className="secondary"
+          disabled={busy || conflicts.length === 0}
+          onClick={() => setAllChoice('remote')}
+          type="button"
+        >
+          Use remote for all
+        </button>
+        <button
+          className="text-button"
+          disabled={busy || conflicts.length === 0}
+          onClick={clearAllChoices}
+          type="button"
+        >
+          Clear all
+        </button>
+      </div>
       {resolution && (
         <div className={`resolution-status resolution-${resolution.status}`}>
           <strong>Batch status: {resolution.status}</strong>
@@ -109,6 +146,7 @@ export function ConflictPanel({
                   className={selectionClass(selected?.choice === 'local')}
                   disabled={busy}
                   onClick={() => setChoice(conflict.id, 'local')}
+                  type="button"
                 >
                   Use local
                 </button>
@@ -116,6 +154,7 @@ export function ConflictPanel({
                   className={selectionClass(selected?.choice === 'remote')}
                   disabled={busy}
                   onClick={() => setChoice(conflict.id, 'remote')}
+                  type="button"
                 >
                   Use remote
                 </button>
@@ -123,6 +162,7 @@ export function ConflictPanel({
                   className={selected?.choice === 'merged' ? 'text-button active' : 'text-button'}
                   disabled={busy}
                   onClick={() => setChoice(conflict.id, 'merged')}
+                  type="button"
                 >
                   Edit merged
                 </button>
@@ -147,6 +187,7 @@ export function ConflictPanel({
         className="primary"
         disabled={busy || !complete}
         onClick={() => void applyBatch(applySelections)}
+        type="button"
       >
         Apply all and synchronize
       </button>

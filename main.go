@@ -113,10 +113,11 @@ func newOnboardingService(home string, core *desktop.Service) (*onboarding.Servi
 		},
 		SaveConfig: func(repositoryURL string, enabled map[string]bool) error {
 			return core.SaveSettings(desktop.SettingsInput{
-				RepositoryURL:   repositoryURL,
-				IntervalMinutes: 10,
-				TrashGraceDays:  30,
-				Agents:          enabled,
+				RepositoryURL:           repositoryURL,
+				IntervalMinutes:         10,
+				TrashGraceDays:          30,
+				Agents:                  enabled,
+				FirstSyncChoiceRequired: true,
 			})
 		},
 		Agents: agents,

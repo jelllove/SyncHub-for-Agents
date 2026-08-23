@@ -4,6 +4,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
@@ -27,6 +28,26 @@ func ConfigPath(home string) string { return filepath.Join(home, "config.yaml") 
 
 // RepoDir returns the local repo clone directory.
 func RepoDir(home string) string { return filepath.Join(home, "repo") }
+
+// ResolveRepoDir resolves the configured local repository directory.
+func ResolveRepoDir(home string, cfg config.Config, goos, userHome string) (string, error) {
+	if strings.TrimSpace(cfg.RepoDir) == "" {
+		return RepoDir(home), nil
+	}
+	expanded, err := pathresolver.ExpandHomeToken(cfg.RepoDir, goos, userHome)
+	if err != nil {
+		return "", err
+	}
+	return pathresolver.ResolveFor(expanded, goos, userHome)
+}
+
+func ResolveRepoDirForCurrentOS(home string, cfg config.Config) (string, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return ResolveRepoDir(home, cfg, runtime.GOOS, userHome)
+}
 
 // StatePath returns the snapshot state file path.
 func StatePath(home string) string { return filepath.Join(home, "state.json") }

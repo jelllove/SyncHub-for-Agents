@@ -32,12 +32,13 @@ type CycleResult struct {
 
 // Daemon runs the sync scheduler for a given synchub home.
 type Daemon struct {
-	Home       string
-	GOOS       string
-	Scheduler  *scheduler.Scheduler
-	Logger     *log.Logger
-	OnCycle    func(CycleResult)
-	OnProgress func(syncengine.Progress)
+	Home             string
+	GOOS             string
+	Scheduler        *scheduler.Scheduler
+	Logger           *log.Logger
+	AutoTriggerOnRun bool
+	OnCycle          func(CycleResult)
+	OnProgress       func(syncengine.Progress)
 
 	closeLog func() error
 	sync     func(string, string, func(syncengine.Progress)) (syncengine.Result, error)
@@ -62,12 +63,13 @@ func New(home, goos string) (*Daemon, error) {
 	}
 
 	d := &Daemon{
-		Home:     home,
-		GOOS:     goos,
-		Logger:   logger,
-		closeLog: closeLog,
-		sync:     cli.RunSyncWithProgress,
-		cleanup:  cli.RunCleanup,
+		Home:             home,
+		GOOS:             goos,
+		Logger:           logger,
+		AutoTriggerOnRun: true,
+		closeLog:         closeLog,
+		sync:             cli.RunSyncWithProgress,
+		cleanup:          cli.RunCleanup,
 	}
 	d.Scheduler = scheduler.New(interval, d.syncJob)
 	d.Scheduler.Subscribe(d.logState)
@@ -149,7 +151,11 @@ func (d *Daemon) logState(s scheduler.State) {
 // Run triggers an initial sync then runs the scheduler until ctx is cancelled.
 func (d *Daemon) Run(ctx context.Context) error {
 	d.Logger.Printf("daemon started (home=%s, interval=%s)", d.Home, d.Scheduler.IntervalDuration())
-	d.Scheduler.Trigger() // sync promptly on startup
+	if d.AutoTriggerOnRun {
+		d.Scheduler.Trigger() // sync promptly on startup
+	} else {
+		d.Logger.Printf("initial sync is waiting for first-sync strategy selection")
+	}
 	d.Scheduler.Run(ctx)
 	d.Logger.Printf("daemon stopped")
 	return d.Close()

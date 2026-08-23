@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/qinqingxu/synchub-for-agents/internal/cli"
+	"github.com/qinqingxu/synchub-for-agents/internal/config"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/startup"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -150,7 +152,15 @@ func (s *WailsService) NeedsOnboarding() bool {
 	if daemon == nil {
 		return true
 	}
-	info, err := os.Stat(filepath.Join(daemon.Home, "repo", ".git"))
+	cfg, err := config.Load(cli.ConfigPath(daemon.Home))
+	if err != nil {
+		return true
+	}
+	repoPath, err := cli.ResolveRepoDirForCurrentOS(daemon.Home, cfg)
+	if err != nil {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(repoPath, ".git"))
 	return err != nil || !info.IsDir()
 }
 

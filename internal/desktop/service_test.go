@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -224,6 +225,34 @@ func TestSnapshotPromotesDoneToErrorWhenLastCycleNeedsAttention(t *testing.T) {
 	}
 	if got.State != "error" {
 		t.Fatalf("snapshot state = %q, want error", got.State)
+	}
+}
+
+func TestSnapshotIncludesRebaseDirtyWorktreeDiagnostic(t *testing.T) {
+	home := configuredHome(t)
+	service, err := New(home, runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	service.recordCycle(daemon.CycleResult{
+		Error:          "pull: git pull --rebase: exit status 128: error: cannot pull with rebase: You have unstaged changes. error: Please commit or stash them.",
+		NeedsAttention: true,
+		FinishedAt:     time.Now(),
+	})
+
+	snapshot, err := service.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.SyncDiagnostic == nil {
+		t.Fatal("expected sync diagnostic")
+	}
+	if snapshot.SyncDiagnostic.Code != "git-rebase-dirty-worktree" {
+		t.Fatalf("diagnostic = %#v", snapshot.SyncDiagnostic)
+	}
+	if !strings.Contains(snapshot.SyncDiagnostic.RepoPath, ".synchub") {
+		t.Fatalf("repo path = %q", snapshot.SyncDiagnostic.RepoPath)
 	}
 }
 

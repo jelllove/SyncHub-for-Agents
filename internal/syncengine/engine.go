@@ -51,6 +51,8 @@ type Engine struct {
 	PushRetries    int
 	Now            func() time.Time
 	OnProgress     func(Progress)
+	FirstSyncMode  string
+	FirstSyncRun   bool
 }
 
 func (e *Engine) SyncOnce() (result Result, retErr error) {
@@ -201,6 +203,9 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	}
 	result.Blocked = append(result.Blocked, blockedPaths...)
 	actions := ReconcileWithBlocked(baseOwned, local, validRemote, blockedPaths)
+	if e.FirstSyncRun {
+		actions = e.applyFirstSyncStrategy(actions, local, validRemote)
+	}
 	result.Actions = actions
 
 	applier := &ResourceApplier{
@@ -624,6 +629,51 @@ func pendingInstallForAdapter(plan *installplan.Plan, adapter string) bool {
 func (e *Engine) publish(progress Progress) {
 	if e.OnProgress != nil {
 		e.OnProgress(progress)
+	}
+}
+
+func (e *Engine) applyFirstSyncStrategy(
+	actions []Action,
+	local state.Snapshot,
+	remote state.Snapshot,
+) []Action {
+	switch e.FirstSyncMode {
+	case "use-cloud":
+		mapped := make([]Action, 0, len(actions))
+		for _, action := range actions {
+			switch action.Type {
+			case PushToRemote:
+				mapped = append(mapped, Action{Type: DeleteLocal, RepoRel: action.RepoRel})
+			case MergeBoth:
+				if _, exists := remote[action.RepoRel]; exists {
+					mapped = append(mapped, Action{Type: PullToLocal, RepoRel: action.RepoRel})
+				} else {
+					mapped = append(mapped, Action{Type: DeleteLocal, RepoRel: action.RepoRel})
+				}
+			default:
+				mapped = append(mapped, action)
+			}
+		}
+		return mapped
+	case "use-local":
+		mapped := make([]Action, 0, len(actions))
+		for _, action := range actions {
+			switch action.Type {
+			case PullToLocal:
+				mapped = append(mapped, Action{Type: DeleteRemote, RepoRel: action.RepoRel})
+			case MergeBoth:
+				if _, exists := local[action.RepoRel]; exists {
+					mapped = append(mapped, Action{Type: PushToRemote, RepoRel: action.RepoRel})
+				} else {
+					mapped = append(mapped, Action{Type: DeleteRemote, RepoRel: action.RepoRel})
+				}
+			default:
+				mapped = append(mapped, action)
+			}
+		}
+		return mapped
+	default:
+		return actions
 	}
 }
 

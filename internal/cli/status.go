@@ -44,9 +44,13 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 	if err != nil {
 		return Status{}, err
 	}
+	repoDir, err := ResolveRepoDir(home, cfg, goos, userHome)
+	if err != nil {
+		return Status{}, fmt.Errorf("resolve repository directory: %w", err)
+	}
 	codecs := portableconfig.BuiltinRegistry()
 	inventory := installplan.NewBuiltinInventory(installplan.CommandRunner{})
-	stageParent := filepath.Join(RepoDir(home), ".git", "synchub-stage")
+	stageParent := filepath.Join(repoDir, ".git", "synchub-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Status{}, fmt.Errorf("create status stage parent: %w", err)
 	}
@@ -68,13 +72,13 @@ func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr e
 		retErr = errors.Join(retErr, collected.Close())
 	}()
 
-	remote, err := syncengine.SnapshotRepo(RepoDir(home))
+	remote, err := syncengine.SnapshotRepo(repoDir)
 	if err != nil {
 		return Status{}, err
 	}
 	remoteOwned, _, ownershipBlocked := syncengine.SplitRemoteSnapshot(remote, resources)
 	validRemote, validationBlocked := syncengine.ValidateRemoteResources(
-		RepoDir(home),
+		repoDir,
 		remoteOwned,
 		resources,
 		codecs,

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -172,4 +173,27 @@ func TestBuildResourceSpecsRejectsUnsafeIdentifiers(t *testing.T) {
 
 func testingErrorContains(err error, want string) bool {
 	return err != nil && strings.Contains(err.Error(), want)
+}
+
+func TestResolveRepoDirUsesConfiguredPath(t *testing.T) {
+	home := filepath.Join(`C:\Users\alice`, ".synchub")
+	cfg := config.Config{RepoDir: `${HOME}\my-sync`}
+	resolved, err := ResolveRepoDir(home, cfg, "windows", `C:\Users\alice`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != `C:\Users\alice\my-sync` {
+		t.Fatalf("resolved = %q", resolved)
+	}
+}
+
+func TestResolveRepoDirFallsBackToDefault(t *testing.T) {
+	home := filepath.Join(`C:\Users\alice`, ".synchub")
+	resolved, err := ResolveRepoDir(home, config.Config{}, "windows", `C:\Users\alice`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != filepath.Join(home, "repo") {
+		t.Fatalf("resolved = %q", resolved)
+	}
 }

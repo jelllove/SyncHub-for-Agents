@@ -15,6 +15,9 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('@wailsio/runtime', () => ({
+  Browser: {
+    OpenURL: vi.fn(),
+  },
   Events: {
     On: vi.fn(() => vi.fn()),
   },
@@ -51,6 +54,9 @@ function configuredSnapshot(): Snapshot {
     pendingActions: 0,
     blockedFiles: 0,
     lastError: '',
+    repoPath: 'C:/Users/test/.synchub/repo',
+    firstSyncRequired: false,
+    syncDiagnostic: null,
     progress: {
       stage: '',
       label: '',
@@ -115,5 +121,29 @@ describe('App settings preview', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close settings' }))
     expect(preview.promise.cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders sync fix panel for git rebase dirty worktree', async () => {
+    api.resourcePreview.mockResolvedValue({
+      generatedAt: '0001-01-01T00:00:00Z',
+      resources: null,
+      files: 0,
+      bytes: 0,
+      excludedFiles: 0,
+      excludedBytes: 0,
+      issues: null,
+    })
+    api.snapshot.mockResolvedValue({
+      ...configuredSnapshot(),
+      syncDiagnostic: {
+        code: 'git-rebase-dirty-worktree',
+        summary: 'Local repository has unstaged changes',
+        repoPath: 'C:/Users/test/.synchub/repo',
+        steps: [{ title: 'Stash then pull', command: 'git stash ...' }],
+      },
+    })
+    render(<App />)
+    expect(await screen.findByText('Fix sync issue')).toBeInTheDocument()
+    expect(screen.getByText('C:/Users/test/.synchub/repo')).toBeInTheDocument()
   })
 })

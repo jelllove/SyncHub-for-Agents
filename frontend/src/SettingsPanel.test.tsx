@@ -31,6 +31,9 @@ function snapshot(generatedAt: string, files: number): Snapshot {
     pendingActions: 0,
     blockedFiles: 0,
     lastError: '',
+    repoPath: 'C:/Users/test/.synchub/repo',
+    firstSyncRequired: false,
+    syncDiagnostic: null,
     progress: {
       stage: '',
       label: '',
@@ -80,6 +83,7 @@ describe('SettingsPanel', () => {
         previewLoading={false}
         close={vi.fn()}
         refreshPreview={refreshPreview}
+        runSyncNow={vi.fn().mockResolvedValue(undefined)}
         save={vi.fn().mockResolvedValue(true)}
       />,
     )
@@ -98,6 +102,7 @@ describe('SettingsPanel', () => {
         previewLoading={false}
         close={vi.fn()}
         refreshPreview={vi.fn().mockResolvedValue(undefined)}
+        runSyncNow={vi.fn().mockResolvedValue(undefined)}
         save={vi.fn().mockResolvedValue(true)}
       />,
     )
@@ -105,5 +110,22 @@ describe('SettingsPanel', () => {
     expect(screen.getByText(/Last refreshed/)).toBeInTheDocument()
     expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByText('safe files')).toBeInTheDocument()
+  })
+
+  it('shows run sync now action in settings and triggers callback', async () => {
+    const runSyncNow = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SettingsPanel
+        snapshot={normalizeSnapshot(snapshot('2026-08-18T09:00:00Z', 7))}
+        busy={false}
+        previewLoading={false}
+        close={vi.fn()}
+        refreshPreview={vi.fn().mockResolvedValue(undefined)}
+        runSyncNow={runSyncNow}
+        save={vi.fn().mockResolvedValue(true)}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Run sync now' }))
+    expect(runSyncNow).toHaveBeenCalledTimes(1)
   })
 })

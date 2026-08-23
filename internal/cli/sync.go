@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
@@ -45,12 +47,18 @@ func runSyncWithUserHome(
 	if err != nil {
 		return syncengine.Result{}, err
 	}
+	repoDir, err := ResolveRepoDir(home, cfg, goos, userHome)
+	if err != nil {
+		return syncengine.Result{}, fmt.Errorf("resolve repository directory: %w", err)
+	}
+	if !cfg.FirstSync.Completed && strings.TrimSpace(cfg.FirstSync.Strategy) == config.FirstSyncStrategyChoose {
+		return syncengine.Result{}, fmt.Errorf("first sync strategy is required before synchronizing")
+	}
 
-	client, err := NewGitClient(home, cfg.RepoURL, RepoDir(home))
+	client, err := NewGitClient(home, cfg.RepoURL, repoDir)
 	if err != nil {
 		return syncengine.Result{}, err
 	}
-	repoDir := RepoDir(home)
 	codecs := portableconfig.BuiltinRegistry()
 	baseStore := state.NewBaseStore(home)
 	conflictStore := conflict.NewStore(
@@ -76,9 +84,21 @@ func runSyncWithUserHome(
 		InstallManager: installManager,
 		PushRetries:    5,
 		Now:            time.Now,
+		FirstSyncMode:  cfg.FirstSync.Strategy,
+		FirstSyncRun:   !cfg.FirstSync.Completed,
 	}
 	if len(onProgress) > 0 {
 		eng.OnProgress = onProgress[0]
 	}
-	return eng.SyncOnce()
+	result, err := eng.SyncOnce()
+	if err != nil {
+		return syncengine.Result{}, err
+	}
+	if !cfg.FirstSync.Completed {
+		cfg.FirstSync.Completed = true
+		if err := config.Save(ConfigPath(home), cfg); err != nil {
+			return syncengine.Result{}, fmt.Errorf("mark first sync completed: %w", err)
+		}
+	}
+	return result, nil
 }

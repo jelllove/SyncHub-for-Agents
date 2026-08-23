@@ -16,6 +16,7 @@ export type SettingsPanelProps = {
   previewLoading: boolean
   close: () => void
   refreshPreview: () => Promise<void>
+  runSyncNow: () => Promise<unknown>
   save: (
     input: SettingsInput,
     startAtLogin: boolean,
@@ -41,11 +42,14 @@ export function SettingsPanel({
   previewLoading,
   close,
   refreshPreview,
+  runSyncNow,
   save,
 }: SettingsPanelProps) {
   const [repositoryUrl, setRepositoryUrl] = useState(snapshot.repositoryUrl)
   const [intervalMinutes, setIntervalMinutes] = useState(snapshot.intervalMinutes)
   const [trashGraceDays, setTrashGraceDays] = useState(snapshot.trashGraceDays)
+  const [repositoryDir, setRepositoryDir] = useState(snapshot.repoPath)
+  const [repoPathMode, setRepoPathMode] = useState<'reclone' | 'migrate'>('reclone')
   const [agents, setAgents] = useState<Record<string, boolean>>(
     Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
   )
@@ -70,7 +74,16 @@ export function SettingsPanel({
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     const saved = await save(
-      { repositoryUrl, intervalMinutes, trashGraceDays, agents, categories, customResources },
+      {
+        repositoryUrl,
+        repositoryDir,
+        repoPathMode,
+        intervalMinutes,
+        trashGraceDays,
+        agents,
+        categories,
+        customResources,
+      },
       startAtLogin,
       startAtLogin !== initialStartAtLogin,
     )
@@ -106,6 +119,39 @@ export function SettingsPanel({
             />
             <small>SSH and HTTPS repositories are supported.</small>
           </label>
+          <label>
+            Local repository directory
+            <input
+              required
+              value={repositoryDir}
+              onChange={(event) => setRepositoryDir(event.target.value)}
+              placeholder={snapshot.repoPath}
+            />
+            <small>Where SyncHub keeps the local clone.</small>
+          </label>
+          <fieldset>
+            <legend>When directory changes</legend>
+            <label className="toggle-row">
+              <span>
+                <strong>Keep old folder, clone into new</strong>
+              </span>
+              <input
+                type="radio"
+                checked={repoPathMode === 'reclone'}
+                onChange={() => setRepoPathMode('reclone')}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>
+                <strong>Move existing repo to new folder</strong>
+              </span>
+              <input
+                type="radio"
+                checked={repoPathMode === 'migrate'}
+                onChange={() => setRepoPathMode('migrate')}
+              />
+            </label>
+          </fieldset>
           <div className="field-grid">
             <label>
               Sync frequency (minutes)
@@ -166,6 +212,20 @@ export function SettingsPanel({
               type="button"
             >
               {previewLoading ? 'Refreshing…' : 'Refresh preview'}
+            </button>
+          </section>
+          <section className="preview-refresh">
+            <div>
+              <strong>Synchronization</strong>
+              <small>Run an immediate one-time synchronization now.</small>
+            </div>
+            <button
+              className="secondary"
+              disabled={busy || !snapshot.configured}
+              onClick={() => void runSyncNow()}
+              type="button"
+            >
+              Run sync now
             </button>
           </section>
           <RestorePreview preview={snapshot.preview} />

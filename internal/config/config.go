@@ -12,7 +12,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const currentVersion = 3
+const currentVersion = 4
+
+const (
+	FirstSyncStrategyChoose     = "choose"
+	FirstSyncStrategyUseCloud   = "use-cloud"
+	FirstSyncStrategyMerge      = "merge-cloud-local"
+	FirstSyncStrategyUseLocal   = "use-local"
+	firstSyncStrategyUnsetValue = ""
+)
+
+type FirstSyncPolicy struct {
+	Strategy  string `yaml:"strategy,omitempty"`
+	Completed bool   `yaml:"completed,omitempty"`
+}
 
 type CustomResource struct {
 	ID       string            `yaml:"id"`
@@ -28,11 +41,13 @@ type CustomResource struct {
 type Config struct {
 	Version             int                        `yaml:"version,omitempty"`
 	RepoURL             string                     `yaml:"repo_url"`
+	RepoDir             string                     `yaml:"repo_dir,omitempty"`
 	SyncIntervalMinutes int                        `yaml:"sync_interval_minutes"`
 	TrashGraceDays      int                        `yaml:"trash_grace_days"`
 	Agents              map[string]bool            `yaml:"agents"`
 	Categories          map[string]map[string]bool `yaml:"categories,omitempty"`
 	CustomResources     []CustomResource           `yaml:"custom_resources,omitempty"`
+	FirstSync           FirstSyncPolicy            `yaml:"first_sync,omitempty"`
 }
 
 // Default returns a Config with all provided agent names enabled.
@@ -86,6 +101,7 @@ func Load(path string) (Config, error) {
 	if c.Agents == nil {
 		c.Agents = map[string]bool{}
 	}
+	versionBeforeMigration := c.Version
 	if c.Version < 1 {
 		if _, configured := c.Agents["vscode-copilot"]; !configured {
 			c.Agents["vscode-copilot"] = true
@@ -98,6 +114,10 @@ func Load(path string) (Config, error) {
 		}
 		c.Version = currentVersion
 	}
+	if versionBeforeMigration < 4 {
+		c.FirstSync.Completed = true
+		c.FirstSync.Strategy = firstSyncStrategyUnsetValue
+	}
 	return c, nil
 }
 
@@ -105,6 +125,12 @@ func Load(path string) (Config, error) {
 func Save(path string, c Config) error {
 	if err := validateCustomResources(c.CustomResources); err != nil {
 		return err
+	}
+	if err := validateFirstSyncPolicy(c.FirstSync); err != nil {
+		return err
+	}
+	if c.FirstSync.Strategy == firstSyncStrategyUnsetValue && !c.FirstSync.Completed {
+		c.FirstSync.Completed = true
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -154,6 +180,19 @@ func validateCustomResources(resources []CustomResource) error {
 
 func ValidateCustomResources(resources []CustomResource) error {
 	return validateCustomResources(resources)
+}
+
+func validateFirstSyncPolicy(policy FirstSyncPolicy) error {
+	switch policy.Strategy {
+	case firstSyncStrategyUnsetValue,
+		FirstSyncStrategyChoose,
+		FirstSyncStrategyUseCloud,
+		FirstSyncStrategyMerge,
+		FirstSyncStrategyUseLocal:
+		return nil
+	default:
+		return fmt.Errorf("first sync strategy %q is not supported", policy.Strategy)
+	}
 }
 
 func validatePathMap(id, field string, values map[string]string) error {

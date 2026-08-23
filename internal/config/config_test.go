@@ -26,6 +26,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	in := Config{
 		RepoURL:             "git@github.com:me/synchub-data.git",
+		RepoDir:             "${HOME}/sync-repo",
 		SyncIntervalMinutes: 15,
 		TrashGraceDays:      7,
 		Agents:              map[string]bool{"claude": true, "gemini": false},
@@ -53,6 +54,9 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if out.RepoURL != in.RepoURL || out.SyncIntervalMinutes != 15 || out.TrashGraceDays != 7 {
 		t.Errorf("round trip mismatch: %+v", out)
 	}
+	if out.RepoDir != in.RepoDir {
+		t.Errorf("repo dir mismatch: %q != %q", out.RepoDir, in.RepoDir)
+	}
 	if out.Agents["claude"] != true || out.Agents["gemini"] != false {
 		t.Errorf("agents mismatch: %+v", out.Agents)
 	}
@@ -67,6 +71,20 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 func TestLoadMissingIsError(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "nope.yaml")); err == nil {
 		t.Fatal("expected error loading missing config")
+	}
+}
+
+func TestSaveRejectsUnsupportedFirstSyncStrategy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	err := Save(path, Config{
+		RepoURL: "git@github.com:me/sync.git",
+		Agents:  map[string]bool{"claude": true},
+		FirstSync: FirstSyncPolicy{
+			Strategy: "invalid-strategy",
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "first sync strategy") {
+		t.Fatalf("Save() error = %v", err)
 	}
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Events } from '@wailsio/runtime'
+import { Browser, Events } from '@wailsio/runtime'
 import {
   ApproveInstallPlan,
   Pause,
@@ -197,6 +197,25 @@ function App() {
     setSettingsOpen(false)
   }
 
+  const saveFirstSyncStrategy = async (strategy: string) => perform(async () => {
+    if (!snapshot) return
+    await SaveSettings({
+      repositoryUrl: snapshot.repositoryUrl,
+      repositoryDir: snapshot.repoPath,
+      repoPathMode: 'reclone',
+      firstSyncStrategy: strategy,
+      intervalMinutes: snapshot.intervalMinutes,
+      trashGraceDays: snapshot.trashGraceDays,
+      agents: Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
+      categories: Object.fromEntries(snapshot.agents.map((agent) => [
+        agent.name,
+        Object.fromEntries(agent.resources.map((resource) => [resource.category, resource.enabled])),
+      ])),
+      customResources: snapshot.customResources,
+    })
+    await TriggerSync()
+  }, 'First sync strategy saved')
+
   if (needsOnboarding) {
     return <Onboarding complete={() => {
       setNeedsOnboarding(false)
@@ -292,6 +311,54 @@ function App() {
 
             <ResultSummary progress={progress} />
 
+            {snapshot.firstSyncRequired && (
+              <section className="attention-panel">
+                <div className="attention-heading">
+                  <h2>Choose first sync strategy</h2>
+                </div>
+                <p>Select how SyncHub should handle your first synchronization between local and cloud data.</p>
+                <div className="inline-actions">
+                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('use-cloud')}>
+                    Use cloud
+                  </button>
+                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('merge-cloud-local')}>
+                    Merge cloud + local
+                  </button>
+                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('use-local')}>
+                    Use local
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {snapshot.syncDiagnostic && (
+              <section className="attention-panel">
+                <div className="attention-heading">
+                  <h2>Fix sync issue</h2>
+                </div>
+                <p>{snapshot.syncDiagnostic.summary}</p>
+                <code>{snapshot.syncDiagnostic.repoPath}</code>
+                <div className="inline-actions">
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => void Browser.OpenURL(toFileURL(snapshot.syncDiagnostic!.repoPath))}
+                  >
+                    Open repo folder
+                  </button>
+                </div>
+                <div className="operation-list">
+                  {snapshot.syncDiagnostic.steps.map((step) => (
+                    <article key={step.title}>
+                      <strong>{step.title}</strong>
+                      <code>{step.command}</code>
+                      {step.warning && <small className="warning">{step.warning}</small>}
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {snapshot.pendingInstallPlan && (
               <InstallPlanPanel
                 plan={snapshot.pendingInstallPlan}
@@ -361,6 +428,7 @@ function App() {
           previewLoading={previewLoading}
           close={closeSettings}
           refreshPreview={refreshResourcePreview}
+          runSyncNow={() => perform(TriggerSync, 'Synchronization queued')}
           save={(input, startAtLogin, startAtLoginChanged) => perform(async () => {
             await SaveSettings(input)
             if (startAtLoginChanged) await SetStartAtLogin(startAtLogin)
@@ -440,6 +508,14 @@ function SettingsIcon() {
 
 function SyncIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.6-2A7 7 0 0 0 6.3 7.7L4 12m16 0-2.3 4.3A7 7 0 0 1 5.4 14" /></svg>
+}
+
+function toFileURL(path: string) {
+  const normalized = path.replace(/\\/g, '/')
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return `file:///${normalized}`
+  }
+  return `file://${normalized}`
 }
 
 export default App

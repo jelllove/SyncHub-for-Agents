@@ -27,6 +27,19 @@ export type AppInstallPlan = Omit<InstallPlan, 'operations'> & {
   operations: AppInstallOperation[]
 }
 
+export type AppSyncFixStep = {
+  title: string
+  command: string
+  warning?: string
+}
+
+export type AppSyncDiagnostic = {
+  code: string
+  summary: string
+  repoPath: string
+  steps: AppSyncFixStep[]
+}
+
 export type AppSnapshot = Omit<
   Snapshot,
   'agents' | 'preview' | 'conflicts' | 'customResources' | 'pendingInstallPlan'
@@ -36,6 +49,7 @@ export type AppSnapshot = Omit<
   conflicts: NonNullable<Snapshot['conflicts']>
   customResources: CustomResourceInput[]
   pendingInstallPlan?: AppInstallPlan | null
+  syncDiagnostic?: AppSyncDiagnostic | null
 }
 
 export function normalizePreview(preview: ResourcePreview): AppPreview {
@@ -64,6 +78,12 @@ export function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
             ...operation,
             args: operation.args ?? [],
           })),
+        }
+      : null,
+    syncDiagnostic: snapshot.syncDiagnostic
+      ? {
+          ...snapshot.syncDiagnostic,
+          steps: snapshot.syncDiagnostic.steps ?? [],
         }
       : null,
   }

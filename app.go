@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
@@ -23,6 +24,7 @@ type guiApplication struct {
 	service    *desktop.Service
 	startup    *startup.Manager
 	activation activationQueue
+	isQuitting atomic.Bool
 }
 
 type activationQueue struct {
@@ -111,8 +113,10 @@ func (gui *guiApplication) configure(
 		gui.activation.Ready(gui.showWindow)
 	})
 	gui.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
-		gui.window.Hide()
-		event.Cancel()
+		if shouldCancelWindowClose(gui.isQuitting.Load()) {
+			gui.window.Hide()
+			event.Cancel()
+		}
 	})
 	gui.app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(*application.ApplicationEvent) {
 		gui.show()
@@ -167,6 +171,7 @@ func (g *guiApplication) configureTray() {
 	})
 	menu.AddSeparator()
 	menu.Add("Quit").OnClick(func(*application.Context) {
+		g.isQuitting.Store(true)
 		g.app.Quit()
 	})
 	g.tray.SetMenu(menu)
@@ -195,4 +200,8 @@ func (g *guiApplication) showWindow() {
 
 func (g *guiApplication) run() error {
 	return g.app.Run()
+}
+
+func shouldCancelWindowClose(isQuitting bool) bool {
+	return !isQuitting
 }

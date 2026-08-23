@@ -407,3 +407,62 @@ func TestSyncOnceCombinesLegacySessionsAndPortableInstructions(t *testing.T) {
 	}
 	assertFileContent(t, filepath.Join(instructionsA, "AGENTS.md"), wantMerged)
 }
+
+func TestApplyFirstSyncStrategyUseCloud(t *testing.T) {
+	engine := &Engine{
+		FirstSyncMode: "use-cloud",
+		FirstSyncRun:  true,
+	}
+	actions := []Action{
+		{Type: PushToRemote, RepoRel: "a"},
+		{Type: MergeBoth, RepoRel: "b"},
+		{Type: PullToLocal, RepoRel: "c"},
+	}
+	local := state.Snapshot{
+		"a": {Hash: "a"},
+		"b": {Hash: "b"},
+	}
+	remote := state.Snapshot{
+		"b": {Hash: "r"},
+		"c": {Hash: "c"},
+	}
+	got := engine.applyFirstSyncStrategy(actions, local, remote)
+	if got[0].Type != DeleteLocal {
+		t.Fatalf("action[0] = %v", got[0].Type)
+	}
+	if got[1].Type != PullToLocal {
+		t.Fatalf("action[1] = %v", got[1].Type)
+	}
+	if got[2].Type != PullToLocal {
+		t.Fatalf("action[2] = %v", got[2].Type)
+	}
+}
+
+func TestApplyFirstSyncStrategyUseLocal(t *testing.T) {
+	engine := &Engine{
+		FirstSyncMode: "use-local",
+		FirstSyncRun:  true,
+	}
+	actions := []Action{
+		{Type: PullToLocal, RepoRel: "a"},
+		{Type: MergeBoth, RepoRel: "b"},
+		{Type: MergeBoth, RepoRel: "c"},
+	}
+	local := state.Snapshot{
+		"b": {Hash: "l"},
+	}
+	remote := state.Snapshot{
+		"a": {Hash: "r"},
+		"c": {Hash: "r"},
+	}
+	got := engine.applyFirstSyncStrategy(actions, local, remote)
+	if got[0].Type != DeleteRemote {
+		t.Fatalf("action[0] = %v", got[0].Type)
+	}
+	if got[1].Type != PushToRemote {
+		t.Fatalf("action[1] = %v", got[1].Type)
+	}
+	if got[2].Type != DeleteRemote {
+		t.Fatalf("action[2] = %v", got[2].Type)
+	}
+}

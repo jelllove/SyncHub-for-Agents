@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +16,9 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
 	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
+	"github.com/qinqingxu/synchub-for-agents/internal/pathresolver"
 	"github.com/qinqingxu/synchub-for-agents/internal/provider"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
@@ -96,10 +99,15 @@ func (s *Service) StartConfigured() error {
 	if s.daemon != nil {
 		return nil
 	}
+	cfg, err := config.Load(cli.ConfigPath(s.home))
+	if err != nil {
+		return err
+	}
 	d, err := daemon.New(s.home, s.goos)
 	if err != nil {
 		return err
 	}
+	d.AutoTriggerOnRun = !(cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose && !cfg.FirstSync.Completed)
 	d.OnCycle = s.recordCycle
 	d.OnProgress = s.recordProgress
 	s.daemon = d
@@ -228,6 +236,10 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		}
 		return Snapshot{}, err
 	}
+	repoPath, err := s.resolveRepoDir(cfg)
+	if err != nil {
+		return Snapshot{}, err
+	}
 	providers, err := cli.LoadProviders(s.home)
 	if err != nil {
 		return Snapshot{}, err
@@ -278,6 +290,9 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		PendingActions:     pendingActions,
 		BlockedFiles:       last.Blocked,
 		LastError:          last.Error,
+		RepoPath:           repoPath,
+		FirstSyncRequired:  cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose && !cfg.FirstSync.Completed,
+		SyncDiagnostic:     classifySyncDiagnostic(last.Error, repoPath),
 		Progress:           progress,
 		Preview:            preview,
 		CustomResources:    desktopCustomResources(cfg.CustomResources),
@@ -325,6 +340,7 @@ func (s *Service) unconfiguredSnapshot() (Snapshot, error) {
 	return Snapshot{
 		Configured:      false,
 		State:           "idle",
+		RepoPath:        cli.RepoDir(s.home),
 		IntervalMinutes: 10,
 		TrashGraceDays:  30,
 		Platform:        s.goos,
@@ -411,13 +427,77 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 			custom = append(custom, item.toConfig())
 		}
 	}
+	repositoryDir := strings.TrimSpace(input.RepositoryDir)
+	if repositoryDir == "" {
+		repositoryDir = existing.RepoDir
+	}
+	if err := validateRepoPathMode(input.RepoPathMode); err != nil {
+		return err
+	}
+	resolvedExistingRepo, err := s.resolveRepoDir(existing)
+	if err != nil {
+		return err
+	}
+	resolvedRequestedRepo, err := s.resolveRepoDir(config.Config{RepoDir: repositoryDir})
+	if err != nil {
+		return err
+	}
+	if !samePath(resolvedExistingRepo, resolvedRequestedRepo) {
+		if err := s.applyRepoDirChange(
+			input.RepositoryURL,
+			resolvedExistingRepo,
+			resolvedRequestedRepo,
+			strings.TrimSpace(input.RepoPathMode),
+		); err != nil {
+			return err
+		}
+	}
+	firstSync := existing.FirstSync
+	if input.FirstSyncChoiceRequired {
+		firstSync.Strategy = strings.TrimSpace(input.FirstSyncStrategy)
+		if firstSync.Strategy == "" {
+			firstSync.Strategy = config.FirstSyncStrategyChoose
+		}
+		firstSync.Completed = false
+	} else if strategy := strings.TrimSpace(input.FirstSyncStrategy); strategy != "" {
+		firstSync.Strategy = strategy
+		firstSync.Completed = false
+	}
+	if err := config.ValidateCustomResources(custom); err != nil {
+		return err
+	}
+	if err := validateFirstSyncStrategy(firstSync.Strategy); err != nil {
+		return err
+	}
+	if firstSync.Strategy == config.FirstSyncStrategyChoose && !input.FirstSyncChoiceRequired {
+		firstSync.Completed = false
+	} else if firstSync.Strategy == "" && !firstSync.Completed {
+		firstSync.Completed = true
+	}
+	persistedRepoDir := repositoryDir
+	defaultRepoDir := cli.RepoDir(s.home)
+	if samePath(resolvedRequestedRepo, defaultRepoDir) {
+		persistedRepoDir = ""
+	} else {
+		if userHome, homeErr := os.UserHomeDir(); homeErr == nil {
+			if tokenized, ok := pathresolver.TokenizeHome(resolvedRequestedRepo, s.goos, userHome); ok {
+				persistedRepoDir = tokenized
+			} else {
+				persistedRepoDir = resolvedRequestedRepo
+			}
+		} else {
+			persistedRepoDir = resolvedRequestedRepo
+		}
+	}
 	cfg := config.Config{
 		RepoURL:             input.RepositoryURL,
+		RepoDir:             persistedRepoDir,
 		SyncIntervalMinutes: input.IntervalMinutes,
 		TrashGraceDays:      input.TrashGraceDays,
 		Agents:              input.Agents,
 		Categories:          categories,
 		CustomResources:     custom,
+		FirstSync:           firstSync,
 	}
 	if err := config.Save(cli.ConfigPath(s.home), cfg); err != nil {
 		return err
@@ -429,6 +509,9 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 		return err
 	}
 	s.Daemon().Scheduler.SetInterval(time.Duration(input.IntervalMinutes) * time.Minute)
+	if cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose && !cfg.FirstSync.Completed {
+		return nil
+	}
 	return s.Trigger()
 }
 
@@ -478,4 +561,89 @@ func (s *Service) Resume() error {
 	}
 	d.Scheduler.Resume()
 	return nil
+}
+
+func (s *Service) resolveRepoDir(cfg config.Config) (string, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	repoPath, err := cli.ResolveRepoDir(s.home, cfg, s.goos, userHome)
+	if err != nil {
+		return "", fmt.Errorf("resolve repository directory: %w", err)
+	}
+	return repoPath, nil
+}
+
+func (s *Service) applyRepoDirChange(repositoryURL, currentRepo, nextRepo, mode string) error {
+	if mode == "" {
+		mode = "reclone"
+	}
+	switch mode {
+	case "migrate":
+		if err := os.MkdirAll(filepath.Dir(nextRepo), 0o755); err != nil {
+			return err
+		}
+		if _, err := os.Stat(nextRepo); err == nil {
+			return fmt.Errorf("new repository directory already exists: %s", nextRepo)
+		}
+		if err := os.Rename(currentRepo, nextRepo); err != nil {
+			return fmt.Errorf("migrate repository directory: %w", err)
+		}
+		return nil
+	case "reclone":
+		client, err := cli.NewGitClient(s.home, repositoryURL, nextRepo)
+		if err != nil {
+			return err
+		}
+		setup := repository.Setup{Client: client}
+		return setup.Initialize(repositoryURL, nextRepo)
+	default:
+		return fmt.Errorf("unsupported repository directory mode %q", mode)
+	}
+}
+
+func validateRepoPathMode(mode string) error {
+	trimmed := strings.TrimSpace(mode)
+	if trimmed == "" || trimmed == "reclone" || trimmed == "migrate" {
+		return nil
+	}
+	return fmt.Errorf("repository directory mode %q is not supported", mode)
+}
+
+func validateFirstSyncStrategy(strategy string) error {
+	switch strategy {
+	case "",
+		config.FirstSyncStrategyChoose,
+		config.FirstSyncStrategyUseCloud,
+		config.FirstSyncStrategyMerge,
+		config.FirstSyncStrategyUseLocal:
+		return nil
+	default:
+		return fmt.Errorf("first sync strategy %q is not supported", strategy)
+	}
+}
+
+func classifySyncDiagnostic(lastError, repoPath string) *SyncDiagnostic {
+	if strings.Contains(lastError, "cannot pull with rebase") &&
+		strings.Contains(lastError, "Please commit or stash them") {
+		return &SyncDiagnostic{
+			Code:     "git-rebase-dirty-worktree",
+			Summary:  "Local repository has unstaged changes, so pull --rebase is blocked.",
+			RepoPath: repoPath,
+			Steps: []SyncFixStep{
+				{Title: "Commit local changes", Command: "git add -A && git commit -m \"wip: local changes\" && git pull --rebase"},
+				{Title: "Stash then pull", Command: "git stash push -u -m \"temp before sync\" && git pull --rebase && git stash pop"},
+				{Title: "Discard local changes", Command: "git restore . && git pull --rebase", Warning: "Destructive: discards local edits"},
+			},
+		}
+	}
+	return nil
+}
+
+func samePath(left, right string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(filepath.Clean(left), filepath.Clean(right))
+	}
+	return filepath.Clean(left) == filepath.Clean(right)
 }
