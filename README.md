@@ -1,5 +1,7 @@
 # SyncHub for Agents
 
+![SyncHub for Agents hackathon poster](backup/hackathon-media-20260821/final/hackathon-poster.png)
+
 SyncHub for Agents is a desktop tray app that keeps AI agent configuration and session data synchronized across multiple computers.
 
 It uses a private Git repository you control as the synchronization bridge, with strict safety filters so credentials and machine-specific state stay local.
