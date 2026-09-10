@@ -72,3 +72,7 @@ wails3 package GOOS=windows ARCH=amd64 INSTALL_SCOPE=user
 
 - Product brand: **SyncHub for Agents**
 - Some internal identifiers and file names still use `SyncHub`/`synchub` for compatibility with existing installs and startup registrations.
+
+## License
+
+SyncHub for Agents is released under the [MIT License](LICENSE).
