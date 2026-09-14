@@ -37,11 +37,20 @@ Unicode true
 !define INFO_COMPANYNAME "SyncHub for Agents"
 !define INFO_PRODUCTNAME "SyncHub for Agents"
 !define PRODUCT_EXECUTABLE "SyncHub.exe"
+!ifndef INFO_PRODUCTVERSION
+    !define INFO_PRODUCTVERSION "0.3.0"
+!endif
+!ifndef INFO_FILEVERSION
+    !define INFO_FILEVERSION "${INFO_PRODUCTVERSION}.0"
+!endif
+!ifndef WAILS_INSTALL_SCOPE
+    !define WAILS_INSTALL_SCOPE "user"
+!endif
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
-VIProductVersion "${INFO_PRODUCTVERSION}.0"
-VIFileVersion    "${INFO_PRODUCTVERSION}.0"
+VIProductVersion "${INFO_FILEVERSION}"
+VIFileVersion    "${INFO_FILEVERSION}"
 
 VIAddVersionKey "CompanyName"     "${INFO_COMPANYNAME}"
 VIAddVersionKey "FileDescription" "${INFO_PRODUCTNAME} Installer"
@@ -60,11 +69,9 @@ ManifestDPIAware true
 # !define MUI_WELCOMEFINISHPAGE_BITMAP "resources\leftimage.bmp" #Include this to add a bitmap on the left side of the Welcome Page. Must be a size of 164x314
 !define MUI_FINISHPAGE_NOAUTOCLOSE # Wait on the INSTFILES page so the user can take a look into the details of the installation steps
 !define MUI_ABORTWARNING # This will warn the user if they exit from the installer.
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
-!define MUI_FINISHPAGE_RUN_TEXT "Launch SyncHub for Agents"
 
 !insertmacro MUI_PAGE_WELCOME # Welcome to the installer page.
-# !insertmacro MUI_PAGE_LICENSE "resources\eula.txt" # Adds a EULA page to the installer
+!insertmacro MUI_PAGE_LICENSE "..\..\..\LICENSE"
 !insertmacro MUI_PAGE_DIRECTORY # In which folder install page.
 !insertmacro MUI_PAGE_INSTFILES # Installing page.
 !insertmacro MUI_PAGE_FINISH # Finished installation page.
@@ -78,7 +85,10 @@ ManifestDPIAware true
 #!finalize 'signtool --file "%1"'
 
 Name "${INFO_PRODUCTNAME}"
-OutFile "..\..\..\bin\SyncHub-for-Agents-Setup-x64.exe" # Name of the installer's file.
+!ifndef INSTALLER_OUTPUT
+    !define INSTALLER_OUTPUT "..\..\..\bin\SyncHub-for-Agents-Setup-x64.exe"
+!endif
+OutFile "${INSTALLER_OUTPUT}"
 !if "${WAILS_INSTALL_SCOPE}" == "user"
     InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}"
 !else
@@ -95,9 +105,11 @@ Section
 
     !insertmacro wails.webview2runtime
 
-    SetOutPath $INSTDIR
+    SetOutPath "$INSTDIR"
+    SetOverwrite on
     
     !insertmacro wails.files
+    File "..\..\..\LICENSE"
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -112,9 +124,9 @@ Section "uninstall"
     !insertmacro wails.setShellContext
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "io.github.qinqingxu.synchub"
 
-    RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
-
-    RMDir /r $INSTDIR
+    # User configuration, repositories, sessions and WebView data are not installer-owned.
+    Delete "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    Delete "$INSTDIR\LICENSE"
 
     Delete "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk"
     Delete "$DESKTOP\${INFO_PRODUCTNAME}.lnk"
@@ -123,4 +135,5 @@ Section "uninstall"
     !insertmacro wails.unassociateCustomProtocols
 
     !insertmacro wails.deleteUninstaller
+    RMDir "$INSTDIR"
 SectionEnd

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -8,11 +9,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/qinqingxu/synchub-for-agents/internal/appversion"
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 	"github.com/qinqingxu/synchub-for-agents/internal/startup"
 	"github.com/qinqingxu/synchub-for-agents/internal/tray"
+	"github.com/qinqingxu/synchub-for-agents/internal/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -25,6 +28,7 @@ type guiApplication struct {
 	startup    *startup.Manager
 	activation activationQueue
 	isQuitting atomic.Bool
+	updates    *updater.Manager
 }
 
 type activationQueue struct {
@@ -88,6 +92,7 @@ func (gui *guiApplication) configure(
 	core *desktop.Service,
 	onboardingService *onboarding.Service,
 	hidden bool,
+	home string,
 ) error {
 	gui.service = core
 	gui.startup = &startup.Manager{
@@ -99,9 +104,21 @@ func (gui *guiApplication) configure(
 	if err := gui.migrateLegacyStartup(); err != nil {
 		return err
 	}
-	gui.app.RegisterService(application.NewService(
+	updates, err := updater.New(home, appversion.Version, runtime.GOOS, runtime.GOARCH, func(status updater.Status) {
+		gui.app.Event.Emit(desktop.UpdateEvent, status)
+	})
+	if err != nil {
+		return err
+	}
+	gui.updates = updates
+	gui.app.RegisterService(application.NewService(desktop.WithUpdates(
 		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
-	))
+		updates,
+		func() {
+			gui.isQuitting.Store(true)
+			gui.app.Quit()
+		},
+	)))
 	gui.window = gui.app.Window.NewWithOptions(initialMainWindowOptions())
 	gui.app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		screen := gui.app.Screen.GetPrimary()
@@ -199,7 +216,23 @@ func (g *guiApplication) showWindow() {
 }
 
 func (g *guiApplication) run() error {
-	return g.app.Run()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		g.updates.Run(ctx)
+	}()
+	err := g.app.Run()
+	cancel()
+	<-done
+	if err != nil {
+		return err
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	return g.updates.ApplyOnExit(executable)
 }
 
 func shouldCancelWindowClose(isQuitting bool) bool {

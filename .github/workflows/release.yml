@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   windows:
     runs-on: windows-2025
@@ -25,41 +29,53 @@ jobs:
       - name: Install tools
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
-          choco install nsis --yes --no-progress
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) {
+            choco install nsis --version=3.11 --yes --no-progress
+          }
           npm ci --prefix frontend
-      - name: Restore signing certificate
+      - name: Test Windows packaging rules
+        shell: pwsh
+        run: ./scripts/release/test-windows.ps1
+      - name: Build, optionally sign, and package Windows x64
         shell: pwsh
         env:
-          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_SIGN_THUMBPRINT: ${{ vars.WINDOWS_SIGN_THUMBPRINT }}
+          WINDOWS_TIMESTAMP_SERVER: ${{ vars.WINDOWS_TIMESTAMP_SERVER }}
+          WINDOWS_REQUIRE_SIGNING: ${{ vars.WINDOWS_REQUIRE_SIGNING }}
+          GITHUB_OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
         run: |
-          if (-not $env:CERTIFICATE_BASE64) { throw "WINDOWS_CERTIFICATE_BASE64 is required" }
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\codesign.pfx", [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
-      - name: Build, sign, and package
+          $ErrorActionPreference = 'Stop'
+          ./scripts/release/windows.ps1 -Version $env:RELEASE_TAG
+          Get-Content bin\WINDOWS-RELEASE-NOTES.txt | Add-Content $env:GITHUB_STEP_SUMMARY
+      - name: Test updater and desktop integration
         shell: pwsh
-        env:
-          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
         run: |
-          if (-not $env:OAUTH_CLIENT_ID) { throw "GITHUB_OAUTH_CLIENT_ID is required" }
-          wails3 task windows:build ARCH=amd64 GITHUB_OAUTH_CLIENT_ID=$env:OAUTH_CLIENT_ID
-          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\SyncHub.exe
-          wails3 generate webview2bootstrapper -dir build\windows\nsis
-          Push-Location build\windows\nsis
-          makensis -DWAILS_INSTALL_SCOPE=user -DREQUEST_EXECUTION_LEVEL=user "-DARG_WAILS_AMD64_BINARY=$env:GITHUB_WORKSPACE\bin\SyncHub.exe" project.nsi
-          Pop-Location
-          & $signTool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\codesign.pfx" /p $env:CERTIFICATE_PASSWORD bin\SyncHub-for-Agents-Setup-x64.exe
-          & $signTool verify /pa /all bin\SyncHub.exe
-          & $signTool verify /pa /all bin\SyncHub-for-Agents-Setup-x64.exe
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          go test . ./internal/updater ./internal/desktop ./internal/scheduler ./internal/daemon
+          npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-windows
-          path: bin/SyncHub-for-Agents-Setup-x64.exe
+          path: |
+            bin/SyncHub-for-Agents-Setup-x64.exe
+            bin/SHA256SUMS.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-release-notes
+          path: bin/WINDOWS-RELEASE-NOTES.txt
           if-no-files-found: error
 
   macos:
+    # Opt in only after configuring the existing Developer ID/notarization secrets.
+    if: vars.RELEASE_MACOS == 'true'
     runs-on: macos-15
     environment: release
     steps:
@@ -100,8 +116,7 @@ jobs:
           OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
         run: |
           test -n "$SIGNING_IDENTITY"
-          test -n "$OAUTH_CLIENT_ID"
-          wails3 task darwin:package:universal GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+          wails3 task darwin:package:universal VERSION="${GITHUB_REF_NAME#v}" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
           codesign --force --deep --options runtime --timestamp \
             --entitlements build/darwin/entitlements.plist \
             --sign "$SIGNING_IDENTITY" bin/SyncHub.app
@@ -119,6 +134,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    if: vars.RELEASE_LINUX == 'true'
     runs-on: ubuntu-24.04
     environment: release
     steps:
@@ -143,7 +159,6 @@ jobs:
         env:
           OAUTH_CLIENT_ID: ${{ vars.GITHUB_OAUTH_CLIENT_ID }}
         run: |
-          test -n "$OAUTH_CLIENT_ID"
           version="${GITHUB_REF_NAME#v}"
           wails3 package GOOS=linux ARCH=amd64 VERSION="$version" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -156,6 +171,11 @@ jobs:
 
   publish:
     needs: [windows, macos, linux]
+    if: >-
+      always() && !cancelled() &&
+      needs.windows.result == 'success' &&
+      (needs.macos.result == 'success' || needs.macos.result == 'skipped') &&
+      (needs.linux.result == 'success' || needs.linux.result == 'skipped')
     runs-on: ubuntu-24.04
     environment: release
     permissions:
@@ -166,10 +186,23 @@ jobs:
           pattern: release-*
           path: dist
           merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-release-notes
+          path: release-notes
       - name: Create checksums
         working-directory: dist
-        run: sha256sum * > SHA256SUMS.txt
+        run: |
+          test -s SyncHub-for-Agents-Setup-x64.exe
+          sha256sum --check SHA256SUMS.txt
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' |
+            sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+          GH_REPO: ${{ github.repository }}
+        run: |
+          args=(--verify-tag --generate-notes --notes-file release-notes/WINDOWS-RELEASE-NOTES.txt)
+          if [[ "${GITHUB_REF_NAME%%+*}" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" dist/* "${args[@]}"

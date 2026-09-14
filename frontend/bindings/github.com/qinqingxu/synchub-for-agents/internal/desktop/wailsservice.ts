@@ -13,6 +13,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as onboarding$0 from "../onboarding/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as updater$0 from "../updater/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -24,6 +27,10 @@ export function ApproveInstallPlan(id: string): $CancellablePromise<void> {
 
 export function CancelOnboarding(): $CancellablePromise<void> {
     return $Call.ByID(3153265431);
+}
+
+export function CheckForUpdates(): $CancellablePromise<updater$0.Status> {
+    return $Call.ByID(749283935);
 }
 
 export function CompleteOnboarding(enabled: { [_ in string]?: boolean } | null): $CancellablePromise<void> {
@@ -58,6 +65,10 @@ export function ResourcePreview(): $CancellablePromise<$models.ResourcePreview> 
     return $Call.ByID(2524841168);
 }
 
+export function RestartToUpdate(): $CancellablePromise<void> {
+    return $Call.ByID(4019363215);
+}
+
 export function Resume(): $CancellablePromise<void> {
     return $Call.ByID(209216979);
 }
@@ -72,6 +83,10 @@ export function RetryInstallPlan(id: string): $CancellablePromise<void> {
 
 export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<void> {
     return $Call.ByID(3950727776, input);
+}
+
+export function SetAutomaticUpdates(enabled: boolean): $CancellablePromise<updater$0.Status> {
+    return $Call.ByID(311923335, enabled);
 }
 
 export function SetRepository(raw: string): $CancellablePromise<void> {
@@ -96,6 +111,10 @@ export function StartGitHubLogin(): $CancellablePromise<onboarding$0.State> {
 
 export function TriggerSync(): $CancellablePromise<void> {
     return $Call.ByID(1437252511);
+}
+
+export function UpdateStatus(): $CancellablePromise<updater$0.Status> {
+    return $Call.ByID(1632584675);
 }
 
 export function VerifySSH(): $CancellablePromise<onboarding$0.State> {

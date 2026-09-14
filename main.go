@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/qinqingxu/synchub-for-agents/internal/appversion"
 	"github.com/qinqingxu/synchub-for-agents/internal/auth"
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
@@ -13,6 +14,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 	"github.com/qinqingxu/synchub-for-agents/internal/sshprobe"
+	"github.com/qinqingxu/synchub-for-agents/internal/updater"
 )
 
 var githubOAuthClientID string
@@ -25,6 +27,17 @@ type desktopBootstrap struct {
 }
 
 func main() {
+	if handled, err := updater.RunHelper(os.Args[1:]); handled {
+		if err != nil {
+			log.Printf("install SyncHub update: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println(appversion.Version)
+		return
+	}
 	if len(os.Args) == 3 && os.Args[1] == "--git-credential" {
 		if err := cli.RunCredential(os.Args[2], os.Stdin, os.Stdout); err != nil {
 			os.Exit(1)
@@ -58,7 +71,7 @@ func runDesktop(hidden bool, bootstrap desktopBootstrap) error {
 	if err != nil {
 		return fmt.Errorf("initialize onboarding: %w", err)
 	}
-	if err := gui.configure(core, onboardingService, hidden); err != nil {
+	if err := gui.configure(core, onboardingService, hidden, home); err != nil {
 		return fmt.Errorf("initialize desktop application: %w", err)
 	}
 	return gui.run()

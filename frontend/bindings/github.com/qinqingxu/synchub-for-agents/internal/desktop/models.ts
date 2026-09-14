@@ -82,19 +82,6 @@ export interface Progress {
     "needsAttention": boolean;
 }
 
-export interface SyncDiagnostic {
-    "code": string;
-    "summary": string;
-    "repoPath": string;
-    "steps": SyncFixStep[] | null;
-}
-
-export interface SyncFixStep {
-    "title": string;
-    "command": string;
-    "warning"?: string;
-}
-
 export interface ResourceCategory {
     "provider": string;
     "id": string;
@@ -170,4 +157,17 @@ export interface Snapshot {
     "pendingInstallPlan"?: InstallPlan | null;
     "conflicts": ConflictSummary[] | null;
     "conflictResolution"?: ConflictResolutionStatus | null;
+}
+
+export interface SyncDiagnostic {
+    "code": string;
+    "summary": string;
+    "repoPath": string;
+    "steps": SyncFixStep[] | null;
+}
+
+export interface SyncFixStep {
+    "title": string;
+    "command": string;
+    "warning"?: string;
 }

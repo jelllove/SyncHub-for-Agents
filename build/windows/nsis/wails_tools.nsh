@@ -1,4 +1,4 @@
-# DO NOT EDIT - Generated automatically by `wails build`
+# Derived from Wails; keep SyncHub's checked runtime installation and metadata.
 
 !include "x64.nsh"
 !include "WinVer.nsh"
@@ -8,16 +8,16 @@
     !define INFO_PROJECTNAME "SyncHub"
 !endif
 !ifndef INFO_COMPANYNAME
-    !define INFO_COMPANYNAME "SyncHub"
+    !define INFO_COMPANYNAME "SyncHub for Agents"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "SyncHub"
+    !define INFO_PRODUCTNAME "SyncHub for Agents"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "0.1.0"
+    !define INFO_PRODUCTVERSION "0.3.0"
 !endif
 !ifndef INFO_COPYRIGHT
-    !define INFO_COPYRIGHT "© 2026, My Company"
+    !define INFO_COPYRIGHT "Copyright © 2026 SyncHub for Agents contributors"
 !endif
 !ifndef PRODUCT_EXECUTABLE
     !define PRODUCT_EXECUTABLE "${INFO_PROJECTNAME}.exe"
@@ -28,7 +28,7 @@
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINST_KEY_NAME}"
 
 !ifndef WAILS_INSTALL_SCOPE
-    !define WAILS_INSTALL_SCOPE "machine"
+    !define WAILS_INSTALL_SCOPE "user"
 !endif
 
 !ifndef REQUEST_EXECUTION_LEVEL
@@ -127,6 +127,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
         WriteRegStr HKCU "${UNINST_KEY}" "Publisher" "${INFO_COMPANYNAME}"
         WriteRegStr HKCU "${UNINST_KEY}" "DisplayName" "${INFO_PRODUCTNAME}"
         WriteRegStr HKCU "${UNINST_KEY}" "DisplayVersion" "${INFO_PRODUCTVERSION}"
+        WriteRegStr HKCU "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
         WriteRegStr HKCU "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXECUTABLE}"
         WriteRegStr HKCU "${UNINST_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
         WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
@@ -138,6 +139,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
         WriteRegStr HKLM "${UNINST_KEY}" "Publisher" "${INFO_COMPANYNAME}"
         WriteRegStr HKLM "${UNINST_KEY}" "DisplayName" "${INFO_PRODUCTNAME}"
         WriteRegStr HKLM "${UNINST_KEY}" "DisplayVersion" "${INFO_PRODUCTVERSION}"
+        WriteRegStr HKLM "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
         WriteRegStr HKLM "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXECUTABLE}"
         WriteRegStr HKLM "${UNINST_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
         WriteRegStr HKLM "${UNINST_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
@@ -178,6 +180,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
 	# If the admin key exists and is not empty then webview2 is already installed
 	ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
     ${If} $0 != ""
+    ${AndIf} $0 != "0.0.0.0"
         Goto ok
     ${EndIf}
 
@@ -185,6 +188,7 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
         # If the installer is run in user level, check the user specific key exists and is not empty then webview2 is already installed
 	    ReadRegStr $0 HKCU "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" "pv"
         ${If} $0 != ""
+        ${AndIf} $0 != "0.0.0.0"
             Goto ok
         ${EndIf}
      ${EndIf}
@@ -197,7 +201,17 @@ RequestExecutionLevel "${REQUEST_EXECUTION_LEVEL}"
     CreateDirectory "$pluginsdir\webview2bootstrapper"
     SetOutPath "$pluginsdir\webview2bootstrapper"
     File "MicrosoftEdgeWebview2Setup.exe"
-    ExecWait '"$pluginsdir\webview2bootstrapper\MicrosoftEdgeWebview2Setup.exe" /silent /install'
+    ClearErrors
+    ExecWait '"$pluginsdir\webview2bootstrapper\MicrosoftEdgeWebview2Setup.exe" /silent /install' $1
+    ${If} ${Errors}
+        SetErrorLevel 2
+        Abort "Could not start the Microsoft WebView2 installer."
+    ${EndIf}
+    ${If} $1 != 0
+    ${AndIf} $1 != 3010
+        SetErrorLevel 2
+        Abort "Microsoft WebView2 installation failed. Please install the runtime and retry."
+    ${EndIf}
     
     SetDetailsPrint both
     ok:

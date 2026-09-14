@@ -16,6 +16,8 @@ It uses a private Git repository you control as the synchronization bridge, with
 - Review and approve plugin/skill install operations before execution, with explicit retry for failed operations.
 - Select which agents and resource categories are included, plus custom resource directories.
 - Start automatically at login.
+- Check GitHub Releases automatically and securely download Windows x64 updates
+  for installation when you quit the app.
 
 ## What is synchronized
 
@@ -48,6 +50,21 @@ See [docs/portable-resources.md](docs/portable-resources.md) for detailed rules.
 5. Keep the app running in the tray on each computer you want to sync.
 
 Detailed install and onboarding guide: [docs/install.md](docs/install.md).
+
+## Software updates
+
+Starting with v0.3.0, release builds check
+[GitHub Releases](https://github.com/jelllove/SyncHub-for-Agents/releases/latest)
+at startup and every six hours. Windows x64 automatically downloads the latest
+stable installer and verifies its SHA-256 checksum before staging it.
+The installer runs after you select **Quit** from the tray, without restarting
+the app; alternatively, use **Restart to update** in settings.
+
+Settings also provide **Check for updates** and an automatic-update switch.
+Closing the window only hides it in the tray and does not install an update.
+macOS, Linux, and Windows ARM64 show a link for manual installation instead.
+Development builds do not update themselves. Users on v0.2.3 and earlier must
+install v0.3.0 or later manually once to enable this feature.
 
 ## Build from source
 

@@ -73,6 +73,7 @@ type Scheduler struct {
 	state       State
 	nextRun     time.Time
 	running     bool
+	jobRunning  bool
 	cancelled   bool
 	nextSubID   uint64
 	subscribers map[uint64]func(State)
@@ -161,6 +162,22 @@ func (s *Scheduler) Pause() {
 	s.notifyIntervalChange()
 }
 
+// PauseIfIdle prevents a new cycle from starting without interrupting a cycle
+// already in progress, including one whose visible state was changed to Paused.
+func (s *Scheduler) PauseIfIdle() bool {
+	s.mu.Lock()
+	if s.jobRunning {
+		s.mu.Unlock()
+		return false
+	}
+	s.paused = true
+	s.nextRun = time.Time{}
+	s.mu.Unlock()
+	s.setState(StatePaused)
+	s.notifyIntervalChange()
+	return true
+}
+
 // Resume re-enables runs.
 func (s *Scheduler) Resume() {
 	s.mu.Lock()
@@ -213,9 +230,18 @@ func (s *Scheduler) runCycle() {
 }
 
 func (s *Scheduler) runCycleBeforeTerminal(beforeTerminal func() bool) {
-	if s.isPaused() {
+	s.mu.Lock()
+	if s.paused {
+		s.mu.Unlock()
 		return
 	}
+	s.jobRunning = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.jobRunning = false
+		s.mu.Unlock()
+	}()
 	s.setState(StateUpdating)
 	err := s.Job()
 	if beforeTerminal != nil && !beforeTerminal() {

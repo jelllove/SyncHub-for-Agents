@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   resourcePreview: vi.fn(),
   snapshot: vi.fn(),
   startAtLogin: vi.fn(),
+  updateStatus: vi.fn(),
 }))
 
 vi.mock('@wailsio/runtime', () => ({
@@ -38,6 +39,10 @@ vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wa
   Snapshot: () => api.snapshot(),
   StartAtLogin: () => api.startAtLogin(),
   TriggerSync: vi.fn(),
+  UpdateStatus: () => api.updateStatus(),
+  CheckForUpdates: vi.fn(),
+  SetAutomaticUpdates: vi.fn(),
+  RestartToUpdate: vi.fn(),
 }))
 
 function configuredSnapshot(): Snapshot {
@@ -102,9 +107,20 @@ describe('App settings preview', () => {
     api.resourcePreview.mockReset()
     api.snapshot.mockReset()
     api.startAtLogin.mockReset()
+    api.updateStatus.mockReset()
     api.needsOnboarding.mockResolvedValue(false)
     api.snapshot.mockResolvedValue(configuredSnapshot())
     api.startAtLogin.mockResolvedValue(false)
+    api.updateStatus.mockResolvedValue({
+      currentVersion: 'v1.0.0',
+      latestVersion: '',
+      phase: 'idle',
+      automatic: true,
+      supported: true,
+      releaseURL: '',
+      error: '',
+      lastChecked: '',
+    })
   })
 
   it('opens settings before preview completion and cancels the request on close', async () => {

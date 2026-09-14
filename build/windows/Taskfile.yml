@@ -15,6 +15,25 @@ vars:
   CROSS_IMAGE: wails-cross
 
 tasks:
+  release:
+    summary: Builds the versioned Windows x64 updater installer without changing dependencies
+    desc: |
+      Run npm ci --prefix frontend once, then:
+        wails3 task windows:release VERSION=0.3.0
+      Requires PowerShell 7, the pinned Wails CLI, Go and NSIS on PATH.
+      Optional environment: GITHUB_OAUTH_CLIENT_ID, WINDOWS_CERTIFICATE_BASE64,
+      WINDOWS_CERTIFICATE_PASSWORD, WINDOWS_SIGN_THUMBPRINT, WINDOWS_TIMESTAMP_SERVER.
+      WINDOWS_REQUIRE_SIGNING=true rejects unsigned builds. Configured signing failures are fatal.
+      Produces bin/SyncHub-for-Agents-Setup-x64.exe and bin/SHA256SUMS.txt.
+    platforms: [windows]
+    preconditions:
+      - sh: 'test "{{.ARCH | default "amd64"}}" = "amd64"'
+        msg: "The updater release installer supports ARCH=amd64 only."
+      - sh: 'test "{{.INSTALL_SCOPE | default "user"}}" = "user"'
+        msg: "The updater release installer uses per-user installation without elevation."
+    cmds:
+      - pwsh -NoProfile -File scripts/release/windows.ps1 -Version "{{.VERSION | default "dev"}}"
+
   build:
     summary: Builds the application for Windows
     cmds:
@@ -97,7 +116,7 @@ tasks:
   package:
     summary: Packages the application
     cmds:
-      - task: '{{if eq (.FORMAT | default "nsis") "msix"}}create:msix:package{{else}}create:nsis:installer{{end}}'
+      - task: '{{if eq (.FORMAT | default "nsis") "msix"}}create:msix:package{{else if eq OS "windows"}}release{{else}}create:nsis:installer{{end}}'
         vars:
           INSTALL_SCOPE: '{{.INSTALL_SCOPE | default "user"}}'
     vars:

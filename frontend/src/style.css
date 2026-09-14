@@ -109,6 +109,13 @@ legend { margin-bottom: 8px; }
 .toggle-row strong { text-transform: capitalize; }
 .toggle-row input { width: 34px; height: 19px; accent-color: var(--green); }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.update-panel { min-width: 0; margin: 28px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.update-panel .toggle-row { color: #344139; gap: 12px; }
+.update-panel .toggle-row input { flex: 0 0 auto; }
+.update-panel p { color: var(--muted); line-height: 1.55; }
+.update-panel [role=status], .update-panel .inline-error { overflow-wrap: anywhere; }
+.update-version { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); }
+.update-version strong { color: var(--ink); overflow-wrap: anywhere; }
 .toast { position: fixed; left: 50%; bottom: 25px; transform: translateX(-50%); padding: 11px 16px; border-radius: 10px; color: white; background: #1e6e4d; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
 .toast.error { background: #9d3732; }
 

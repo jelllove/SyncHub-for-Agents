@@ -20,5 +20,7 @@ export type {
     ResourceIssue,
     ResourcePreview,
     SettingsInput,
-    Snapshot
+    Snapshot,
+    SyncDiagnostic,
+    SyncFixStep
 } from "./models.js";

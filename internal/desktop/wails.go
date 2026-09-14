@@ -11,6 +11,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/startup"
+	"github.com/qinqingxu/synchub-for-agents/internal/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -28,6 +29,8 @@ type WailsService struct {
 	startup             *startup.Manager
 	done                chan error
 	unsubscribeProgress func()
+	updates             *updater.Manager
+	quitForUpdate       func()
 }
 
 func NewWailsService(

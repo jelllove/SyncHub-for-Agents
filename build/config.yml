@@ -1,6 +1,7 @@
 # This file contains the configuration for this project.
 # When you update `info` or `fileAssociations`, run `wails3 task common:update:build-assets` to update the assets.
-# Note that this will overwrite any changes you have made to the assets.
+# Note that this overwrites customized assets, including the updater-compatible Windows installer.
+# Windows releases instead generate version resources through scripts/release/windows.ps1.
 version: '3'
 
 # This information is used to generate the build assets.
@@ -9,9 +10,9 @@ info:
   productName: "SyncHub for Agents"
   productIdentifier: "io.github.qinqingxu.synchub"
   description: "Synchronize AI agent configs and sessions across computers"
-  copyright: "Copyright © 2026"
+  copyright: "Copyright © 2026 SyncHub for Agents contributors"
   comments: "Cross-platform AI agent config and session sync"
-  version: "0.1.0"
+  version: "0.3.0"
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

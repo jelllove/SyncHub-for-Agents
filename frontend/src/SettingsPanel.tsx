@@ -9,6 +9,7 @@ import { hasGeneratedPreview } from './desktopState'
 import { CustomResourceEditor } from './resources/CustomResourceEditor'
 import { ResourceSettings, type CategorySettings } from './resources/ResourceSettings'
 import { RestorePreview } from './resources/RestorePreview'
+import { UpdatePanel } from './UpdatePanel'
 
 export type SettingsPanelProps = {
   snapshot: AppSnapshot
@@ -256,6 +257,7 @@ export function SettingsPanel({
             </button>
           </div>
         </form>
+        <UpdatePanel syncBusy={busy || snapshot.state === 'updating'} />
       </aside>
     </div>
   )
