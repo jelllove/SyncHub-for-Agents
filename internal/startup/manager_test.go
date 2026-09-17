@@ -96,12 +96,13 @@ func (backend *fakeBackend) IsEnabled() (bool, error) {
 	return backend.enabled, nil
 }
 
-func TestManagerControlsNativeAutostart(t *testing.T) {
+func TestManagerControlsWindowsNativeAutostart(t *testing.T) {
 	backend := &fakeBackend{}
 	manager := &Manager{
 		Backend:    backend,
 		Identifier: "io.github.qinqingxu.synchub",
 		Arguments:  []string{"--hidden"},
+		GOOS:       "windows",
 	}
 	if err := manager.Enable(); err != nil {
 		t.Fatal(err)

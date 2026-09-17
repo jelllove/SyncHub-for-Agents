@@ -23,6 +23,12 @@ entry points. The React frontend consumes the desktop service boundary through
 generated Wails bindings. These entry points and frontend code are outside the
 import scan.
 
+The desktop executable uses Wails' native tray. Shared tray icons remain in
+`internal/tray`; the legacy `synchub tray` backend is isolated in
+`internal/tray/legacy`. Keeping the Fyne tray backend out of the desktop dependency
+graph prevents colliding Objective-C menu symbols on macOS without disabling
+either user-facing tray mode. A dependency-graph test guards this separation.
+
 ## Two enforced directions
 
 [The architecture guard](../tools/archcheck/boundaries_test.go) groups the current

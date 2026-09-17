@@ -128,6 +128,12 @@ jobs:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Install Wails
         shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
@@ -138,12 +144,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: choco install nsis --yes --no-progress
-      - name: Install Linux packaging dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh

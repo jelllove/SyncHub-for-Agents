@@ -1,4 +1,4 @@
-package tray
+package legacy
 
 import (
 	"reflect"

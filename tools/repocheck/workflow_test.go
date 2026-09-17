@@ -171,3 +171,22 @@ func TestMaintenanceProposalIsBoundedToValidationFailures(t *testing.T) {
 		t.Fatal("CI must offer a review-only repair proposal and retain its evidence")
 	}
 }
+
+func TestLinuxBuildDependenciesPrecedeWailsInstallation(t *testing.T) {
+	ci := loadWorkflow(t, "ci.yml")
+	dependencies, wails := -1, -1
+	for index, s := range ci.Jobs["package"].Steps {
+		if strings.Contains(s.Run, "libgtk-4-dev") && strings.Contains(s.Run, "libwebkitgtk-6.0-dev") {
+			if s.If != "runner.os == 'Linux'" {
+				t.Fatal("Linux native dependencies must be scoped to the Linux runner")
+			}
+			dependencies = index
+		}
+		if strings.Contains(s.Run, "go install github.com/wailsapp/wails/v3/cmd/wails3@") {
+			wails = index
+		}
+	}
+	if dependencies < 0 || wails < 0 || dependencies >= wails {
+		t.Fatal("GTK/WebKit development libraries must be installed before compiling the Wails CLI")
+	}
+}
