@@ -77,4 +77,3 @@ func TestEnsureHomeRejectsLegacyFile(t *testing.T) {
 		t.Fatal("expected error when legacy path is not a directory")
 	}
 }
-

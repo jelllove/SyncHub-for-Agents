@@ -125,4 +125,3 @@ func copyFile(sourcePath, targetPath string) error {
 	_, err = io.Copy(target, source)
 	return err
 }
-

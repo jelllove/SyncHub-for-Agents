@@ -404,36 +404,6 @@ func blockedRepoPaths(issues []resource.Issue, specs map[string]resource.Spec) [
 	return paths
 }
 
-func PrepareResourceActions(
-	base state.Snapshot,
-	local state.Snapshot,
-	remoteSnapshot state.Snapshot,
-	validRemote state.Snapshot,
-	specs map[string]resource.Spec,
-	skipped []resource.Issue,
-	blocked []resource.Issue,
-) ([]Action, []string) {
-	baseOwned, _, _ := SplitRemoteSnapshot(base, specs)
-	local = cloneSnapshot(local)
-	validRemote = cloneSnapshot(validRemote)
-	for repoRel, meta := range validRemote {
-		if isInternalPortablePath(repoRel) {
-			local[repoRel] = meta
-		}
-	}
-	skipPrefixes := skippedRepoPrefixes(skipped, specs)
-	local = withoutPrefixes(local, skipPrefixes)
-	baseOwned = withoutPrefixes(baseOwned, skipPrefixes)
-	validRemote = withoutPrefixes(validRemote, skipPrefixes)
-	blockedPaths := blockedRepoPaths(blocked, specs)
-	for _, repoRel := range blockedPaths {
-		if meta, ok := remoteSnapshot[repoRel]; ok {
-			validRemote[repoRel] = meta
-		}
-	}
-	return ReconcileWithBlocked(baseOwned, local, validRemote, blockedPaths), blockedPaths
-}
-
 func resourceRepoPrefix(spec resource.Spec) string {
 	const sentinel = "__synchub_resource_root__"
 	repoRel, err := spec.RepoPath(sentinel)

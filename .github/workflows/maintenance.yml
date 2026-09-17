@@ -1,0 +1,19 @@
+name: Repository maintenance
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-maintenance
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    uses: ./.github/workflows/ci.yml
+    with:
+      maintenance: true
