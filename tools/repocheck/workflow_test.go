@@ -215,6 +215,7 @@ func TestAppImageVerificationUsesNormalizedGeneratorPaths(t *testing.T) {
 			commands = append(commands, command.Value)
 		}
 	}
+
 	script := strings.Join(commands, "\n")
 	for _, required := range []string{
 		"cmp --silent",
@@ -224,5 +225,20 @@ func TestAppImageVerificationUsesNormalizedGeneratorPaths(t *testing.T) {
 		if !strings.Contains(script, required) {
 			t.Fatalf("AppImage verification/publication is missing %q", required)
 		}
+	}
+}
+
+func TestLinuxSmokeConsumesPackageListingBeforeSearching(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "scripts", "smoke", "linux.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	if strings.Contains(script, `dpkg-deb --contents "$deb" |`) {
+		t.Fatal("grep -q can close the pipe early and make dpkg-deb fail under pipefail")
+	}
+	if !strings.Contains(script, `dpkg-deb --contents "$deb" > "$work_dir/deb-contents.txt"`) ||
+		!strings.Contains(script, `grep -q 'usr/bin/SyncHub' "$work_dir/deb-contents.txt"`) {
+		t.Fatal("the complete package listing must be captured and checked")
 	}
 }
