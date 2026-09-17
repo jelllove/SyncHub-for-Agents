@@ -36,7 +36,7 @@ jobs:
         run: node scripts/dev.mjs propose
       - name: Publish CI failure response
         if: always() && steps.proposal.outputs.report_directory != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ci-failure-response
           path: ${{ steps.proposal.outputs.report_directory }}
