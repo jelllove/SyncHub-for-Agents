@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync, lstatSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { checkEvidenceDrift } from "./doc-drift.mjs";
 
 export const commands = {
   setup: "Restore locked dependencies and build embedded frontend assets.",
@@ -247,3 +248,5 @@ export function checkReference(root, write = false) {
     writeFileSync(filename, expected);
   }
 }
+
+export { checkEvidenceDrift };

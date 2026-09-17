@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "synchub-validation": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/mcp/validation-server.mjs"]
+    }
+  }
+}

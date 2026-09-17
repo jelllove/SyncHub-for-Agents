@@ -18,10 +18,74 @@ function put(root, file, value) {
   mkdirSync(path.dirname(filename), { recursive: true });
   writeFileSync(filename, value);
 }
+function evidenceFixture(root) {
+  put(root, ".env.example", [
+    "SYNCHUB_GITHUB_CLIENT_ID=",
+    "ACSYNC_GITHUB_CLIENT_ID=",
+    "SYNCHUB_RUN_HELPER_INTEGRATION=0",
+    "",
+  ].join("\n"));
+  put(root, "CODEOWNERS", "* @jelllove\n");
+  put(root, ".agents/skills/synchub-validation/SKILL.md", "# SyncHub Validation\n");
+  put(root, ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks:\n      - entry: node scripts/dev.mjs check\n        pass_filenames: false\n      - entry: node scripts/dev.mjs docs\n        pass_filenames: false\n");
+  put(root, ".github/labels.yml", [
+    "- name: ai-readiness",
+    "- name: validation",
+    "- name: repair-proof",
+    "- name: agent-review",
+    "- name: documentation-drift",
+    "",
+  ].join("\n"));
+  put(root, ".github/ISSUE_TEMPLATE/config.yml", [
+    "blank_issues_enabled: true",
+    "contact_links:",
+    "  - name: AI readiness evidence report",
+    "",
+  ].join("\n"));
+  put(root, "docs/specs/validation-receipt.v1.schema.json", JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub validation receipt v1",
+    required: ["schemaVersion", "status", "checks", "source"],
+  }) + "\n");
+  put(root, "docs/specs/repair-proof.v1.schema.json", JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub contained repair proof v1",
+    required: ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
+  }) + "\n");
+  put(root, ".github/workflows/ci.yml", "name: CI\nrepository-validation\nmaintenance-proposal\n");
+  put(root, ".github/workflows/maintenance.yml", "name: Repository maintenance\n");
+  put(root, ".github/workflows/repair-verification.yml", "name: Repair verification\nrepair-verification\n");
+  put(root, ".github/workflows/self-healing.yml", "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs propose\nci-failure-response\n");
+  put(root, ".github/workflows/codeql.yml", "name: CodeQL\njavascript-typescript\n");
+  put(root, "docs/specs/README.md", "# SyncHub versioned specifications\n");
+  put(root, "docs/specs/agentic-validation.v1.md", "# Agentic validation specification v1\n");
+  put(root, "docs/adr/0001-validation-evidence.md", "# ADR 0001: Version repository validation evidence\n");
+  put(root, "docs/reports/agentic-validation-reports.md", "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`\n");
+  put(root, "docs/dashboards/agentic-readiness-dashboard.json", JSON.stringify({
+    schemaVersion: 1,
+    signals: ["ci-failure-response"],
+  }) + "\n");
+  put(root, "docs/runbooks/ci-failure-response.md", "detection containment remediation validation rollback\n");
+  put(root, ".vscode/mcp.json", JSON.stringify({
+    servers: { "synchub-validation": { command: "node", args: ["tools/mcp/validation-server.mjs"] } },
+  }) + "\n");
+  put(root, "tools/mcp/validation-server.mjs", "export const name = 'synchub-validation';\n");
+  put(root, "docs/operations/agentic-observability.md", [
+    "# Agentic observability",
+    "ai-readiness validation repair-proof agent-review documentation-drift",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml",
+    "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`",
+    "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
+    "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
+    "CODEOWNERS .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
+    "",
+  ].join("\n"));
+}
 function fixture() {
   const root = temporary("synchub-repair-source-");
   const scripts = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts");
-  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs"]) {
+  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs", "doc-drift.mjs"]) {
     put(root, `scripts/${name}`, readFileSync(path.join(scripts, name)));
   }
   put(root, ".gitignore", ".artifacts/\nfrontend/node_modules/\n");
@@ -38,6 +102,7 @@ function fixture() {
     packages: { "": { name: "repair-fixture", version: "1.0.0" } },
   }));
   put(root, "docs/development.md", `${referenceStart}\n${referenceEnd}\n`);
+  evidenceFixture(root);
   checkReference(root, true);
   run("git", ["init", "--quiet"], root);
   run("git", ["add", "."], root);

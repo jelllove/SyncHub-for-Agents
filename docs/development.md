@@ -59,7 +59,8 @@ repair pass over Git-listed Go files. It includes non-ignored untracked files,
 rejects symlinks, never deletes files, and never stages, commits, or pushes.
 Each subprocess has a ten-minute timeout. Review the resulting diff.
 The weekly/manual [maintenance workflow](../.github/workflows/maintenance.yml)
-audits the same checks without applying repairs or opening issues or PRs.
+audits the same Windows and Linux checks without applying repairs or opening
+issues or PRs. It skips installer packaging, not the Linux race or frontend tests.
 There is deliberately no unattended source modification.
 
 This is separate from application trash cleanup. The existing daemon wires
@@ -76,7 +77,12 @@ Its schedule, pause behavior, retention policy, and safety filters are unchanged
 `check`, then the full current-host Go suite (including workflow and architecture
 guards), lint-configuration regressions, and all frontend/UI/tooling tests.
 It does not install dependencies; run setup first.
-The existing Linux CI job also runs the Go suite with `-race`.
+The Linux CI job runs the Go suite with `-race`, `go vet`, frontend lint and
+typechecking, lint-configuration regressions, and all frontend/UI/tooling tests as
+separate native command steps. It runs for every PR and weekly/manual maintenance
+audit, without maintenance-mode or path filters. Windows verification still owns
+the source-bound receipts; Linux checks add cross-platform coverage rather than
+replacing that runner.
 Use `check` for quick feedback and `docs` for documentation-only changes.
 
 Each verification creates a new `.artifacts/validation/run-*` directory containing
@@ -115,6 +121,28 @@ links the original logs and JSON; it does not load scripts or remote resources.
 Native-process integration tests use a 20-second test budget for Git/Go startup
 on busy hosts. Their explicit child-command timeout assertions remain unchanged;
 ordinary UI tests retain the default timeout.
+
+The committed evidence contracts live in the
+[validation receipt schema](specs/validation-receipt.v1.schema.json),
+[repair proof schema](specs/repair-proof.v1.schema.json), and
+[agentic observability guide](operations/agentic-observability.md).
+`node scripts/dev.mjs docs` checks that those files still reference the
+workflows, labels, artifact names, and command entry points that publish the
+evidence.
+The optional [MCP server](../tools/mcp/validation-server.mjs) exposes read-only
+agent tools for listing validation commands and running the same documentation
+drift check; it does not edit files or run application synchronization.
+The committed
+[SyncHub validation skill](../.agents/skills/synchub-validation/SKILL.md) gives
+agents the same setup, verification, safety, and handoff sequence without
+publishing local codeblend evaluator binaries or session-specific skill locks.
+Developers who use the `pre-commit` framework can enable
+[local hooks](../.pre-commit-config.yaml) for `node scripts/dev.mjs check` and
+`node scripts/dev.mjs docs`; the repository still keeps the existing opt-in
+`.githooks` path for Git-only workflows.
+CodeQL JavaScript/TypeScript analysis runs from
+[codeql.yml](../.github/workflows/codeql.yml) and reports through GitHub code
+scanning.
 
 The PR workflow and weekly/manual maintenance audit share this runner, append
 results to the GitHub job summary, and upload logs/JSON even on failure. Artifacts
@@ -283,5 +311,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs` |
 <!-- dev-reference:end -->

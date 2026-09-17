@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jelllove/SyncHub-for-Agents/schemas/repair-proof.v1.schema.json",
+  "title": "SyncHub contained repair proof v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "kind": {
+      "const": "repair-verification"
+    },
+    "scenario": {
+      "const": "diagnostic-go-format"
+    },
+    "sourceScope": {
+      "const": "committed-source"
+    },
+    "productionIncident": {
+      "const": false
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40,64}$"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finishedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "status": {
+      "enum": ["running", "passed", "failed"]
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "outcome", "receipt"],
+        "properties": {
+          "id": {
+            "enum": ["baseline", "injected-failure", "repaired", "rollback"]
+          },
+          "outcome": {
+            "enum": ["passed", "failed", "running"]
+          },
+          "receipt": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "snapshots": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "injected": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "repaired": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "rollback": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "originalSourceUnchanged": {
+      "type": "boolean"
+    },
+    "error": {
+      "type": "string"
+    }
+  }
+}

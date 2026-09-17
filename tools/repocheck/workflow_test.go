@@ -59,6 +59,15 @@ func TestRepositoryGatesAreUnconditionalForPullRequests(t *testing.T) {
 	for id, expected := range map[string][]string{
 		"repository": {"node scripts/dev.mjs setup", "node scripts/dev.mjs verify"},
 		"security":   {"node scripts/dev.mjs setup", "npm --prefix frontend audit --audit-level=high", "go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./..."},
+		"test": {
+			"node scripts/dev.mjs setup",
+			"go test -race ./...",
+			"go vet ./...",
+			"npm --prefix frontend run lint",
+			"npm --prefix frontend run typecheck",
+			"npm --prefix frontend run test:lint",
+			"npm --prefix frontend test",
+		},
 	} {
 		current, ok := ci.Jobs[id]
 		if !ok || current.If != "" || current.ContinueOnError || current.Timeout <= 0 {
@@ -103,10 +112,11 @@ func TestMaintenanceReusesChecksWithoutPackagingOrWritePermissions(t *testing.T)
 	if _, ok := ci.On["workflow_call"]; !ok {
 		t.Fatal("CI must remain reusable")
 	}
-	for _, id := range []string{"test", "package"} {
-		if ci.Jobs[id].If != "${{ !inputs.maintenance }}" {
-			t.Fatalf("maintenance must not launch the %s matrix", id)
-		}
+	if ci.Jobs["package"].If != "${{ !inputs.maintenance }}" {
+		t.Fatal("maintenance must not launch the packaging matrix")
+	}
+	if ci.Jobs["test"].If != "" {
+		t.Fatal("maintenance must run the Linux race and frontend checks")
 	}
 }
 
@@ -145,6 +155,132 @@ func TestValidationReportsRemainAvailableAfterFailures(t *testing.T) {
 	}
 	if !foundRunner || !foundUpload {
 		t.Fatal("CI must execute validation and publish its real report artifacts")
+	}
+}
+
+func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
+	for _, relative := range []string{
+		".env.example",
+		".github/labels.yml",
+		".agents/skills/synchub-validation/SKILL.md",
+		"CODEOWNERS",
+		".github/ISSUE_TEMPLATE/config.yml",
+		"docs/specs/validation-receipt.v1.schema.json",
+		"docs/specs/repair-proof.v1.schema.json",
+		"docs/specs/README.md",
+		"docs/specs/agentic-validation.v1.md",
+		"docs/adr/0001-validation-evidence.md",
+		"docs/operations/agentic-observability.md",
+		"docs/reports/agentic-validation-reports.md",
+		"docs/dashboards/agentic-readiness-dashboard.json",
+		"docs/runbooks/ci-failure-response.md",
+		".vscode/mcp.json",
+		"tools/mcp/validation-server.mjs",
+		".pre-commit-config.yaml",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestEvidenceArtifactsRemainDocumentedAndPublished(t *testing.T) {
+	ciData, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repairData, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "repair-verification.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	guide, err := os.ReadFile(filepath.Join("..", "..", "docs", "operations", "agentic-observability.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"repository-validation", "maintenance-proposal"} {
+		if !strings.Contains(string(ciData), required) || !strings.Contains(string(guide), required) {
+			t.Fatalf("%s must be published by CI and documented", required)
+		}
+	}
+	if !strings.Contains(string(repairData), "repair-verification") || !strings.Contains(string(guide), "repair-verification") {
+		t.Fatal("repair proof must be published and documented")
+	}
+}
+
+func TestStaticAnalysisAndPreCommitContracts(t *testing.T) {
+	preCommit, err := os.ReadFile(filepath.Join("..", "..", ".pre-commit-config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"repo: local", "node scripts/dev.mjs check", "node scripts/dev.mjs docs", "pass_filenames: false"} {
+		if !strings.Contains(string(preCommit), required) {
+			t.Fatalf(".pre-commit-config.yaml must contain %q", required)
+		}
+	}
+	codeql := loadWorkflow(t, "codeql.yml")
+	if _, ok := codeql.On["pull_request"]; !ok {
+		t.Fatal("CodeQL must run on pull requests")
+	}
+	if codeql.Permissions["contents"] != "read" || codeql.Permissions["security-events"] != "write" || len(codeql.Permissions) != 2 {
+		t.Fatal("CodeQL must use only read contents and write security-events permissions")
+	}
+	analyze := codeql.Jobs["analyze"]
+	if analyze.Timeout <= 0 || analyze.ContinueOnError {
+		t.Fatal("CodeQL analysis must be time-bounded and fail closed")
+	}
+	joined := ""
+	languages := false
+	for _, s := range analyze.Steps {
+		if s.ContinueOnError {
+			t.Fatal("CodeQL steps must not ignore failures")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+		if s.With["languages"] == "javascript-typescript" {
+			languages = true
+		}
+	}
+	for _, required := range []string{
+		"github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63",
+		"github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("CodeQL workflow must contain %q", required)
+		}
+	}
+	if !languages {
+		t.Fatal("CodeQL workflow must analyze JavaScript/TypeScript")
+	}
+}
+
+func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
+	workflow := loadWorkflow(t, "self-healing.yml")
+	if _, ok := workflow.On["workflow_run"]; !ok {
+		t.Fatal("self-healing diagnostics must run from workflow_run failure signals")
+	}
+	if _, ok := workflow.On["workflow_dispatch"]; !ok {
+		t.Fatal("self-healing diagnostics must support manual dispatch")
+	}
+	if workflow.Permissions["contents"] != "read" || workflow.Permissions["actions"] != "read" || len(workflow.Permissions) != 2 {
+		t.Fatal("self-healing diagnostics must remain read-only")
+	}
+	response := workflow.Jobs["response"]
+	if response.If == "" || response.Timeout <= 0 || response.ContinueOnError {
+		t.Fatal("self-healing diagnostics must be conditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range response.Steps {
+		if s.ContinueOnError {
+			t.Fatal("self-healing diagnostics must not hide step failures")
+		}
+		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+	}
+	for _, forbidden := range []string{"git push", "gh issue create", "gh pr create", "pull-requests: write", "contents: write"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("self-healing diagnostics must not mutate repository state with %q", forbidden)
+		}
+	}
+	if !strings.Contains(joined, "node scripts/dev.mjs propose") {
+		t.Fatal("self-healing diagnostics must publish the existing review-only proposal")
 	}
 }
 
