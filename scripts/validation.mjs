@@ -2,6 +2,7 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { artifactDirectory, run } from "./dev-lib.mjs";
 import { changedSourcePaths, sourceSnapshot } from "./source-snapshot.mjs";
+import { renderHTML, renderJUnit } from "./reporting.mjs";
 
 export function validationChecks(root) {
   return [
@@ -99,6 +100,10 @@ export function runValidation(root, checks, { summaryPath } = {}) {
   report.status = report.source.status === "stable" && report.checks.every(check => check.status === "passed")
     ? "passed" : "failed";
   report.finishedAt = new Date().toISOString();
+  const junit = renderJUnit(report);
+  const html = renderHTML(report);
+  writeFileSync(path.join(directory, "junit.xml"), junit, { flag: "wx" });
+  writeFileSync(path.join(directory, "index.html"), html, { flag: "wx" });
   save();
   if (summaryPath) {
     appendFileSync(summaryPath, [

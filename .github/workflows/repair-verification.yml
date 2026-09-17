@@ -1,0 +1,34 @@
+name: Repair verification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    name: Repair safety verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+      - name: Verify diagnostic failure, repair, revalidation and rollback
+        id: verify
+        run: node scripts/dev.mjs repair:verify
+      - name: Publish native repair evidence
+        if: always() && steps.verify.outputs.report_directory != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: repair-verification
+          path: ${{ steps.verify.outputs.report_directory }}
+          retention-days: 14
+          if-no-files-found: error

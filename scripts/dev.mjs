@@ -6,6 +6,7 @@ import {
 } from "./dev-lib.mjs";
 import { runValidation, validationChecks } from "./validation.mjs";
 import { proposeMaintenance } from "./maintenance.mjs";
+import { runContainerRepairProbe } from "./repair-container.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const [command, ...extra] = process.argv.slice(2);
@@ -48,6 +49,11 @@ try {
     publishReportDirectory(directory);
     console.log(`Maintenance proposal: ${report.status}; ${report.changes.length} file(s). Artifacts: ${directory}`);
     if (report.status === "failed") throw new Error(report.error);
+  } else if (command === "repair:verify") {
+    const { report, directory } = runContainerRepairProbe(root);
+    publishReportDirectory(directory);
+    console.log(`Contained repair verification: ${report.status}. Artifacts: ${directory}`);
+    if (report.status !== "passed") throw new Error(report.errors.join("\n"));
   } else {
     const files = repositoryFiles(root);
     switch (command) {

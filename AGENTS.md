@@ -63,6 +63,9 @@ through a user-owned private Git repository.
 - `node scripts/dev.mjs propose` prepares a bounded formatting/reference patch
   without changing source or the index. Review the report and patch; never treat
   a proposal as a passing full validation or apply a report marked failed/running.
+- `node scripts/dev.mjs repair:verify` checks a diagnostic repair/rollback cycle
+  in a restricted Linux container using committed inputs. It does not repair the
+  developer checkout, merge a PR, or establish production autonomy.
 - For documentation-only edits, run `node scripts/dev.mjs docs`. This checks
   relative link target existence and generated versions/command references,
   not semantic accuracy; review the prose against code.

@@ -32,7 +32,7 @@ function evaluate(root, checks, options) {
 function commandFixture(root) {
   const scripts = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts");
   mkdirSync(path.join(root, "scripts"));
-  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs"]) {
+  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs"]) {
     writeFileSync(path.join(root, "scripts", name), readFileSync(path.join(scripts, name)));
   }
   const env = { ...process.env };
@@ -64,6 +64,8 @@ describe("validation receipts", { timeout: 20_000 }, () => {
     expect(readFileSync(path.join(directory, "success.log"), "utf8")).toContain("checked");
     expect(readFileSync(path.join(directory, "success.log"), "utf8")).toContain("warning detail");
     expect(JSON.parse(readFileSync(path.join(directory, "validation.json"), "utf8"))).toEqual(report);
+    expect(existsSync(path.join(directory, "junit.xml"))).toBe(true);
+    expect(existsSync(path.join(directory, "index.html"))).toBe(true);
   });
 
   it("retains a failed result and error details while still checking independent commands", () => {

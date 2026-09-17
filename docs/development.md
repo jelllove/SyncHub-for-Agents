@@ -14,6 +14,7 @@ node scripts/dev.mjs verify
 Setup restores Go modules and the npm lockfile and builds frontend assets required
 by Go's embed directive. It does not install global tools, change Git configuration,
 start a daemon, or access a user's synchronization repository.
+For a pinned Linux environment, use the [development container](devcontainer.md).
 
 For desktop development, install the Wails CLI at the version in the generated
 reference below using `go install github.com/wailsapp/wails/v3/cmd/wails3@<version>`
@@ -106,6 +107,11 @@ still exits nonzero. Timeouts fail rather than being silently retried.
 Interrupted reports remain `running`, not `passed`.
 The Go log contains `go test -json` events, including skipped platform-dependent
 tests; successful stderr diagnostics are retained alongside stdout.
+Completed runs also contain `junit.xml` and a self-contained `index.html`.
+JUnit cases describe validation command groups plus source integrity, not the
+number of individual application tests. Source capture errors and observed
+changes remain failures even when the underlying commands passed. The HTML report
+links the original logs and JSON; it does not load scripts or remote resources.
 Native-process integration tests use a 20-second test budget for Git/Go startup
 on busy hosts. Their explicit child-command timeout assertions remain unchanged;
 ordinary UI tests retain the default timeout.
@@ -164,6 +170,46 @@ git apply --reverse path-to-repair.patch
 Keep the failing run, proposal, regression test, and passing run linked in the PR.
 This review-first backstop is not an autonomous production rollback system.
 
+## Contained native repair verification
+
+With Docker running Linux containers and the intended source changes committed:
+
+```powershell
+node scripts/dev.mjs repair:verify
+```
+
+The command builds the development image and runs a diagnostic proof with the
+source mounted read-only. The container is non-root, has a read-only root
+filesystem, no added capabilities, no Docker socket or host-home mounts, a
+512-process limit, two CPUs, 6 GiB memory, and a 4 GiB temporary filesystem.
+Only the new report directory is writable on the host. Named containers are
+removed on completion/failure; development image layers remain reusable.
+Container-local Git trust is restricted to `/source` and `/source/.git`, which
+allows a non-root worker to read Windows bind mounts without changing host Git
+configuration or trusting arbitrary repositories.
+Image construction and contained verification each have a 20-minute deadline;
+the CI job has a 45-minute ceiling. Registry/network failures remain failures,
+and TLS, checksum, or package-signature verification must not be disabled.
+
+The worker clones the committed source into a disposable workspace, restores
+locked dependencies, and proves this sequence using native project commands:
+
+1. The unmodified baseline passes the full validation suite.
+2. A deliberately injected Go-formatting fault fails the normal check.
+3. The bounded proposal repairs only that diagnostic file; the full suite passes.
+4. Reversing that exact patch restores the failing state and its source digest.
+
+The original checkout must remain unchanged. Results under
+`.artifacts/repair-verification/` include the container image identity, resource
+limits, native validation receipts/logs, patch, and before/after/rollback digests.
+The [repair workflow](../.github/workflows/repair-verification.yml) runs this proof
+for PRs and retains artifacts for 14 days without repository write permissions.
+
+This is explicitly a **diagnostic fault-injection scenario**, not a production
+incident, an automatic fix to a PR, or proof of recurring autonomous operation.
+Uncommitted changes are refused so the source revision is unambiguous; untracked
+local tools are not copied into the committed verification workspace.
+
 ## Architecture and platform coverage
 
 The [architecture guide](architecture.md) documents the actual module roles and
@@ -221,6 +267,7 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `node scripts/dev.mjs check` | Check Go formatting/vet, frontend ESLint/TypeScript, and documentation without rewriting files. |
 | `node scripts/dev.mjs verify` | Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs. |
 | `node scripts/dev.mjs propose` | Prepare a bounded, review-only Go formatting/reference patch; never apply or commit it. |
+| `node scripts/dev.mjs repair:verify` | Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container. |
 | `node scripts/dev.mjs format` | Apply gofmt to repository-owned Go files only; never stage or commit. |
 | `node scripts/dev.mjs cleanup` | Run one bounded formatting repair pass; never delete files or touch sync data. |
 | `node scripts/dev.mjs docs` | Check local Markdown file links and the generated development reference. |

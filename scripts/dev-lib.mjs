@@ -8,6 +8,7 @@ export const commands = {
   check: "Check Go formatting/vet, frontend ESLint/TypeScript, and documentation without rewriting files.",
   verify: "Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs.",
   propose: "Prepare a bounded, review-only Go formatting/reference patch; never apply or commit it.",
+  "repair:verify": "Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container.",
   format: "Apply gofmt to repository-owned Go files only; never stage or commit.",
   cleanup: "Run one bounded formatting repair pass; never delete files or touch sync data.",
   docs: "Check local Markdown file links and the generated development reference.",

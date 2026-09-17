@@ -10,6 +10,11 @@ Inherit the [root guidance](../AGENTS.md).
   changes must fail verification, not yield a success-shaped fallback.
 - [maintenance.mjs](maintenance.mjs) prepares review-only formatting/reference
   proposals in isolated snapshots; it must never apply patches to the real tree.
+- [repair-container.mjs](repair-container.mjs) contains the diagnostic native
+  repair proof; [repair-loop.mjs](repair-loop.mjs) runs only against disposable
+  clones and records failure, repair, revalidation and rollback.
+- [reporting.mjs](reporting.mjs) renders completed receipts as JUnit and offline
+  HTML. Do not turn incomplete/error/source-changed receipts into success.
 - Keep the opt-in hook fast and non-mutating. Dependency installation belongs
   to setup; report generation belongs to explicit verification.
 - Propagate native command failures. Validation may finish independent checks
@@ -30,6 +35,9 @@ Inherit the [root guidance](../AGENTS.md).
   upload arbitrary pre-existing `.artifacts` paths after initialization failures.
 - Maintenance audits must remain read-only with respect to source and user data.
   Do not add automatic commits, issue/PR creation, or merge permissions.
+- Diagnostic repair proofs must stay clearly labeled as fault injection, use
+  committed inputs and immutable container identities, and never mount host homes
+  or the Docker socket or run with privileged/root container permissions.
 - Add regression tests using synthetic repositories in
   [validation.test.mjs](../frontend/validation.test.mjs) and
   [tooling.test.mjs](../frontend/tooling.test.mjs). CI wiring is tested in
