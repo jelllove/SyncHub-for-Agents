@@ -22,6 +22,10 @@ the work observable; they do not claim production autonomous repair.
   ([workflow](../../.github/workflows/self-healing.yml)) listens to failed CI
   `workflow_run` events or manual dispatch, runs `node scripts/dev.mjs propose`,
   and publishes `ci-failure-response` without write permissions.
+- `.github/workflows/codeql.yml`
+  ([workflow](../../.github/workflows/codeql.yml)) runs pinned CodeQL
+  JavaScript/TypeScript analysis for pull requests, default-branch pushes,
+  schedules, and manual dispatch.
 
 ## Artifact contracts
 
@@ -31,6 +35,14 @@ the work observable; they do not claim production autonomous repair.
 - Repository path `docs/specs/repair-proof.v1.schema.json`
   ([schema](../specs/repair-proof.v1.schema.json)) describes diagnostic repair
   proof receipts written by `node scripts/dev.mjs repair:verify`.
+- Repository path `docs/specs/README.md`
+  ([spec index](../specs/README.md)) and repository path
+  `docs/specs/agentic-validation.v1.md`
+  ([specification](../specs/agentic-validation.v1.md)) define the versioned
+  validation evidence set.
+- Repository path `docs/adr/0001-validation-evidence.md`
+  ([ADR](../adr/0001-validation-evidence.md)) records why the evidence contracts
+  are versioned.
 - `repository-validation`, `maintenance-proposal`, and `repair-verification`
   artifacts are retained by GitHub Actions for bounded review windows.
 - `ci-failure-response` captures the same bounded proposal format after CI
@@ -68,3 +80,5 @@ repair proposals as patches requiring review rather than automatic fixes.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
 - `tools/mcp/validation-server.mjs` is a read-only stdio MCP server with tools
   for listing validation commands and running `node scripts/dev.mjs docs`.
+- `.pre-commit-config.yaml` offers optional local pre-commit hooks for
+  `node scripts/dev.mjs check` and `node scripts/dev.mjs docs`.

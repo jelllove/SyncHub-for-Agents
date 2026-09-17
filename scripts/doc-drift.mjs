@@ -10,6 +10,9 @@ const requiredLabels = ["ai-readiness", "validation", "repair-proof", "agent-rev
 const requiredGuideEntries = [
   "docs/specs/validation-receipt.v1.schema.json",
   "docs/specs/repair-proof.v1.schema.json",
+  "docs/specs/README.md",
+  "docs/specs/agentic-validation.v1.md",
+  "docs/adr/0001-validation-evidence.md",
   "docs/reports/agentic-validation-reports.md",
   "docs/dashboards/agentic-readiness-dashboard.json",
   "docs/runbooks/ci-failure-response.md",
@@ -17,6 +20,7 @@ const requiredGuideEntries = [
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
   ".github/workflows/self-healing.yml",
+  ".github/workflows/codeql.yml",
   ".github/ISSUE_TEMPLATE/config.yml",
   ".vscode/mcp.json",
   "CODEOWNERS",
@@ -106,4 +110,7 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".github/workflows/self-healing.yml"), "workflow_run", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs propose", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "ci-failure-response", "self-healing.yml");
+  requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs check", ".pre-commit-config.yaml");
+  requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs docs", ".pre-commit-config.yaml");
+  requireContains(read(root, ".github/workflows/codeql.yml"), "javascript-typescript", "codeql.yml");
 }

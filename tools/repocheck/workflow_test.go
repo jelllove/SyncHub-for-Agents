@@ -166,12 +166,16 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		".github/ISSUE_TEMPLATE/config.yml",
 		"docs/specs/validation-receipt.v1.schema.json",
 		"docs/specs/repair-proof.v1.schema.json",
+		"docs/specs/README.md",
+		"docs/specs/agentic-validation.v1.md",
+		"docs/adr/0001-validation-evidence.md",
 		"docs/operations/agentic-observability.md",
 		"docs/reports/agentic-validation-reports.md",
 		"docs/dashboards/agentic-readiness-dashboard.json",
 		"docs/runbooks/ci-failure-response.md",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
+		".pre-commit-config.yaml",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
@@ -199,6 +203,51 @@ func TestEvidenceArtifactsRemainDocumentedAndPublished(t *testing.T) {
 	}
 	if !strings.Contains(string(repairData), "repair-verification") || !strings.Contains(string(guide), "repair-verification") {
 		t.Fatal("repair proof must be published and documented")
+	}
+}
+
+func TestStaticAnalysisAndPreCommitContracts(t *testing.T) {
+	preCommit, err := os.ReadFile(filepath.Join("..", "..", ".pre-commit-config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"repo: local", "node scripts/dev.mjs check", "node scripts/dev.mjs docs", "pass_filenames: false"} {
+		if !strings.Contains(string(preCommit), required) {
+			t.Fatalf(".pre-commit-config.yaml must contain %q", required)
+		}
+	}
+	codeql := loadWorkflow(t, "codeql.yml")
+	if _, ok := codeql.On["pull_request"]; !ok {
+		t.Fatal("CodeQL must run on pull requests")
+	}
+	if codeql.Permissions["contents"] != "read" || codeql.Permissions["security-events"] != "write" || len(codeql.Permissions) != 2 {
+		t.Fatal("CodeQL must use only read contents and write security-events permissions")
+	}
+	analyze := codeql.Jobs["analyze"]
+	if analyze.Timeout <= 0 || analyze.ContinueOnError {
+		t.Fatal("CodeQL analysis must be time-bounded and fail closed")
+	}
+	joined := ""
+	languages := false
+	for _, s := range analyze.Steps {
+		if s.ContinueOnError {
+			t.Fatal("CodeQL steps must not ignore failures")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+		if s.With["languages"] == "javascript-typescript" {
+			languages = true
+		}
+	}
+	for _, required := range []string{
+		"github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63",
+		"github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("CodeQL workflow must contain %q", required)
+		}
+	}
+	if !languages {
+		t.Fatal("CodeQL workflow must analyze JavaScript/TypeScript")
 	}
 }
 

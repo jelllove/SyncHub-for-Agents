@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: synchub-check
+        name: SyncHub repository check
+        entry: node scripts/dev.mjs check
+        language: system
+        pass_filenames: false
+      - id: synchub-docs
+        name: SyncHub documentation drift check
+        entry: node scripts/dev.mjs docs
+        language: system
+        pass_filenames: false

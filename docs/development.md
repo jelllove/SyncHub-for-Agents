@@ -132,6 +132,13 @@ evidence.
 The optional [MCP server](../tools/mcp/validation-server.mjs) exposes read-only
 agent tools for listing validation commands and running the same documentation
 drift check; it does not edit files or run application synchronization.
+Developers who use the `pre-commit` framework can enable
+[local hooks](../.pre-commit-config.yaml) for `node scripts/dev.mjs check` and
+`node scripts/dev.mjs docs`; the repository still keeps the existing opt-in
+`.githooks` path for Git-only workflows.
+CodeQL JavaScript/TypeScript analysis runs from
+[codeql.yml](../.github/workflows/codeql.yml) and reports through GitHub code
+scanning.
 
 The PR workflow and weekly/manual maintenance audit share this runner, append
 results to the GitHub job summary, and upload logs/JSON even on failure. Artifacts
