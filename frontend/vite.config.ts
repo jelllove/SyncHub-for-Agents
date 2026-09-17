@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import wails from "@wailsio/runtime/plugins/vite";
 
@@ -12,6 +13,7 @@ export default defineConfig({
   },
   plugins: [react(), wails("./bindings")],
   test: {
+    exclude: [...configDefaults.exclude, "lint.test.mjs"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     clearMocks: true,

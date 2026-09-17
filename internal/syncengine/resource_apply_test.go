@@ -125,13 +125,19 @@ func TestResourceApplierMovesSkillDeletionToRecovery(t *testing.T) {
 }
 
 func TestResourceApplierCreatesSharedAliasAndFallsBackToManagedCopy(t *testing.T) {
+	probeErr := os.Symlink(t.TempDir(), filepath.Join(t.TempDir(), "link"))
+	defaultMode := "symlink"
+	if probeErr != nil {
+		defaultMode = "managed-copy"
+		t.Logf("host cannot create directory symlinks; validating the default managed-copy fallback: %v", probeErr)
+	}
 	for _, tc := range []struct {
 		name       string
 		symlink    func(string, string) error
 		wantMode   string
 		wantIsLink bool
 	}{
-		{name: "symlink", wantMode: "symlink", wantIsLink: true},
+		{name: "system default", wantMode: defaultMode, wantIsLink: probeErr == nil},
 		{
 			name:     "managed copy",
 			symlink:  func(string, string) error { return errors.New("privilege not held") },
@@ -185,10 +191,33 @@ func TestResourceApplierCreatesSharedAliasAndFallsBackToManagedCopy(t *testing.T
 			if err := json.Unmarshal(data, &aliases); err != nil {
 				t.Fatal(err)
 			}
-			if aliases[filepath.Clean(alias)].Mode != tc.wantMode {
+			record := aliases[filepath.Clean(alias)]
+			if record.Mode != tc.wantMode || record.Canonical != filepath.Clean(canonical) {
 				t.Fatalf("alias record = %#v", aliases)
 			}
 		})
+	}
+}
+
+func TestResourceApplierHonorsSuccessfulLinkOperation(t *testing.T) {
+	primary := t.TempDir()
+	alias := filepath.Join(t.TempDir(), "nested", "alias")
+	calls := 0
+	applier := &ResourceApplier{
+		Symlink: func(oldname, newname string) error {
+			calls++
+			if oldname != primary || newname != alias {
+				t.Fatalf("link arguments = (%q, %q), want (%q, %q)", oldname, newname, primary, alias)
+			}
+			if info, err := os.Stat(filepath.Dir(newname)); err != nil || !info.IsDir() {
+				t.Fatalf("link parent must exist before the operation: %v", err)
+			}
+			return nil
+		},
+	}
+	mode, err := applier.ensureAlias(primary, alias)
+	if err != nil || mode != "symlink" || calls != 1 {
+		t.Fatalf("ensureAlias = (%q, %v), link calls = %d", mode, err, calls)
 	}
 }
 

@@ -1,4 +1,4 @@
-package tray
+package legacy
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 	"github.com/qinqingxu/synchub-for-agents/internal/settings"
+	"github.com/qinqingxu/synchub-for-agents/internal/tray"
 )
 
 // App binds a daemon to a system-tray UI.
@@ -43,12 +44,12 @@ func Run(home, goos string) error {
 func (a *App) onReady() {
 	systray.SetTitle("synchub")
 	systray.SetTooltip("SyncHub")
-	systray.SetIcon(Icon(scheduler.StateIdle, a.GOOS))
+	systray.SetIcon(tray.Icon(scheduler.StateIdle, a.GOOS))
 
 	// Repaint the icon (and keep logging) on every state change.
 	a.d.Scheduler.Subscribe(func(s scheduler.State) {
 		a.d.Logger.Printf("state: %s", s)
-		systray.SetIcon(Icon(s, a.GOOS))
+		systray.SetIcon(tray.Icon(s, a.GOOS))
 	})
 
 	if addr, shutdown, err := settings.Serve(a.Home); err == nil {

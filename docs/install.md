@@ -56,8 +56,8 @@ Start SyncHub from the application menu.
 ### AppImage
 
 ```bash
-chmod +x SyncHub-amd64.AppImage
-./SyncHub-amd64.AppImage
+chmod +x SyncHub-x86_64.AppImage
+./SyncHub-x86_64.AppImage
 ```
 
 Keep the AppImage at a permanent path before enabling **Start at login**.

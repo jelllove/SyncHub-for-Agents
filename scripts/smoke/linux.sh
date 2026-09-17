@@ -20,7 +20,8 @@ test -x "$appimage"
 test -n "$deb"
 test -f "$deb"
 dpkg-deb --info "$deb" >/dev/null
-dpkg-deb --contents "$deb" | grep -q 'usr/bin/SyncHub'
+dpkg-deb --contents "$deb" > "$work_dir/deb-contents.txt"
+grep -q 'usr/bin/SyncHub' "$work_dir/deb-contents.txt"
 
 (
   cd "$work_dir"

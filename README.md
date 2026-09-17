@@ -70,20 +70,25 @@ install v0.3.0 or later manually once to enable this feature.
 
 ### Prerequisites
 
-- Go 1.26+
-- Node.js + npm
+- Go version declared in [go.mod](go.mod)
+- Node.js version pinned in [.node-version](.node-version), with npm
 - Wails v3 CLI (`wails3`)
 - NSIS (`makensis`) for Windows installer packaging
 
 ### Useful commands
 
 ```powershell
-npm --prefix frontend install
-npm --prefix frontend run build
+node scripts/dev.mjs setup
+node scripts/dev.mjs verify
 go test ./...
+npm --prefix frontend test
 wails3 dev
 wails3 package GOOS=windows ARCH=amd64 INSTALL_SCOPE=user
 ```
+
+See the [development guide](docs/development.md) for reproducible setup, hooks,
+maintenance, and documentation checks, and [CONTRIBUTING.md](CONTRIBUTING.md)
+before submitting a change.
 
 ## Project notes
 

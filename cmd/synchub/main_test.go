@@ -11,4 +11,3 @@ func TestRootCommandUsesSynchub(t *testing.T) {
 		t.Fatal("Short description must not be empty")
 	}
 }
-

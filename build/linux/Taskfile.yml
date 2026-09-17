@@ -125,13 +125,18 @@ tasks:
       - |
         if ! cmp --silent \
           "{{.ROOT_DIR}}/build/linux/appimage/build/AppRun-x86_64" \
-          "{{.ROOT_DIR}}/build/linux/appimage/build/{{.APP_NAME}}-x86_64.AppDir/AppRun"; then
-          rm -f "{{.ROOT_DIR}}/bin/{{.APP_NAME}}-x86_64.AppImage"
+          "{{.ROOT_DIR}}/build/linux/appimage/build/{{.APPIMAGE_NAME}}-x86_64.AppDir/AppRun"; then
+          rm -f -- "{{.ROOT_DIR}}/bin/{{.APPIMAGE_NAME}}-x86_64.AppImage" "{{.ROOT_DIR}}/bin/{{.APP_NAME}}-x86_64.AppImage"
           echo "Generated AppImage used an unverified AppRun helper" >&2
           exit 1
         fi
+      - |
+        if [ "{{.APPIMAGE_NAME}}" != "{{.APP_NAME}}" ]; then
+          mv -- "{{.OUTPUT_DIR}}/{{.APPIMAGE_NAME}}-x86_64.AppImage" "{{.OUTPUT_DIR}}/{{.APP_NAME}}-x86_64.AppImage"
+        fi
     vars:
       APP_NAME: '{{.APP_NAME}}'
+      APPIMAGE_NAME: '{{.APP_NAME | lower}}'
       APP_BINARY: '../../../bin/{{.APP_NAME}}'
       ICON: '{{.APP_NAME}}.png'
       DESKTOP_FILE: '../{{.APP_NAME}}.desktop'

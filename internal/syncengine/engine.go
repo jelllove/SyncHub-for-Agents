@@ -176,35 +176,26 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		BlockedFiles: len(collected.Blocked) + len(ownershipBlocked) + len(validationBlocked),
 		Skipped:      result.Skipped,
 	})
-	local := cloneSnapshot(collected.Snapshot)
-	baseOwned, _, _ := SplitRemoteSnapshot(baseSnapshot, e.Resources)
-	for repoRel, meta := range validRemote {
-		if isInternalPortablePath(repoRel) {
-			local[repoRel] = meta
-		}
-	}
-	skipPrefixes := skippedRepoPrefixes(collected.Skipped, e.Resources)
-	local = withoutPrefixes(local, skipPrefixes)
-	baseOwned = withoutPrefixes(baseOwned, skipPrefixes)
-	validRemote = withoutPrefixes(validRemote, skipPrefixes)
-
-	blockedPaths := blockedRepoPaths(
-		append(append(append(
-			[]resource.Issue{},
-			collected.Blocked...),
-			ownershipBlocked...),
-			validationBlocked...),
+	blocked := append(append(append(
+		[]resource.Issue{},
+		collected.Blocked...),
+		ownershipBlocked...),
+		validationBlocked...)
+	plan := prepareResourcePlan(
+		baseSnapshot,
+		collected.Snapshot,
+		remoteSnapshot,
+		validRemote,
 		e.Resources,
+		collected.Skipped,
+		blocked,
 	)
-	for _, repoRel := range blockedPaths {
-		if meta, ok := remoteSnapshot[repoRel]; ok {
-			validRemote[repoRel] = meta
-		}
-	}
-	result.Blocked = append(result.Blocked, blockedPaths...)
-	actions := ReconcileWithBlocked(baseOwned, local, validRemote, blockedPaths)
+	baseOwned := plan.base
+	skipPrefixes := plan.skipPrefixes
+	result.Blocked = append(result.Blocked, plan.blockedPaths...)
+	actions := plan.actions
 	if e.FirstSyncRun {
-		actions = e.applyFirstSyncStrategy(actions, local, validRemote)
+		actions = e.applyFirstSyncStrategy(actions, plan.local, plan.remote)
 	}
 	result.Actions = actions
 
@@ -632,51 +623,6 @@ func (e *Engine) publish(progress Progress) {
 	}
 }
 
-func (e *Engine) applyFirstSyncStrategy(
-	actions []Action,
-	local state.Snapshot,
-	remote state.Snapshot,
-) []Action {
-	switch e.FirstSyncMode {
-	case "use-cloud":
-		mapped := make([]Action, 0, len(actions))
-		for _, action := range actions {
-			switch action.Type {
-			case PushToRemote:
-				mapped = append(mapped, Action{Type: DeleteLocal, RepoRel: action.RepoRel})
-			case MergeBoth:
-				if _, exists := remote[action.RepoRel]; exists {
-					mapped = append(mapped, Action{Type: PullToLocal, RepoRel: action.RepoRel})
-				} else {
-					mapped = append(mapped, Action{Type: DeleteLocal, RepoRel: action.RepoRel})
-				}
-			default:
-				mapped = append(mapped, action)
-			}
-		}
-		return mapped
-	case "use-local":
-		mapped := make([]Action, 0, len(actions))
-		for _, action := range actions {
-			switch action.Type {
-			case PullToLocal:
-				mapped = append(mapped, Action{Type: DeleteRemote, RepoRel: action.RepoRel})
-			case MergeBoth:
-				if _, exists := local[action.RepoRel]; exists {
-					mapped = append(mapped, Action{Type: PushToRemote, RepoRel: action.RepoRel})
-				} else {
-					mapped = append(mapped, Action{Type: DeleteRemote, RepoRel: action.RepoRel})
-				}
-			default:
-				mapped = append(mapped, action)
-			}
-		}
-		return mapped
-	default:
-		return actions
-	}
-}
-
 func sortedResourceSpecs(specs map[string]resource.Spec) []resource.Spec {
 	keys := make([]string, 0, len(specs))
 	for key := range specs {
@@ -709,14 +655,6 @@ func currentInstallManifests(
 		manifests[spec.Key] = data
 	}
 	return manifests, nil
-}
-
-func cloneSnapshot(source state.Snapshot) state.Snapshot {
-	out := make(state.Snapshot, len(source))
-	for repoRel, meta := range source {
-		out[repoRel] = meta
-	}
-	return out
 }
 
 func applyIssue(resourceKey, repoRel, code string, err error) resource.Issue {

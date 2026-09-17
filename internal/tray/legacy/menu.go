@@ -1,4 +1,4 @@
-package tray
+package legacy
 
 func pauseTitle(paused bool) string {
 	if paused {

@@ -2,31 +2,107 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
   pull_request:
+  workflow_call:
+    inputs:
+      maintenance:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  test:
-    name: Test and lint
-    runs-on: ubuntu-24.04
+  repository:
+    name: Repository checks
+    runs-on: windows-2025
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
           go-version-file: go.mod
           cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: node scripts/dev.mjs setup
+      - id: validation
+        run: node scripts/dev.mjs verify
+      - name: Prepare review-only repair proposal
+        id: proposal
+        if: failure() && steps.validation.outcome == 'failure'
+        run: node scripts/dev.mjs propose
+      - name: Test Windows packaging rules
+        shell: pwsh
+        run: ./scripts/release/test-windows.ps1
+      - name: Publish validation results
+        if: always() && steps.validation.outputs.report_directory != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: repository-validation
+          path: ${{ steps.validation.outputs.report_directory }}
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish maintenance proposal
+        if: always() && steps.proposal.outputs.report_directory != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: maintenance-proposal
+          path: ${{ steps.proposal.outputs.report_directory }}
+          retention-days: 14
+          if-no-files-found: error
+
+  security:
+    name: Security checks
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: node scripts/dev.mjs setup
+      - run: npm --prefix frontend audit --audit-level=high
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+  test:
+    if: ${{ !inputs.maintenance }}
+    name: Test and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install desktop build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev
+      - run: node scripts/dev.mjs setup
       - run: go test -race ./...
       - run: go vet ./...
 
   package:
+    if: ${{ !inputs.maintenance }}
     name: Package (${{ matrix.name }})
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -49,9 +125,15 @@ jobs:
           cache: true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Install Wails
         shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
@@ -62,12 +144,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: choco install nsis --yes --no-progress
-      - name: Install Linux packaging dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh

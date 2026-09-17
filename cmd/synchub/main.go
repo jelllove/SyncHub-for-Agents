@@ -10,7 +10,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
 	"github.com/qinqingxu/synchub-for-agents/internal/repository"
-	"github.com/qinqingxu/synchub-for-agents/internal/tray"
+	legacytray "github.com/qinqingxu/synchub-for-agents/internal/tray/legacy"
 	"github.com/spf13/cobra"
 )
 
@@ -134,7 +134,7 @@ func trayCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tray.Run(home, runtime.GOOS)
+			return legacytray.Run(home, runtime.GOOS)
 		},
 	}
 }
