@@ -16,6 +16,7 @@ const requiredGuideEntries = [
   "docs/reports/agentic-validation-reports.md",
   "docs/dashboards/agentic-readiness-dashboard.json",
   "docs/runbooks/ci-failure-response.md",
+  ".agents/skills/synchub-validation/SKILL.md",
   ".github/workflows/ci.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",

@@ -162,6 +162,7 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	for _, relative := range []string{
 		".env.example",
 		".github/labels.yml",
+		".agents/skills/synchub-validation/SKILL.md",
 		"CODEOWNERS",
 		".github/ISSUE_TEMPLATE/config.yml",
 		"docs/specs/validation-receipt.v1.schema.json",

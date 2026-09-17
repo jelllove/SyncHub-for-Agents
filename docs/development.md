@@ -132,6 +132,10 @@ evidence.
 The optional [MCP server](../tools/mcp/validation-server.mjs) exposes read-only
 agent tools for listing validation commands and running the same documentation
 drift check; it does not edit files or run application synchronization.
+The committed
+[SyncHub validation skill](../.agents/skills/synchub-validation/SKILL.md) gives
+agents the same setup, verification, safety, and handoff sequence without
+publishing local codeblend evaluator binaries or session-specific skill locks.
 Developers who use the `pre-commit` framework can enable
 [local hooks](../.pre-commit-config.yaml) for `node scripts/dev.mjs check` and
 `node scripts/dev.mjs docs`; the repository still keeps the existing opt-in

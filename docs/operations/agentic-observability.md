@@ -75,6 +75,8 @@ repair proposals as patches requiring review rather than automatic fixes.
 
 - `CODEOWNERS` routes repository-wide review ownership to the maintainer without
   requiring a second approver in this single-maintainer repository.
+- `.agents/skills/synchub-validation/SKILL.md` provides committed repository
+  guidance for setup, check, verify, repair proof, and score-assessment handoff.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.

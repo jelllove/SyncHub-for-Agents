@@ -24,6 +24,8 @@ not define production incident response or autonomous repair of user sync data.
 ## Required review surfaces
 
 - `CODEOWNERS` declares the maintainer review route.
+- `.agents/skills/synchub-validation/SKILL.md` declares the repository-local
+  validation and handoff skill.
 - `.github/labels.yml` declares evidence-routing labels.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports to
   maintenance evidence.

@@ -59,6 +59,8 @@ function evidenceFixture(root) {
     "",
   ].join("\n"));
   writeFileSync(path.join(root, "CODEOWNERS"), "* @jelllove\n");
+  mkdirSync(path.join(root, ".agents", "skills", "synchub-validation"), { recursive: true });
+  writeFileSync(path.join(root, ".agents", "skills", "synchub-validation", "SKILL.md"), "# SyncHub Validation\n");
   writeFileSync(path.join(root, ".pre-commit-config.yaml"), "repos:\n  - repo: local\n    hooks:\n      - entry: node scripts/dev.mjs check\n        pass_filenames: false\n      - entry: node scripts/dev.mjs docs\n        pass_filenames: false\n");
   writeFileSync(path.join(root, ".github", "labels.yml"), [
     "- name: ai-readiness",
@@ -111,7 +113,7 @@ function evidenceFixture(root) {
     "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
     "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
-    "CODEOWNERS .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
+    "CODEOWNERS .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
     "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));

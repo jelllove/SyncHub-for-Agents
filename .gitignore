@@ -6,6 +6,8 @@
 /bin/
 /frontend/node_modules/
 /frontend/dist/
+/.agents/skills/codeblend-ai-composite/
+/skills-lock.json
 /build/linux/appimage/build/
 /build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 /build/ios/xcode/overlay.json
