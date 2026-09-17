@@ -190,3 +190,39 @@ func TestLinuxBuildDependenciesPrecedeWailsInstallation(t *testing.T) {
 		t.Fatal("GTK/WebKit development libraries must be installed before compiling the Wails CLI")
 	}
 }
+
+func TestAppImageVerificationUsesNormalizedGeneratorPaths(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "build", "linux", "Taskfile.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var taskfile struct {
+		Tasks map[string]struct {
+			Vars map[string]yaml.Node `yaml:"vars"`
+			Cmds []yaml.Node          `yaml:"cmds"`
+		} `yaml:"tasks"`
+	}
+	if err := yaml.Unmarshal(data, &taskfile); err != nil {
+		t.Fatal(err)
+	}
+	task := taskfile.Tasks["create:appimage"]
+	if task.Vars["APPIMAGE_NAME"].Value != "{{.APP_NAME | lower}}" {
+		t.Fatal("AppImage paths must match the Wails generator's normalized name")
+	}
+	var commands []string
+	for _, command := range task.Cmds {
+		if command.Kind == yaml.ScalarNode {
+			commands = append(commands, command.Value)
+		}
+	}
+	script := strings.Join(commands, "\n")
+	for _, required := range []string{
+		"cmp --silent",
+		"{{.APPIMAGE_NAME}}-x86_64.AppDir/AppRun",
+		`mv -- "{{.OUTPUT_DIR}}/{{.APPIMAGE_NAME}}-x86_64.AppImage" "{{.OUTPUT_DIR}}/{{.APP_NAME}}-x86_64.AppImage"`,
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("AppImage verification/publication is missing %q", required)
+		}
+	}
+}
