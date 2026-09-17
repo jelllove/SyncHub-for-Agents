@@ -59,6 +59,15 @@ func TestRepositoryGatesAreUnconditionalForPullRequests(t *testing.T) {
 	for id, expected := range map[string][]string{
 		"repository": {"node scripts/dev.mjs setup", "node scripts/dev.mjs verify"},
 		"security":   {"node scripts/dev.mjs setup", "npm --prefix frontend audit --audit-level=high", "go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./..."},
+		"test": {
+			"node scripts/dev.mjs setup",
+			"go test -race ./...",
+			"go vet ./...",
+			"npm --prefix frontend run lint",
+			"npm --prefix frontend run typecheck",
+			"npm --prefix frontend run test:lint",
+			"npm --prefix frontend test",
+		},
 	} {
 		current, ok := ci.Jobs[id]
 		if !ok || current.If != "" || current.ContinueOnError || current.Timeout <= 0 {
@@ -103,10 +112,11 @@ func TestMaintenanceReusesChecksWithoutPackagingOrWritePermissions(t *testing.T)
 	if _, ok := ci.On["workflow_call"]; !ok {
 		t.Fatal("CI must remain reusable")
 	}
-	for _, id := range []string{"test", "package"} {
-		if ci.Jobs[id].If != "${{ !inputs.maintenance }}" {
-			t.Fatalf("maintenance must not launch the %s matrix", id)
-		}
+	if ci.Jobs["package"].If != "${{ !inputs.maintenance }}" {
+		t.Fatal("maintenance must not launch the packaging matrix")
+	}
+	if ci.Jobs["test"].If != "" {
+		t.Fatal("maintenance must run the Linux race and frontend checks")
 	}
 }
 

@@ -76,7 +76,6 @@ jobs:
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 
   test:
-    if: ${{ !inputs.maintenance }}
     name: Test and lint
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -98,6 +97,10 @@ jobs:
       - run: node scripts/dev.mjs setup
       - run: go test -race ./...
       - run: go vet ./...
+      - run: npm --prefix frontend run lint
+      - run: npm --prefix frontend run typecheck
+      - run: npm --prefix frontend run test:lint
+      - run: npm --prefix frontend test
 
   package:
     if: ${{ !inputs.maintenance }}

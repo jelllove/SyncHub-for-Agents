@@ -59,7 +59,8 @@ repair pass over Git-listed Go files. It includes non-ignored untracked files,
 rejects symlinks, never deletes files, and never stages, commits, or pushes.
 Each subprocess has a ten-minute timeout. Review the resulting diff.
 The weekly/manual [maintenance workflow](../.github/workflows/maintenance.yml)
-audits the same checks without applying repairs or opening issues or PRs.
+audits the same Windows and Linux checks without applying repairs or opening
+issues or PRs. It skips installer packaging, not the Linux race or frontend tests.
 There is deliberately no unattended source modification.
 
 This is separate from application trash cleanup. The existing daemon wires
@@ -76,7 +77,12 @@ Its schedule, pause behavior, retention policy, and safety filters are unchanged
 `check`, then the full current-host Go suite (including workflow and architecture
 guards), lint-configuration regressions, and all frontend/UI/tooling tests.
 It does not install dependencies; run setup first.
-The existing Linux CI job also runs the Go suite with `-race`.
+The Linux CI job runs the Go suite with `-race`, `go vet`, frontend lint and
+typechecking, lint-configuration regressions, and all frontend/UI/tooling tests as
+separate native command steps. It runs for every PR and weekly/manual maintenance
+audit, without maintenance-mode or path filters. Windows verification still owns
+the source-bound receipts; Linux checks add cross-platform coverage rather than
+replacing that runner.
 Use `check` for quick feedback and `docs` for documentation-only changes.
 
 Each verification creates a new `.artifacts/validation/run-*` directory containing
