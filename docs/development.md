@@ -122,6 +122,14 @@ Native-process integration tests use a 20-second test budget for Git/Go startup
 on busy hosts. Their explicit child-command timeout assertions remain unchanged;
 ordinary UI tests retain the default timeout.
 
+The committed evidence contracts live in the
+[validation receipt schema](specs/validation-receipt.v1.schema.json),
+[repair proof schema](specs/repair-proof.v1.schema.json), and
+[agentic observability guide](operations/agentic-observability.md).
+`node scripts/dev.mjs docs` checks that those files still reference the
+workflows, labels, artifact names, and command entry points that publish the
+evidence.
+
 The PR workflow and weekly/manual maintenance audit share this runner, append
 results to the GitHub job summary, and upload logs/JSON even on failure. Artifacts
 expire after 14 days in GitHub; local reports are retained until explicitly removed.
@@ -289,5 +297,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs` |
 <!-- dev-reference:end -->

@@ -32,7 +32,7 @@ function evaluate(root, checks, options) {
 function commandFixture(root) {
   const scripts = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts");
   mkdirSync(path.join(root, "scripts"));
-  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs"]) {
+  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs", "doc-drift.mjs"]) {
     writeFileSync(path.join(root, "scripts", name), readFileSync(path.join(scripts, name)));
   }
   const env = { ...process.env };
@@ -40,6 +40,47 @@ function commandFixture(root) {
   const outputFile = path.join(root, "workflow-output.txt");
   env.GITHUB_OUTPUT = outputFile;
   return { env, outputFile };
+}
+function evidenceFixture(root) {
+  mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
+  mkdirSync(path.join(root, "docs", "operations"), { recursive: true });
+  mkdirSync(path.join(root, "docs", "specs"), { recursive: true });
+  writeFileSync(path.join(root, ".env.example"), [
+    "SYNCHUB_GITHUB_CLIENT_ID=",
+    "ACSYNC_GITHUB_CLIENT_ID=",
+    "SYNCHUB_RUN_HELPER_INTEGRATION=0",
+    "",
+  ].join("\n"));
+  writeFileSync(path.join(root, ".github", "labels.yml"), [
+    "- name: ai-readiness",
+    "- name: validation",
+    "- name: repair-proof",
+    "- name: agent-review",
+    "- name: documentation-drift",
+    "",
+  ].join("\n"));
+  writeFileSync(path.join(root, "docs", "specs", "validation-receipt.v1.schema.json"), JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub validation receipt v1",
+    required: ["schemaVersion", "status", "checks", "source"],
+  }) + "\n");
+  writeFileSync(path.join(root, "docs", "specs", "repair-proof.v1.schema.json"), JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub contained repair proof v1",
+    required: ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
+  }) + "\n");
+  writeFileSync(path.join(root, ".github", "workflows", "ci.yml"), "name: CI\nrepository-validation\nmaintenance-proposal\n");
+  writeFileSync(path.join(root, ".github", "workflows", "maintenance.yml"), "name: Repository maintenance\n");
+  writeFileSync(path.join(root, ".github", "workflows", "repair-verification.yml"), "name: Repair verification\nrepair-verification\n");
+  writeFileSync(path.join(root, "docs", "operations", "agentic-observability.md"), [
+    "# Agentic observability",
+    "ai-readiness validation repair-proof agent-review documentation-drift",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml",
+    "`repository-validation` `maintenance-proposal` `repair-verification`",
+    "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify",
+    "",
+  ].join("\n"));
 }
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -276,6 +317,7 @@ describe("validation receipts", { timeout: 20_000 }, () => {
       test: 'node -e "process.exit(0)"',
     } }));
     writeFileSync(path.join(root, "docs", "development.md"), `${referenceStart}\n${referenceEnd}\n`);
+    evidenceFixture(root);
     checkReference(root, true);
     const result = spawnSync(process.execPath, [path.join(root, "scripts", "dev.mjs"), "verify"], {
       cwd: root, env, encoding: "utf8", timeout: 60_000,

@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:lint": "node --test lint.test.mjs"
+    "test:lint": "node --test lint.test.mjs doc-drift.test.mjs"
   },
   "engines": {
     "node": ">=24.13.0 <25"

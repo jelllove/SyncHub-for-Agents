@@ -158,6 +158,43 @@ func TestValidationReportsRemainAvailableAfterFailures(t *testing.T) {
 	}
 }
 
+func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
+	for _, relative := range []string{
+		".env.example",
+		".github/labels.yml",
+		"docs/specs/validation-receipt.v1.schema.json",
+		"docs/specs/repair-proof.v1.schema.json",
+		"docs/operations/agentic-observability.md",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestEvidenceArtifactsRemainDocumentedAndPublished(t *testing.T) {
+	ciData, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repairData, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "repair-verification.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	guide, err := os.ReadFile(filepath.Join("..", "..", "docs", "operations", "agentic-observability.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"repository-validation", "maintenance-proposal"} {
+		if !strings.Contains(string(ciData), required) || !strings.Contains(string(guide), required) {
+			t.Fatalf("%s must be published by CI and documented", required)
+		}
+	}
+	if !strings.Contains(string(repairData), "repair-verification") || !strings.Contains(string(guide), "repair-verification") {
+		t.Fatal("repair proof must be published and documented")
+	}
+}
+
 func TestMaintenanceProposalIsBoundedToValidationFailures(t *testing.T) {
 	ci := loadWorkflow(t, "ci.yml")
 	foundProposal, foundUpload := false, false

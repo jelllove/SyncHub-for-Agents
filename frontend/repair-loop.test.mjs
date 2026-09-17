@@ -18,10 +18,48 @@ function put(root, file, value) {
   mkdirSync(path.dirname(filename), { recursive: true });
   writeFileSync(filename, value);
 }
+function evidenceFixture(root) {
+  put(root, ".env.example", [
+    "SYNCHUB_GITHUB_CLIENT_ID=",
+    "ACSYNC_GITHUB_CLIENT_ID=",
+    "SYNCHUB_RUN_HELPER_INTEGRATION=0",
+    "",
+  ].join("\n"));
+  put(root, ".github/labels.yml", [
+    "- name: ai-readiness",
+    "- name: validation",
+    "- name: repair-proof",
+    "- name: agent-review",
+    "- name: documentation-drift",
+    "",
+  ].join("\n"));
+  put(root, "docs/specs/validation-receipt.v1.schema.json", JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub validation receipt v1",
+    required: ["schemaVersion", "status", "checks", "source"],
+  }) + "\n");
+  put(root, "docs/specs/repair-proof.v1.schema.json", JSON.stringify({
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    title: "SyncHub contained repair proof v1",
+    required: ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
+  }) + "\n");
+  put(root, ".github/workflows/ci.yml", "name: CI\nrepository-validation\nmaintenance-proposal\n");
+  put(root, ".github/workflows/maintenance.yml", "name: Repository maintenance\n");
+  put(root, ".github/workflows/repair-verification.yml", "name: Repair verification\nrepair-verification\n");
+  put(root, "docs/operations/agentic-observability.md", [
+    "# Agentic observability",
+    "ai-readiness validation repair-proof agent-review documentation-drift",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml",
+    "`repository-validation` `maintenance-proposal` `repair-verification`",
+    "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify",
+    "",
+  ].join("\n"));
+}
 function fixture() {
   const root = temporary("synchub-repair-source-");
   const scripts = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts");
-  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs"]) {
+  for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs", "doc-drift.mjs"]) {
     put(root, `scripts/${name}`, readFileSync(path.join(scripts, name)));
   }
   put(root, ".gitignore", ".artifacts/\nfrontend/node_modules/\n");
@@ -38,6 +76,7 @@ function fixture() {
     packages: { "": { name: "repair-fixture", version: "1.0.0" } },
   }));
   put(root, "docs/development.md", `${referenceStart}\n${referenceEnd}\n`);
+  evidenceFixture(root);
   checkReference(root, true);
   run("git", ["init", "--quiet"], root);
   run("git", ["add", "."], root);

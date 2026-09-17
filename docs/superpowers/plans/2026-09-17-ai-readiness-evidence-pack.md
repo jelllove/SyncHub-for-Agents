@@ -73,9 +73,9 @@ function writeFixture(root, overrides = {}) {
       "$id": "https://github.com/jelllove/SyncHub-for-Agents/schemas/validation-receipt.v1.schema.json",
       "title": "SyncHub validation receipt v1",
       "type": "object",
-      "required": ["version", "status", "checks", "source"],
+      "required": ["schemaVersion", "status", "checks", "source"],
       "properties": {
-        "version": { "const": 1 },
+        "schemaVersion": { "const": 1 },
         "status": { "enum": ["passed", "failed", "running"] },
         "checks": { "type": "array" },
         "source": { "type": "object" }
@@ -86,7 +86,7 @@ function writeFixture(root, overrides = {}) {
       "$id": "https://github.com/jelllove/SyncHub-for-Agents/schemas/repair-proof.v1.schema.json",
       "title": "SyncHub contained repair proof v1",
       "type": "object",
-      "required": ["scenario", "status", "baseline", "repair", "rollback"],
+      "required": ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
       "properties": {
         "scenario": { "const": "diagnostic-go-format" },
         "status": { "enum": ["passed", "failed"] },
@@ -102,7 +102,7 @@ function writeFixture(root, overrides = {}) {
       "",
       "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml.",
       "",
-      "Artifacts: repository-validation, maintenance-proposal, native-repair-proof.",
+      "Artifacts: repository-validation, maintenance-proposal, repair-verification.",
       "",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
       "",
@@ -132,7 +132,7 @@ function writeFixture(root, overrides = {}) {
       "      - run: node scripts/dev.mjs repair:verify",
       "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
       "        with:",
-      "          name: native-repair-proof",
+      "          name: repair-verification",
       "",
     ].join("\n"),
   };
@@ -173,7 +173,7 @@ test("checkEvidenceDrift rejects undocumented repair artifact", () => {
   });
   assert.throws(
     () => checkEvidenceDrift(root),
-    /agentic-observability.md must mention "native-repair-proof"/,
+    /agentic-observability.md must mention "repair-verification"/,
   );
 });
 ```
@@ -204,7 +204,7 @@ Add this content:
 import path from "node:path";
 import { readFileSync } from "node:fs";
 
-const requiredLabels = ["ai-readiness", "validation", "repair-proof", "agent-review"];
+const requiredLabels = ["ai-readiness", "validation", "repair-proof", "agent-review", "documentation-drift"];
 const requiredDocs = [
   "docs/specs/validation-receipt.v1.schema.json",
   "docs/specs/repair-proof.v1.schema.json",
@@ -213,7 +213,7 @@ const requiredDocs = [
   ".github/workflows/repair-verification.yml",
   "repository-validation",
   "maintenance-proposal",
-  "native-repair-proof",
+  "repair-verification",
   "node scripts/dev.mjs verify",
   "node scripts/dev.mjs repair:verify",
 ];
@@ -250,7 +250,7 @@ export function checkEvidenceDrift(root) {
   }
 
   requireJsonSchema(root, "docs/specs/validation-receipt.v1.schema.json", "SyncHub validation receipt v1", [
-    "version",
+    "schemaVersion",
     "status",
     "checks",
     "source",
@@ -270,7 +270,7 @@ export function checkEvidenceDrift(root) {
 
   requireContains(read(root, ".github/workflows/ci.yml"), "repository-validation", "ci.yml");
   requireContains(read(root, ".github/workflows/ci.yml"), "maintenance-proposal", "ci.yml");
-  requireContains(read(root, ".github/workflows/repair-verification.yml"), "native-repair-proof", "repair-verification.yml");
+  requireContains(read(root, ".github/workflows/repair-verification.yml"), "repair-verification", "repair-verification.yml");
 }
 ```
 
@@ -391,9 +391,9 @@ Use a compact JSON Schema with required keys:
   "title": "SyncHub validation receipt v1",
   "type": "object",
   "additionalProperties": true,
-  "required": ["version", "status", "checks", "source"],
+  "required": ["schemaVersion", "status", "checks", "source"],
   "properties": {
-    "version": { "const": 1 },
+    "schemaVersion": { "const": 1 },
     "status": { "enum": ["passed", "failed", "running"] },
     "checks": {
       "type": "array",
@@ -434,7 +434,7 @@ Use a compact JSON Schema with required keys:
   "title": "SyncHub contained repair proof v1",
   "type": "object",
   "additionalProperties": true,
-  "required": ["scenario", "status", "baseline", "repair", "rollback"],
+  "required": ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
   "properties": {
     "scenario": { "const": "diagnostic-go-format" },
     "status": { "enum": ["passed", "failed"] },
@@ -468,7 +468,7 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/maintenance.yml` schedules the same repository/security and
   Linux test checks without write permissions or packaging.
 - `.github/workflows/repair-verification.yml` runs
-  `node scripts/dev.mjs repair:verify` and publishes `native-repair-proof`.
+  `node scripts/dev.mjs repair:verify` and publishes `repair-verification`.
 
 ## Artifact contracts
 
@@ -476,7 +476,7 @@ the work observable; they do not claim production autonomous repair.
   written by `node scripts/dev.mjs verify`.
 - `docs/specs/repair-proof.v1.schema.json` describes diagnostic repair proof
   receipts written by `node scripts/dev.mjs repair:verify`.
-- `repository-validation`, `maintenance-proposal`, and `native-repair-proof`
+- `repository-validation`, `maintenance-proposal`, and `repair-verification`
   artifacts are retained by GitHub Actions for bounded review windows.
 
 ## Labels and handoff
@@ -556,7 +556,7 @@ func TestEvidenceArtifactsRemainDocumentedAndPublished(t *testing.T) {
 			t.Fatalf("%s must be published by CI and documented", required)
 		}
 	}
-	if !strings.Contains(string(repairData), "native-repair-proof") || !strings.Contains(string(guide), "native-repair-proof") {
+	if !strings.Contains(string(repairData), "repair-verification") || !strings.Contains(string(guide), "repair-verification") {
 		t.Fatal("native repair proof must be published and documented")
 	}
 }
