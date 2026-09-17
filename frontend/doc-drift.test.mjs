@@ -45,6 +45,15 @@ function writeFixture(root, overrides = {}) {
       "  description: Documentation and executable behavior alignment",
       "",
     ].join("\n"),
+    "CODEOWNERS": "* @jelllove\n",
+    ".github/ISSUE_TEMPLATE/config.yml": [
+      "blank_issues_enabled: true",
+      "contact_links:",
+      "  - name: AI readiness evidence report",
+      "    url: https://github.com/jelllove/SyncHub-for-Agents/actions/workflows/maintenance.yml",
+      "    about: Run maintenance evidence before filing stale validation issues.",
+      "",
+    ].join("\n"),
     "docs/specs/validation-receipt.v1.schema.json": JSON.stringify({
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://github.com/jelllove/SyncHub-for-Agents/schemas/validation-receipt.v1.schema.json",
@@ -78,15 +87,33 @@ function writeFixture(root, overrides = {}) {
       "",
       "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
       "",
-      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml.",
+      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml.",
       "",
-      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`.",
       "",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
       "",
-      "Commands: node scripts/dev.mjs verify and node scripts/dev.mjs repair:verify.",
+      "Surfaces: CODEOWNERS, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
+    "docs/reports/agentic-validation-reports.md": "# Reports\n\n`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`\n",
+    "docs/dashboards/agentic-readiness-dashboard.json": JSON.stringify({
+      schemaVersion: 1,
+      title: "SyncHub agentic readiness dashboard",
+      signals: ["repository-validation", "maintenance-proposal", "repair-verification", "ci-failure-response"],
+    }) + "\n",
+    "docs/runbooks/ci-failure-response.md": "# CI failure response\n\nDetection, containment, remediation, validation, and rollback stay review-only.\n",
+    ".vscode/mcp.json": JSON.stringify({
+      servers: {
+        "synchub-validation": {
+          command: "node",
+          args: ["tools/mcp/validation-server.mjs"],
+        },
+      },
+    }) + "\n",
+    "tools/mcp/validation-server.mjs": "export const name = 'synchub-validation';\n",
     ".github/workflows/ci.yml": [
       "name: CI",
       "jobs:",
@@ -111,6 +138,25 @@ function writeFixture(root, overrides = {}) {
       "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
       "        with:",
       "          name: repair-verification",
+      "",
+    ].join("\n"),
+    ".github/workflows/self-healing.yml": [
+      "name: Self-healing diagnostics",
+      "on:",
+      "  workflow_run:",
+      "    workflows: [CI]",
+      "    types: [completed]",
+      "  workflow_dispatch:",
+      "permissions:",
+      "  actions: read",
+      "  contents: read",
+      "jobs:",
+      "  response:",
+      "    steps:",
+      "      - run: node scripts/dev.mjs propose",
+      "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "        with:",
+      "          name: ci-failure-response",
       "",
     ].join("\n"),
   };
@@ -151,15 +197,36 @@ test("checkEvidenceDrift rejects undocumented repair artifact", () => {
     "docs/operations/agentic-observability.md": [
       "# Agentic observability",
       "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
-      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml.",
+      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml.",
       "Artifacts: `repository-validation` and `maintenance-proposal`.",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
-      "Commands: node scripts/dev.mjs verify and node scripts/dev.mjs repair:verify.",
+      "Surfaces: CODEOWNERS, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
   });
   assert.throws(
     () => checkEvidenceDrift(root),
     /agentic-observability.md must mention "`repair-verification`"/,
+  );
+});
+
+test("checkEvidenceDrift rejects undocumented dashboard surface", () => {
+  const root = fixtureRoot();
+  writeFixture(root, {
+    "docs/operations/agentic-observability.md": [
+      "# Agentic observability",
+      "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
+      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`.",
+      "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
+      "Surfaces: CODEOWNERS, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/reports/agentic-validation-reports.md, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
+      "",
+    ].join("\n"),
+  });
+  assert.throws(
+    () => checkEvidenceDrift(root),
+    /agentic-observability.md must mention "docs\/dashboards\/agentic-readiness-dashboard.json"/,
   );
 });

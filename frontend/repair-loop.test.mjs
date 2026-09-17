@@ -25,12 +25,19 @@ function evidenceFixture(root) {
     "SYNCHUB_RUN_HELPER_INTEGRATION=0",
     "",
   ].join("\n"));
+  put(root, "CODEOWNERS", "* @jelllove\n");
   put(root, ".github/labels.yml", [
     "- name: ai-readiness",
     "- name: validation",
     "- name: repair-proof",
     "- name: agent-review",
     "- name: documentation-drift",
+    "",
+  ].join("\n"));
+  put(root, ".github/ISSUE_TEMPLATE/config.yml", [
+    "blank_issues_enabled: true",
+    "contact_links:",
+    "  - name: AI readiness evidence report",
     "",
   ].join("\n"));
   put(root, "docs/specs/validation-receipt.v1.schema.json", JSON.stringify({
@@ -46,13 +53,26 @@ function evidenceFixture(root) {
   put(root, ".github/workflows/ci.yml", "name: CI\nrepository-validation\nmaintenance-proposal\n");
   put(root, ".github/workflows/maintenance.yml", "name: Repository maintenance\n");
   put(root, ".github/workflows/repair-verification.yml", "name: Repair verification\nrepair-verification\n");
+  put(root, ".github/workflows/self-healing.yml", "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs propose\nci-failure-response\n");
+  put(root, "docs/reports/agentic-validation-reports.md", "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`\n");
+  put(root, "docs/dashboards/agentic-readiness-dashboard.json", JSON.stringify({
+    schemaVersion: 1,
+    signals: ["ci-failure-response"],
+  }) + "\n");
+  put(root, "docs/runbooks/ci-failure-response.md", "detection containment remediation validation rollback\n");
+  put(root, ".vscode/mcp.json", JSON.stringify({
+    servers: { "synchub-validation": { command: "node", args: ["tools/mcp/validation-server.mjs"] } },
+  }) + "\n");
+  put(root, "tools/mcp/validation-server.mjs", "export const name = 'synchub-validation';\n");
   put(root, "docs/operations/agentic-observability.md", [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
-    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml",
-    "`repository-validation` `maintenance-proposal` `repair-verification`",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml",
+    "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json",
-    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify",
+    "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
+    "CODEOWNERS .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));
 }

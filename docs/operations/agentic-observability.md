@@ -18,6 +18,10 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/repair-verification.yml`
   ([workflow](../../.github/workflows/repair-verification.yml)) runs
   `node scripts/dev.mjs repair:verify` and publishes `repair-verification`.
+- `.github/workflows/self-healing.yml`
+  ([workflow](../../.github/workflows/self-healing.yml)) listens to failed CI
+  `workflow_run` events or manual dispatch, runs `node scripts/dev.mjs propose`,
+  and publishes `ci-failure-response` without write permissions.
 
 ## Artifact contracts
 
@@ -29,6 +33,17 @@ the work observable; they do not claim production autonomous repair.
   proof receipts written by `node scripts/dev.mjs repair:verify`.
 - `repository-validation`, `maintenance-proposal`, and `repair-verification`
   artifacts are retained by GitHub Actions for bounded review windows.
+- `ci-failure-response` captures the same bounded proposal format after CI
+  failure detection.
+- Repository path `docs/reports/agentic-validation-reports.md`
+  ([report index](../reports/agentic-validation-reports.md)) lists the current
+  machine-readable report artifacts.
+- Repository path `docs/dashboards/agentic-readiness-dashboard.json`
+  ([dashboard](../dashboards/agentic-readiness-dashboard.json)) mirrors the
+  workflow and artifact names for automation.
+- Repository path `docs/runbooks/ci-failure-response.md`
+  ([runbook](../runbooks/ci-failure-response.md)) defines detection,
+  containment, remediation proposal, validation, and rollback handoff.
 
 ## Labels and handoff
 
@@ -43,3 +58,13 @@ the work observable; they do not claim production autonomous repair.
 Human reviewers should link failed and passing workflow runs in pull requests,
 verify the report `status` before trusting individual command rows, and treat
 repair proposals as patches requiring review rather than automatic fixes.
+
+## Agent execution surfaces
+
+- `CODEOWNERS` routes repository-wide review ownership to the maintainer without
+  requiring a second approver in this single-maintainer repository.
+- `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
+  the maintenance evidence workflow.
+- `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
+- `tools/mcp/validation-server.mjs` is a read-only stdio MCP server with tools
+  for listing validation commands and running `node scripts/dev.mjs docs`.

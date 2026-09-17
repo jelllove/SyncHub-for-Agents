@@ -43,20 +43,33 @@ function commandFixture(root) {
 }
 function evidenceFixture(root) {
   mkdirSync(path.join(root, ".github", "workflows"), { recursive: true });
+  mkdirSync(path.join(root, ".github", "ISSUE_TEMPLATE"), { recursive: true });
   mkdirSync(path.join(root, "docs", "operations"), { recursive: true });
   mkdirSync(path.join(root, "docs", "specs"), { recursive: true });
+  mkdirSync(path.join(root, "docs", "reports"), { recursive: true });
+  mkdirSync(path.join(root, "docs", "dashboards"), { recursive: true });
+  mkdirSync(path.join(root, "docs", "runbooks"), { recursive: true });
+  mkdirSync(path.join(root, ".vscode"), { recursive: true });
+  mkdirSync(path.join(root, "tools", "mcp"), { recursive: true });
   writeFileSync(path.join(root, ".env.example"), [
     "SYNCHUB_GITHUB_CLIENT_ID=",
     "ACSYNC_GITHUB_CLIENT_ID=",
     "SYNCHUB_RUN_HELPER_INTEGRATION=0",
     "",
   ].join("\n"));
+  writeFileSync(path.join(root, "CODEOWNERS"), "* @jelllove\n");
   writeFileSync(path.join(root, ".github", "labels.yml"), [
     "- name: ai-readiness",
     "- name: validation",
     "- name: repair-proof",
     "- name: agent-review",
     "- name: documentation-drift",
+    "",
+  ].join("\n"));
+  writeFileSync(path.join(root, ".github", "ISSUE_TEMPLATE", "config.yml"), [
+    "blank_issues_enabled: true",
+    "contact_links:",
+    "  - name: AI readiness evidence report",
     "",
   ].join("\n"));
   writeFileSync(path.join(root, "docs", "specs", "validation-receipt.v1.schema.json"), JSON.stringify({
@@ -72,13 +85,28 @@ function evidenceFixture(root) {
   writeFileSync(path.join(root, ".github", "workflows", "ci.yml"), "name: CI\nrepository-validation\nmaintenance-proposal\n");
   writeFileSync(path.join(root, ".github", "workflows", "maintenance.yml"), "name: Repository maintenance\n");
   writeFileSync(path.join(root, ".github", "workflows", "repair-verification.yml"), "name: Repair verification\nrepair-verification\n");
+  writeFileSync(path.join(root, ".github", "workflows", "self-healing.yml"), "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs propose\nci-failure-response\n");
+  writeFileSync(path.join(root, "docs", "reports", "agentic-validation-reports.md"), "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`\n");
+  writeFileSync(path.join(root, "docs", "dashboards", "agentic-readiness-dashboard.json"), JSON.stringify({
+    schemaVersion: 1,
+    signals: ["ci-failure-response"],
+  }) + "\n");
+  writeFileSync(path.join(root, "docs", "runbooks", "ci-failure-response.md"), "detection containment remediation validation rollback\n");
+  mkdirSync(path.join(root, ".vscode"), { recursive: true });
+  writeFileSync(path.join(root, ".vscode", "mcp.json"), JSON.stringify({
+    servers: { "synchub-validation": { command: "node", args: ["tools/mcp/validation-server.mjs"] } },
+  }) + "\n");
+  mkdirSync(path.join(root, "tools", "mcp"), { recursive: true });
+  writeFileSync(path.join(root, "tools", "mcp", "validation-server.mjs"), "export const name = 'synchub-validation';\n");
   writeFileSync(path.join(root, "docs", "operations", "agentic-observability.md"), [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
-    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml",
-    "`repository-validation` `maintenance-proposal` `repair-verification`",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml",
+    "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json",
-    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify",
+    "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
+    "CODEOWNERS .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));
 }

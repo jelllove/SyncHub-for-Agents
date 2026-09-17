@@ -162,9 +162,16 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	for _, relative := range []string{
 		".env.example",
 		".github/labels.yml",
+		"CODEOWNERS",
+		".github/ISSUE_TEMPLATE/config.yml",
 		"docs/specs/validation-receipt.v1.schema.json",
 		"docs/specs/repair-proof.v1.schema.json",
 		"docs/operations/agentic-observability.md",
+		"docs/reports/agentic-validation-reports.md",
+		"docs/dashboards/agentic-readiness-dashboard.json",
+		"docs/runbooks/ci-failure-response.md",
+		".vscode/mcp.json",
+		"tools/mcp/validation-server.mjs",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
@@ -192,6 +199,38 @@ func TestEvidenceArtifactsRemainDocumentedAndPublished(t *testing.T) {
 	}
 	if !strings.Contains(string(repairData), "repair-verification") || !strings.Contains(string(guide), "repair-verification") {
 		t.Fatal("repair proof must be published and documented")
+	}
+}
+
+func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
+	workflow := loadWorkflow(t, "self-healing.yml")
+	if _, ok := workflow.On["workflow_run"]; !ok {
+		t.Fatal("self-healing diagnostics must run from workflow_run failure signals")
+	}
+	if _, ok := workflow.On["workflow_dispatch"]; !ok {
+		t.Fatal("self-healing diagnostics must support manual dispatch")
+	}
+	if workflow.Permissions["contents"] != "read" || workflow.Permissions["actions"] != "read" || len(workflow.Permissions) != 2 {
+		t.Fatal("self-healing diagnostics must remain read-only")
+	}
+	response := workflow.Jobs["response"]
+	if response.If == "" || response.Timeout <= 0 || response.ContinueOnError {
+		t.Fatal("self-healing diagnostics must be conditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range response.Steps {
+		if s.ContinueOnError {
+			t.Fatal("self-healing diagnostics must not hide step failures")
+		}
+		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+	}
+	for _, forbidden := range []string{"git push", "gh issue create", "gh pr create", "pull-requests: write", "contents: write"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("self-healing diagnostics must not mutate repository state with %q", forbidden)
+		}
+	}
+	if !strings.Contains(joined, "node scripts/dev.mjs propose") {
+		t.Fatal("self-healing diagnostics must publish the existing review-only proposal")
 	}
 }
 

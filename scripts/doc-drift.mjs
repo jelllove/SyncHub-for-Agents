@@ -10,14 +10,24 @@ const requiredLabels = ["ai-readiness", "validation", "repair-proof", "agent-rev
 const requiredGuideEntries = [
   "docs/specs/validation-receipt.v1.schema.json",
   "docs/specs/repair-proof.v1.schema.json",
+  "docs/reports/agentic-validation-reports.md",
+  "docs/dashboards/agentic-readiness-dashboard.json",
+  "docs/runbooks/ci-failure-response.md",
   ".github/workflows/ci.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
+  ".github/workflows/self-healing.yml",
+  ".github/ISSUE_TEMPLATE/config.yml",
+  ".vscode/mcp.json",
+  "CODEOWNERS",
+  "tools/mcp/validation-server.mjs",
   "`repository-validation`",
   "`maintenance-proposal`",
   "`repair-verification`",
+  "`ci-failure-response`",
   "node scripts/dev.mjs verify",
   "node scripts/dev.mjs repair:verify",
+  "node scripts/dev.mjs propose",
 ];
 
 function read(root, relative) {
@@ -57,6 +67,8 @@ export function checkEvidenceDrift(root) {
 
   const labels = read(root, ".github/labels.yml");
   for (const label of requiredLabels) requireLabel(labels, label);
+  requireContains(read(root, "CODEOWNERS"), "@jelllove", "CODEOWNERS");
+  requireContains(read(root, ".github/ISSUE_TEMPLATE/config.yml"), "AI readiness evidence report", "issue template config");
 
   requireJsonSchema(root, "docs/specs/validation-receipt.v1.schema.json", "SyncHub validation receipt v1", [
     "schemaVersion",
@@ -78,7 +90,20 @@ export function checkEvidenceDrift(root) {
     requireContains(guide, entry, "agentic-observability.md");
   }
 
+  const dashboard = JSON.parse(read(root, "docs/dashboards/agentic-readiness-dashboard.json"));
+  if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response")) {
+    throw new Error("agentic-readiness-dashboard.json must list the ci-failure-response signal");
+  }
+  const mcp = JSON.parse(read(root, ".vscode/mcp.json"));
+  const server = mcp.servers?.["synchub-validation"];
+  if (server?.command !== "node" || !server.args?.includes("tools/mcp/validation-server.mjs")) {
+    throw new Error(".vscode/mcp.json must expose tools/mcp/validation-server.mjs");
+  }
+
   requireContains(read(root, ".github/workflows/ci.yml"), "repository-validation", "ci.yml");
   requireContains(read(root, ".github/workflows/ci.yml"), "maintenance-proposal", "ci.yml");
   requireContains(read(root, ".github/workflows/repair-verification.yml"), "repair-verification", "repair-verification.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "workflow_run", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs propose", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "ci-failure-response", "self-healing.yml");
 }

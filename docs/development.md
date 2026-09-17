@@ -129,6 +129,9 @@ The committed evidence contracts live in the
 `node scripts/dev.mjs docs` checks that those files still reference the
 workflows, labels, artifact names, and command entry points that publish the
 evidence.
+The optional [MCP server](../tools/mcp/validation-server.mjs) exposes read-only
+agent tools for listing validation commands and running the same documentation
+drift check; it does not edit files or run application synchronization.
 
 The PR workflow and weekly/manual maintenance audit share this runner, append
 results to the GitHub job summary, and upload logs/JSON even on failure. Artifacts
@@ -297,5 +300,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs` |
 <!-- dev-reference:end -->

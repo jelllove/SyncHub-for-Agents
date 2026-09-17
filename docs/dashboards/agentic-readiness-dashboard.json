@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "title": "SyncHub agentic readiness dashboard",
+  "signals": [
+    "repository-validation",
+    "maintenance-proposal",
+    "repair-verification",
+    "ci-failure-response"
+  ],
+  "workflows": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/maintenance.yml",
+    ".github/workflows/repair-verification.yml",
+    ".github/workflows/self-healing.yml"
+  ],
+  "reviewHandoff": "docs/operations/agentic-observability.md"
+}
