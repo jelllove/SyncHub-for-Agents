@@ -252,6 +252,55 @@ func TestStaticAnalysisAndPreCommitContracts(t *testing.T) {
 	}
 }
 
+func TestCopilotAgentReviewWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
+	workflow := loadWorkflow(t, "copilot-agent-review.yml")
+	if _, ok := workflow.On["pull_request"]; !ok {
+		t.Fatal("Copilot agent review must run on pull requests")
+	}
+	if _, ok := workflow.On["workflow_dispatch"]; !ok {
+		t.Fatal("Copilot agent review must support manual dispatch")
+	}
+	if workflow.Permissions["contents"] != "read" ||
+		workflow.Permissions["pull-requests"] != "read" ||
+		workflow.Permissions["checks"] != "read" ||
+		workflow.Permissions["copilot-requests"] != "write" ||
+		len(workflow.Permissions) != 4 {
+		t.Fatal("Copilot agent review must use only read permissions plus copilot-requests write")
+	}
+	review := workflow.Jobs["review"]
+	if review.Name != "Copilot agent review" || review.Timeout <= 0 || review.ContinueOnError {
+		t.Fatal("Copilot agent review job must be named for the required status, time-bounded, and fail closed")
+	}
+	joined := ""
+	foundCopilot, foundPrompt, foundArtifact := false, false, false
+	for _, s := range review.Steps {
+		if s.ContinueOnError {
+			t.Fatal("Copilot agent review steps must not hide failures")
+		}
+		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+		if strings.Contains(s.Run, "npm install --global @github/copilot@1.0.84") {
+			foundCopilot = true
+		}
+		if strings.Contains(s.Run, "You are reviewing SyncHub for Agents") &&
+			strings.Contains(s.Run, "Do not modify files") {
+			foundPrompt = true
+		}
+		if strings.HasPrefix(s.Uses, "actions/upload-artifact@") &&
+			s.With["name"] == "copilot-agent-review" &&
+			s.With["if-no-files-found"] == "error" {
+			foundArtifact = true
+		}
+	}
+	for _, forbidden := range []string{"contents: write", "pull-requests: write", "gh issue create", "gh pr create", "git push"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("Copilot agent review must not mutate repository state with %q", forbidden)
+		}
+	}
+	if !foundCopilot || !foundPrompt || !foundArtifact {
+		t.Fatal("Copilot agent review must run a pinned Copilot CLI prompt and publish its report artifact")
+	}
+}
+
 func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 	workflow := loadWorkflow(t, "self-healing.yml")
 	if _, ok := workflow.On["workflow_run"]; !ok {
