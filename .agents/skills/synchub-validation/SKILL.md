@@ -30,8 +30,8 @@ Run commands from the repository root:
 
 - Do not run application sync, trash cleanup, installer smoke tests, or repair
   loops against real user agent homes, credentials, or sync repositories.
-- Treat `node scripts/dev.mjs propose` output as a review-only patch proposal,
-  not an automatic source repair.
+- Treat `node scripts/dev.mjs propose` output as review-only repair and
+  rollback patch proposals, not automatic source repair.
 - Preserve source-bound validation failures and report artifacts exactly; never
   edit reports to make checks look successful.
 - Keep releases, tags, merges, and stricter branch protection changes separate

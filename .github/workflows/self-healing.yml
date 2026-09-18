@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .node-version
-      - name: Prepare bounded review-only repair proposal
+      - name: Prepare bounded repair and rollback handoff
         id: proposal
         run: node scripts/dev.mjs propose
       - name: Publish CI failure response

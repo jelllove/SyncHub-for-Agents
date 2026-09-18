@@ -29,6 +29,7 @@ const requiredGuideEntries = [
   ".vscode/mcp.json",
   "CODEOWNERS",
   "tools/mcp/validation-server.mjs",
+  "tools/mcp/synchub-mcp-server.mjs",
   "Documentation drift",
   "`repository-validation`",
   "`maintenance-proposal`",
@@ -106,8 +107,8 @@ export function checkEvidenceDrift(root) {
   }
   const mcp = JSON.parse(read(root, ".vscode/mcp.json"));
   const server = mcp.servers?.["synchub-validation"];
-  if (server?.command !== "node" || !server.args?.includes("tools/mcp/validation-server.mjs")) {
-    throw new Error(".vscode/mcp.json must expose tools/mcp/validation-server.mjs");
+  if (server?.command !== "node" || !server.args?.includes("tools/mcp/synchub-mcp-server.mjs")) {
+    throw new Error(".vscode/mcp.json must expose tools/mcp/synchub-mcp-server.mjs");
   }
 
   requireContains(read(root, ".github/workflows/ci.yml"), "repository-validation", "ci.yml");

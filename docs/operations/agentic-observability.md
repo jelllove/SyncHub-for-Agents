@@ -27,7 +27,8 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/self-healing.yml`
   ([workflow](../../.github/workflows/self-healing.yml)) listens to failed CI
   `workflow_run` events or manual dispatch, runs `node scripts/dev.mjs propose`,
-  and publishes `ci-failure-response` without write permissions.
+  and publishes a bounded repair and rollback handoff as `ci-failure-response`
+  without write permissions.
 - `.github/workflows/codeql.yml`
   ([workflow](../../.github/workflows/codeql.yml)) runs pinned CodeQL
   JavaScript/TypeScript analysis for pull requests, default-branch pushes,
@@ -57,7 +58,8 @@ the work observable; they do not claim production autonomous repair.
 - `repository-validation`, `maintenance-proposal`, and `repair-verification`
   artifacts are retained by GitHub Actions for bounded review windows.
 - `ci-failure-response` captures the same bounded proposal format after CI
-  failure detection.
+  failure detection, including review-only `repair.patch` and `rollback.patch`
+  artifacts when a supported repair is proposed.
 - `copilot-agent-review` captures the read-only Copilot PR auditor output. It is
   designed to become a required status check after a hosted run has passed.
 - Repository path `docs/reports/agentic-validation-reports.md`
@@ -95,8 +97,11 @@ repair proposals as patches requiring review rather than automatic fixes.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
-- `tools/mcp/validation-server.mjs` is a read-only stdio MCP server with tools
-  for listing validation commands and running `node scripts/dev.mjs docs`.
-  Its tools set `annotations.readOnlyHint: true` for Copilot code review.
+- `tools/mcp/synchub-mcp-server.mjs` is the shipped repository MCP server
+  wrapper configured by `.vscode/mcp.json`.
+- `tools/mcp/validation-server.mjs` is the read-only stdio MCP implementation
+  with tools for listing validation commands and running
+  `node scripts/dev.mjs docs`. Its tools set `annotations.readOnlyHint: true`
+  for Copilot code review.
 - `.pre-commit-config.yaml` offers optional local pre-commit hooks for
   `node scripts/dev.mjs check` and `node scripts/dev.mjs docs`.

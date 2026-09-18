@@ -16,7 +16,7 @@
 - `frontend/maintenance.test.mjs`: Assert rollback artifacts are present, applicable, reversible, size-bounded, and absent on no-change/failure reports.
 - `.github/workflows/self-healing.yml`: Rename the proposal step/artifact language to bounded repair plus rollback handoff while keeping read-only permissions.
 - `Taskfile.yml`: Add repository validation tasks that expose `setup`, `check`, `verify`, `docs`, and `repair:verify` commands.
-- `tools/mcp/synchub-validation-server.mjs`: Add a committed wrapper whose filename makes the shipped repository MCP server discoverable while delegating to the existing implementation.
+- `tools/mcp/synchub-mcp-server.mjs`: Add a committed wrapper whose filename makes the shipped repository MCP server discoverable while delegating to the existing implementation.
 - `.vscode/mcp.json`: Point the MCP config at the discoverable wrapper.
 - `tools/mcp/validation-server.mjs`: Keep the existing server implementation; no runtime logic changes unless tests require command text updates.
 - `frontend/mcp-server.test.mjs`: Assert the MCP config points to the wrapper and the listed validation commands remain complete.
@@ -181,7 +181,7 @@ git commit -m "feat: publish rollback handoff artifacts" -m "Co-authored-by: Cop
 
 **Files:**
 - Modify: `Taskfile.yml`
-- Create: `tools/mcp/synchub-validation-server.mjs`
+- Create: `tools/mcp/synchub-mcp-server.mjs`
 - Modify: `.vscode/mcp.json`
 - Modify: `frontend/mcp-server.test.mjs`
 - Modify: `tools/repocheck/workflow_test.go`
@@ -200,7 +200,7 @@ Then add this test before the existing MCP server behavior test:
 test("repository MCP config points at the shipped SyncHub validation server wrapper", () => {
   const config = JSON.parse(readFileSync(path.join(root, ".vscode", "mcp.json"), "utf8"));
   assert.equal(config.servers["synchub-validation"].command, "node");
-  assert.deepEqual(config.servers["synchub-validation"].args, ["tools/mcp/synchub-validation-server.mjs"]);
+  assert.deepEqual(config.servers["synchub-validation"].args, ["tools/mcp/synchub-mcp-server.mjs"]);
 });
 ```
 
@@ -235,7 +235,7 @@ func TestRepositoryValidationTasksAreDiscoverable(t *testing.T) {
 Update `TestEvidenceConfigurationFilesAreCommitted` to include:
 
 ```go
-		"tools/mcp/synchub-validation-server.mjs",
+		"tools/mcp/synchub-mcp-server.mjs",
 ```
 
 - [ ] **Step 2: Run targeted tests and confirm failure**
@@ -282,7 +282,7 @@ Append to `Taskfile.yml` under `tasks:`:
 
 - [ ] **Step 4: Add the shipped MCP wrapper**
 
-Create `tools/mcp/synchub-validation-server.mjs`:
+Create `tools/mcp/synchub-mcp-server.mjs`:
 
 ```js
 #!/usr/bin/env node
@@ -297,7 +297,7 @@ Change `.vscode/mcp.json`:
     "synchub-validation": {
       "type": "stdio",
       "command": "node",
-      "args": ["tools/mcp/synchub-validation-server.mjs"]
+      "args": ["tools/mcp/synchub-mcp-server.mjs"]
     }
   }
 }
@@ -319,7 +319,7 @@ Expected: PASS.
 Run:
 
 ```powershell
-git add Taskfile.yml .vscode/mcp.json tools/mcp/synchub-validation-server.mjs frontend/mcp-server.test.mjs tools/repocheck/workflow_test.go
+git add Taskfile.yml .vscode/mcp.json tools/mcp/synchub-mcp-server.mjs frontend/mcp-server.test.mjs tools/repocheck/workflow_test.go
 git commit -m "ci: expose repository validation surfaces" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 

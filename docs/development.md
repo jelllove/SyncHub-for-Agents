@@ -129,9 +129,10 @@ The committed evidence contracts live in the
 `node scripts/dev.mjs docs` checks that those files still reference the
 workflows, labels, artifact names, and command entry points that publish the
 evidence.
-The optional [MCP server](../tools/mcp/validation-server.mjs) exposes read-only
-agent tools for listing validation commands and running the same documentation
-drift check; it does not edit files or run application synchronization.
+The optional [MCP server](../tools/mcp/synchub-mcp-server.mjs) wrapper exposes
+the read-only [validation server implementation](../tools/mcp/validation-server.mjs)
+for listing validation commands and running the same documentation drift check;
+it does not edit files or run application synchronization.
 The committed
 [SyncHub validation skill](../.agents/skills/synchub-validation/SKILL.md) gives
 agents the same setup, verification, safety, and handoff sequence without
@@ -161,11 +162,12 @@ marked command/version reference below. It does not change dependencies, edit
 application logic, or attempt to repair arbitrary test failures.
 
 The command creates `.artifacts/maintenance/run-*` with `proposal.json` and, when
-applicable, `repair.patch`. A proposal is limited to 50 changed files and 1 MiB of
-patch data. It verifies application and reversal in an isolated snapshot and checks
-canonical output before publishing the patch. Source files and the real Git index
-are never modified; per-file before/after SHA-256 digests identify the proposed
-change, including when the working tree is already dirty.
+applicable, `repair.patch` plus `rollback.patch`. A proposal is limited to 50
+changed files and 1 MiB per patch. It verifies repair application, rollback
+application, rollback restoration, and canonical output in an isolated snapshot
+before publishing the patches. Source files and the real Git index are never
+modified; per-file before/after SHA-256 digests identify the proposed change,
+including when the working tree is already dirty.
 
 `proposed` means only that this limited repair is applicable and canonical, not
 that the full test suite has passed. `no-changes` means no supported repair was
@@ -179,20 +181,21 @@ produce an explicit error rather than being silently replaced. Convert a file's
 encoding deliberately before retrying; the tools do not guess another encoding.
 
 After downloading and inspecting a report with status `proposed`, a maintainer
-may explicitly apply its patch and verify the result:
+may explicitly apply its repair patch and verify the result:
 
 ```powershell
-git apply --check path-to-repair.patch
-git apply path-to-repair.patch
+git apply --check repair.patch
+git apply repair.patch
 node scripts/dev.mjs verify
 ```
 
 If that exact patch needs to be reverted, first check for conflicting intervening
-edits; never reset the whole worktree:
+edits; prefer the generated rollback handoff and never reset the whole worktree:
 
 ```powershell
-git apply --reverse --check path-to-repair.patch
-git apply --reverse path-to-repair.patch
+git apply --check rollback.patch
+git apply rollback.patch
+node scripts/dev.mjs verify
 ```
 
 Keep the failing run, proposal, regression test, and passing run linked in the PR.
@@ -294,7 +297,7 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `node scripts/dev.mjs setup` | Restore locked dependencies and build embedded frontend assets. |
 | `node scripts/dev.mjs check` | Check Go formatting/vet, frontend ESLint/TypeScript, and documentation without rewriting files. |
 | `node scripts/dev.mjs verify` | Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs. |
-| `node scripts/dev.mjs propose` | Prepare a bounded, review-only Go formatting/reference patch; never apply or commit it. |
+| `node scripts/dev.mjs propose` | Prepare bounded, review-only Go formatting/reference repair and rollback patches; never apply or commit them. |
 | `node scripts/dev.mjs repair:verify` | Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container. |
 | `node scripts/dev.mjs format` | Apply gofmt to repository-owned Go files only; never stage or commit. |
 | `node scripts/dev.mjs cleanup` | Run one bounded formatting repair pass; never delete files or touch sync data. |

@@ -70,9 +70,10 @@ function evidenceFixture(root) {
   }) + "\n");
   put(root, "docs/runbooks/ci-failure-response.md", "detection containment remediation validation rollback\n");
   put(root, ".vscode/mcp.json", JSON.stringify({
-    servers: { "synchub-validation": { command: "node", args: ["tools/mcp/validation-server.mjs"] } },
+    servers: { "synchub-validation": { command: "node", args: ["tools/mcp/synchub-mcp-server.mjs"] } },
   }) + "\n");
   put(root, "tools/mcp/validation-server.mjs", "export const name = 'synchub-validation';\n");
+  put(root, "tools/mcp/synchub-mcp-server.mjs", "import './validation-server.mjs';\n");
   put(root, "docs/operations/agentic-observability.md", [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
@@ -80,7 +81,7 @@ function evidenceFixture(root) {
     "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `copilot-agent-review`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
     "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
-    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
+    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .github/workflows/codeql.yml",
     "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));

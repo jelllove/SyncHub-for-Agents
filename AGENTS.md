@@ -60,9 +60,10 @@ through a user-owned private Git repository.
   individual passed checks when the overall report failed.
 - `check` checks Go formatting, runs `go vet`, frontend lint/typechecking, and docs
   drift checks. Repair Go formatting with `node scripts/dev.mjs format`.
-- `node scripts/dev.mjs propose` prepares a bounded formatting/reference patch
-  without changing source or the index. Review the report and patch; never treat
-  a proposal as a passing full validation or apply a report marked failed/running.
+- `node scripts/dev.mjs propose` prepares bounded review-only
+  formatting/reference repair and rollback patches without changing source or
+  the index. Review the report and patches; never treat a proposal as a passing
+  full validation or apply a report marked failed/running.
 - `node scripts/dev.mjs repair:verify` checks a diagnostic repair/rollback cycle
   in a restricted Linux container using committed inputs. It does not repair the
   developer checkout, merge a PR, or establish production autonomy.

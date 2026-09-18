@@ -27,6 +27,7 @@ type job struct {
 }
 
 type step struct {
+	Name            string            `yaml:"name"`
 	ID              string            `yaml:"id"`
 	Run             string            `yaml:"run"`
 	Uses            string            `yaml:"uses"`
@@ -433,15 +434,20 @@ func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 		if s.ContinueOnError {
 			t.Fatal("self-healing diagnostics must not hide step failures")
 		}
-		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+		joined += "\n" + s.Name + "\n" + s.Run + "\n" + s.Uses + "\n"
+		for _, value := range s.With {
+			joined += value + "\n"
+		}
 	}
 	for _, forbidden := range []string{"git push", "gh issue create", "gh pr create", "pull-requests: write", "contents: write"} {
 		if strings.Contains(joined, forbidden) {
 			t.Fatalf("self-healing diagnostics must not mutate repository state with %q", forbidden)
 		}
 	}
-	if !strings.Contains(joined, "node scripts/dev.mjs propose") {
-		t.Fatal("self-healing diagnostics must publish the existing review-only proposal")
+	if !strings.Contains(joined, "node scripts/dev.mjs propose") ||
+		!strings.Contains(joined, "bounded repair and rollback handoff") ||
+		!strings.Contains(joined, "ci-failure-response") {
+		t.Fatal("self-healing diagnostics must publish the existing bounded repair and rollback handoff")
 	}
 }
 

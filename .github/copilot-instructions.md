@@ -11,6 +11,8 @@ Use the repository-local validation guidance in
 - Run `node scripts/dev.mjs verify` before proposing code changes that affect
   application behavior, workflows, scripts, or validation evidence.
 - Run `node scripts/dev.mjs docs` for documentation-only changes.
+- Treat `node scripts/dev.mjs propose` output as review-only repair and
+  rollback patch proposals; do not apply, commit, or push them automatically.
 - Treat `node scripts/dev.mjs repair:verify` as a diagnostic proof, not as
   production self-healing.
 
