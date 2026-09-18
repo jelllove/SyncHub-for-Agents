@@ -1,11 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const server = path.join(root, "tools", "mcp", "validation-server.mjs");
+
+test("repository MCP config points at the shipped SyncHub MCP server wrapper", () => {
+  const config = JSON.parse(readFileSync(path.join(root, ".vscode", "mcp.json"), "utf8"));
+  assert.equal(config.servers["synchub-validation"].command, "node");
+  assert.deepEqual(config.servers["synchub-validation"].args, ["tools/mcp/synchub-mcp-server.mjs"]);
+});
 
 function request(process, message) {
   return new Promise((resolve, reject) => {

@@ -179,10 +179,35 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		"docs/runbooks/ci-failure-response.md",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
+		"tools/mcp/synchub-mcp-server.mjs",
 		".pre-commit-config.yaml",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestRepositoryValidationTasksAreDiscoverable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Taskfile.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"repo:setup:",
+		"node scripts/dev.mjs setup",
+		"repo:check:",
+		"node scripts/dev.mjs check",
+		"repo:verify:",
+		"node scripts/dev.mjs verify",
+		"repo:docs:",
+		"node scripts/dev.mjs docs",
+		"repo:repair:verify:",
+		"node scripts/dev.mjs repair:verify",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("Taskfile.yml must expose repository validation command %q", required)
 		}
 	}
 }
