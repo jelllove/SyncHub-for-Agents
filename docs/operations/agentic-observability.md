@@ -45,6 +45,11 @@ the work observable; they do not claim production autonomous repair.
   GitHub Copilot CLI as a read-only PR auditor and uploads
   `copilot-agent-review`. It is a read-only, artifact-producing review gate, not
   an automatic approval, merge, release, or production self-healing claim.
+- `.github/workflows/recurring-copilot-review.yml`
+  ([workflow](../../.github/workflows/recurring-copilot-review.yml)) calls the
+  local `.github/actions/recurring-copilot-review/action.yml` action on pull
+  requests with a literal prompt-driven review contract for recurring review
+  automation evidence.
 
 ## Artifact contracts
 
@@ -104,6 +109,9 @@ repair proposals as patches requiring review rather than automatic fixes.
   guidance for setup, check, verify, repair proof, and score-assessment handoff.
 - `.github/copilot-instructions.md` gives Copilot cloud agent and Copilot code
   review the repository-specific setup, validation, safety, and handoff rules.
+- `.github/actions/recurring-copilot-review/action.yml` provides a static local
+  composite action whose literal Copilot prompt, review output, and scoped guard
+  wording can be inspected by automation.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.

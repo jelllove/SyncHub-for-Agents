@@ -1,0 +1,9 @@
+name: Recurring Copilot review
+description: Prompt-driven recurring PR review
+runs:
+  using: composite
+  steps:
+    - run: npm install --global @github/copilot@1.0.84 --no-audit --no-fund
+      shell: bash
+    - run: copilot -p "Review pull request changed files and publish review output with scoped guards"
+      shell: bash
