@@ -666,10 +666,17 @@ func TestShippedMcpServerLivesUnderMcpDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := string(server)
+	if !strings.Contains(string(server), `import "../../tools/mcp/validation-server.mjs"`) {
+		t.Fatal("shipped MCP server must delegate to tools/mcp/validation-server.mjs")
+	}
+	impl, err := os.ReadFile(filepath.Join("..", "..", "tools", "mcp", "validation-server.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(impl)
 	for _, required := range []string{"tools/list", "repository_validation_commands", "readOnlyHint"} {
 		if !strings.Contains(body, required) {
-			t.Fatalf("shipped MCP server must contain %q", required)
+			t.Fatalf("MCP implementation must contain %q", required)
 		}
 	}
 }

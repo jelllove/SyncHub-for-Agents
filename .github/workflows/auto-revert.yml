@@ -59,5 +59,19 @@ jobs:
             exit 0
           fi
           git commit --message "auto-revert: restore last good main before ${FAILED_SHA}"
-          git push origin "HEAD:refs/heads/${branch}"
-          gh pr create --base main --head "$branch" --title "$title" --body "This auto-revert PR restores main after CI failed on ${FAILED_SHA}. It does not merge itself; a maintainer must review and merge the revert."
+          if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null 2>&1; then
+            echo "auto-revert branch already exists; opening or reusing the pull request"
+          else
+            git push origin "HEAD:refs/heads/${branch}"
+          fi
+          if [ "$(gh pr list --head "$branch" --state open --json number --jq 'length')" = "0" ]; then
+            gh pr create --base main --head "$branch" --title "$title" --body "$(cat <<EOF
+          This auto-revert PR restores main after CI failed on ${FAILED_SHA}.
+          It does not merge itself.
+
+          GitHub does not start Actions on pull requests created with GITHUB_TOKEN.
+          After opening, a maintainer must dispatch or push a follow-up commit so
+          required checks can run, then review and merge the revert.
+          EOF
+          )"
+          fi
