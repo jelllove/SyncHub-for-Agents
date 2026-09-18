@@ -49,6 +49,9 @@ test("validation MCP server exposes read-only repository tools", async () => {
       "repository_docs_check",
       "repository_validation_commands",
     ]);
+    for (const tool of tools.result.tools) {
+      assert.deepEqual(tool.annotations, { readOnlyHint: true }, tool.name);
+    }
 
     const commands = await request(child, {
       jsonrpc: "2.0",

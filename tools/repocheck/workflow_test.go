@@ -19,6 +19,7 @@ type job struct {
 	Name            string                 `yaml:"name"`
 	If              string                 `yaml:"if"`
 	Uses            string                 `yaml:"uses"`
+	Permissions     map[string]string      `yaml:"permissions"`
 	Timeout         int                    `yaml:"timeout-minutes"`
 	ContinueOnError bool                   `yaml:"continue-on-error"`
 	With            map[string]interface{} `yaml:"with"`
@@ -162,6 +163,8 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	for _, relative := range []string{
 		".env.example",
 		".github/labels.yml",
+		".github/copilot-instructions.md",
+		".github/workflows/copilot-setup-steps.yml",
 		".agents/skills/synchub-validation/SKILL.md",
 		"CODEOWNERS",
 		".github/ISSUE_TEMPLATE/config.yml",
@@ -180,6 +183,90 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestCopilotInstructionsAreCommitted(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "copilot-instructions.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"node scripts/dev.mjs setup",
+		"node scripts/dev.mjs check",
+		"node scripts/dev.mjs verify",
+		"node scripts/dev.mjs docs",
+		"Do not run application sync",
+		"Do not create releases or tags",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("Copilot instructions must contain %q", required)
+		}
+	}
+}
+
+func TestCopilotSetupStepsAreBoundedAndDeterministic(t *testing.T) {
+	workflow := loadWorkflow(t, "copilot-setup-steps.yml")
+	job := workflow.Jobs["copilot-setup-steps"]
+	if len(workflow.Jobs) != 1 || job.Timeout <= 0 || job.Timeout > 59 || job.ContinueOnError {
+		t.Fatal("Copilot setup steps must have one bounded fail-closed job")
+	}
+	if job.Permissions["contents"] != "read" || len(job.Permissions) != 1 {
+		t.Fatal("Copilot setup steps must use read-only contents permission")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError {
+			t.Fatal("Copilot setup steps must not ignore failures")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+		if strings.HasPrefix(s.Uses, "actions/setup-go@") && s.With["go-version-file"] != "go.mod" {
+			t.Fatal("Copilot setup must read Go version from go.mod")
+		}
+		if strings.HasPrefix(s.Uses, "actions/setup-node@") && s.With["node-version-file"] != ".node-version" {
+			t.Fatal("Copilot setup must read Node version from .node-version")
+		}
+	}
+	for _, required := range []string{
+		"actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+		"actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+		"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+		"libgtk-4-dev libwebkitgtk-6.0-dev",
+		"node scripts/dev.mjs setup",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("Copilot setup steps must contain %q", required)
+		}
+	}
+}
+
+func TestDocumentationDriftGateIsDedicatedAndFailClosed(t *testing.T) {
+	ci := loadWorkflow(t, "ci.yml")
+	job := ci.Jobs["documentation-drift"]
+	if job.Name != "Documentation drift" || job.If != "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("Documentation drift must be a dedicated unconditional fail-closed job")
+	}
+	if ci.Permissions["contents"] != "read" || len(ci.Permissions) != 1 {
+		t.Fatal("Documentation drift must inherit read-only workflow permissions")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError || s.If != "" {
+			t.Fatal("Documentation drift steps must not be skipped or ignored")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+	}
+	for _, required := range []string{
+		"actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+		"actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+		"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+		"node scripts/dev.mjs setup",
+		"node scripts/dev.mjs docs",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("Documentation drift job must contain %q", required)
 		}
 	}
 }

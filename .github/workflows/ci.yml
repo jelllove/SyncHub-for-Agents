@@ -14,6 +14,24 @@ permissions:
   contents: read
 
 jobs:
+  documentation-drift:
+    name: Documentation drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: node scripts/dev.mjs setup
+      - run: node scripts/dev.mjs docs
+
   repository:
     name: Repository checks
     runs-on: windows-2025
