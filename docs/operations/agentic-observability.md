@@ -86,6 +86,11 @@ the work observable; they do not claim production autonomous repair.
 - Repository path `docs/runbooks/ci-failure-response.md`
   ([runbook](../runbooks/ci-failure-response.md)) defines detection,
   containment, remediation proposal, validation, and rollback handoff.
+- Repository path `docs/operations/agentic-learning-lifecycle.md`
+  ([lifecycle](agentic-learning-lifecycle.md)) and repository path
+  `docs/reports/agentic-review-findings.md`
+  ([findings](../reports/agentic-review-findings.md)) describe how recurring
+  Copilot review findings become candidate, active, retired, or rejected rules.
 
 ## Labels and handoff
 
