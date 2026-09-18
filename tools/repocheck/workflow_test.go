@@ -191,6 +191,19 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	}
 }
 
+func TestCodeownersCoverBothMaintainerAccounts(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "CODEOWNERS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{"* ", "@qinqingxu", "@jelllove"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("CODEOWNERS must include %q", required)
+		}
+	}
+}
+
 func TestRootValidationEntrypointsAreDiscoverable(t *testing.T) {
 	for _, filename := range []string{"package.json", "Makefile"} {
 		data, err := os.ReadFile(filepath.Join("..", "..", filename))
