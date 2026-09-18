@@ -124,6 +124,7 @@ function writeFixture(root, overrides = {}) {
       "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .github/actions/recurring-copilot-review/action.yml, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
       "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "Shipped MCP: .mcp.json mcp/synchub-validation/server.mjs.",
+      "Lifecycle: docs/operations/agentic-learning-lifecycle.md docs/reports/agentic-review-findings.md candidate active retired rejected Recurring Copilot review.",
       "",
       "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, node scripts/dev.mjs propose, go test ./..., and npm test.",
       "",
@@ -132,12 +133,14 @@ function writeFixture(root, overrides = {}) {
     "docs/specs/agentic-validation.v1.md": "# Agentic validation specification v1\n",
     "docs/adr/0001-validation-evidence.md": "# ADR 0001: Version repository validation evidence\n",
     "docs/reports/agentic-validation-reports.md": "# Reports\n\n`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`\n",
+    "docs/reports/agentic-review-findings.md": "PR #16 Copilot review finding follow-up validation Recurring Copilot review\n",
     "docs/dashboards/agentic-readiness-dashboard.json": JSON.stringify({
       schemaVersion: 1,
       title: "SyncHub agentic readiness dashboard",
       signals: ["repository-validation", "maintenance-proposal", "repair-verification", "ci-failure-response", "rollback-verification", "copilot-agent-review"],
     }) + "\n",
     "docs/runbooks/ci-failure-response.md": "# CI failure response\n\nDetection, containment, remediation, validation, and rollback stay review-only.\n",
+    "docs/operations/agentic-learning-lifecycle.md": "candidate active retired rejected Recurring Copilot review regression validation agentic-review-findings.md\n",
     ".vscode/mcp.json": JSON.stringify({
       servers: {
         "synchub-validation": {
@@ -305,6 +308,7 @@ test("checkEvidenceDrift rejects undocumented repair artifact", () => {
       "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .github/actions/recurring-copilot-review/action.yml, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
       "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "Shipped MCP: .mcp.json mcp/synchub-validation/server.mjs.",
+      "Lifecycle: docs/operations/agentic-learning-lifecycle.md docs/reports/agentic-review-findings.md candidate active retired rejected Recurring Copilot review.",
       "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, node scripts/dev.mjs propose, go test ./..., and npm test.",
       "",
     ].join("\n"),
@@ -327,6 +331,7 @@ test("checkEvidenceDrift rejects undocumented dashboard surface", () => {
       "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .github/actions/recurring-copilot-review/action.yml, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
       "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "Shipped MCP: .mcp.json mcp/synchub-validation/server.mjs.",
+      "Lifecycle: docs/operations/agentic-learning-lifecycle.md docs/reports/agentic-review-findings.md candidate active retired rejected Recurring Copilot review.",
       "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, node scripts/dev.mjs propose, go test ./..., and npm test.",
       "",
     ].join("\n"),
@@ -349,6 +354,7 @@ test("checkEvidenceDrift rejects undocumented Copilot agent review artifact", ()
       "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .github/actions/recurring-copilot-review/action.yml, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
       "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "Shipped MCP: .mcp.json mcp/synchub-validation/server.mjs.",
+      "Lifecycle: docs/operations/agentic-learning-lifecycle.md docs/reports/agentic-review-findings.md candidate active retired rejected Recurring Copilot review.",
       "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, node scripts/dev.mjs propose, go test ./..., and npm test.",
       "",
     ].join("\n"),
@@ -371,6 +377,7 @@ test("checkEvidenceDrift rejects undocumented rollback verification artifact", (
       "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .github/actions/recurring-copilot-review/action.yml, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
       "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "Shipped MCP: .mcp.json mcp/synchub-validation/server.mjs.",
+      "Lifecycle: docs/operations/agentic-learning-lifecycle.md docs/reports/agentic-review-findings.md candidate active retired rejected Recurring Copilot review.",
       "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, node scripts/dev.mjs propose, go test ./..., and npm test.",
       "",
     ].join("\n"),
@@ -378,5 +385,16 @@ test("checkEvidenceDrift rejects undocumented rollback verification artifact", (
   assert.throws(
     () => checkEvidenceDrift(root),
     /agentic-observability.md must mention "`rollback-verification`"/,
+  );
+});
+
+test("checkEvidenceDrift rejects incomplete agentic learning lifecycle", () => {
+  const root = fixtureRoot();
+  writeFixture(root, {
+    "docs/operations/agentic-learning-lifecycle.md": "candidate active\n",
+  });
+  assert.throws(
+    () => checkEvidenceDrift(root),
+    /agentic-learning-lifecycle.md must mention "retired"/,
   );
 });

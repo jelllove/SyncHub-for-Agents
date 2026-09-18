@@ -48,7 +48,7 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/recurring-copilot-review.yml`
   ([workflow](../../.github/workflows/recurring-copilot-review.yml)) calls the
   local `.github/actions/recurring-copilot-review/action.yml` action on pull
-  requests with a literal prompt-driven review contract for recurring review
+  requests with a literal prompt-driven review contract for Recurring Copilot review
   automation evidence.
 
 ## Artifact contracts

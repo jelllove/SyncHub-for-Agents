@@ -68,11 +68,13 @@ function evidenceFixture(root) {
   put(root, "docs/specs/agentic-validation.v1.md", "# Agentic validation specification v1\n");
   put(root, "docs/adr/0001-validation-evidence.md", "# ADR 0001: Version repository validation evidence\n");
   put(root, "docs/reports/agentic-validation-reports.md", "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`\n");
+  put(root, "docs/reports/agentic-review-findings.md", "PR #16 Copilot review finding follow-up validation Recurring Copilot review\n");
   put(root, "docs/dashboards/agentic-readiness-dashboard.json", JSON.stringify({
     schemaVersion: 1,
     signals: ["ci-failure-response", "rollback-verification", "copilot-agent-review"],
   }) + "\n");
   put(root, "docs/runbooks/ci-failure-response.md", "detection containment remediation validation rollback\n");
+  put(root, "docs/operations/agentic-learning-lifecycle.md", "candidate active retired rejected Recurring Copilot review regression validation agentic-review-findings.md\n");
   put(root, ".vscode/mcp.json", JSON.stringify({
     servers: { "synchub-validation": { command: "node", args: ["tools/mcp/synchub-mcp-server.mjs"] } },
   }) + "\n");
@@ -95,8 +97,9 @@ function evidenceFixture(root) {
     ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/auto-revert.yml .github/workflows/pr-validation.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml .github/workflows/recurring-copilot-review.yml .github/workflows/copilot-setup-steps.yml Documentation drift",
     "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
-    "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
+    "docs/reports/agentic-validation-reports.md docs/reports/agentic-review-findings.md docs/dashboards/agentic-readiness-dashboard.json docs/operations/agentic-learning-lifecycle.md docs/runbooks/ci-failure-response.md",
     "CODEOWNERS .github/copilot-instructions.md .github/actions/recurring-copilot-review/action.yml .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json Makefile package.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .mcp.json mcp/synchub-validation/server.mjs .github/workflows/codeql.yml",
+    "candidate active retired rejected Recurring Copilot review",
     "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs rollback:verify node scripts/dev.mjs propose go test ./... npm test",
     "",
   ].join("\n"));

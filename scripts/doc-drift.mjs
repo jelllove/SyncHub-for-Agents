@@ -14,7 +14,9 @@ const requiredGuideEntries = [
   "docs/specs/agentic-validation.v1.md",
   "docs/adr/0001-validation-evidence.md",
   "docs/reports/agentic-validation-reports.md",
+  "docs/reports/agentic-review-findings.md",
   "docs/dashboards/agentic-readiness-dashboard.json",
+  "docs/operations/agentic-learning-lifecycle.md",
   "docs/runbooks/ci-failure-response.md",
   "Makefile",
   "package.json",
@@ -51,6 +53,11 @@ const requiredGuideEntries = [
   "node scripts/dev.mjs propose",
   "go test ./...",
   "npm test",
+  "candidate",
+  "active",
+  "retired",
+  "rejected",
+  "Recurring Copilot review",
 ];
 
 function read(root, relative) {
@@ -112,6 +119,16 @@ export function checkEvidenceDrift(root) {
   for (const entry of requiredLabels.concat(requiredGuideEntries)) {
     requireContains(guide, entry, "agentic-observability.md");
   }
+  const lifecycle = read(root, "docs/operations/agentic-learning-lifecycle.md");
+  for (const state of ["candidate", "active", "retired", "rejected"]) {
+    requireContains(lifecycle, state, "agentic-learning-lifecycle.md");
+  }
+  requireContains(lifecycle, "regression validation", "agentic-learning-lifecycle.md");
+  requireContains(lifecycle, "agentic-review-findings.md", "agentic-learning-lifecycle.md");
+  const findings = read(root, "docs/reports/agentic-review-findings.md");
+  requireContains(findings, "Copilot review finding", "agentic-review-findings.md");
+  requireContains(findings, "follow-up validation", "agentic-review-findings.md");
+  requireContains(findings, "Recurring Copilot review", "agentic-review-findings.md");
 
   const dashboard = JSON.parse(read(root, "docs/dashboards/agentic-readiness-dashboard.json"));
   if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response") ||
