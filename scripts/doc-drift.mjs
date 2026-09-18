@@ -26,7 +26,11 @@ const requiredGuideEntries = [
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
   ".github/workflows/self-healing.yml",
+  ".github/workflows/auto-revert.yml",
+  ".github/workflows/pr-validation.yml",
   ".github/workflows/codeql.yml",
+  ".mcp.json",
+  "mcp/synchub-validation/server.mjs",
   ".github/ISSUE_TEMPLATE/config.yml",
   ".vscode/mcp.json",
   "CODEOWNERS",
@@ -43,6 +47,8 @@ const requiredGuideEntries = [
   "node scripts/dev.mjs repair:verify",
   "node scripts/dev.mjs rollback:verify",
   "node scripts/dev.mjs propose",
+  "go test ./...",
+  "npm test",
 ];
 
 function read(root, relative) {
@@ -124,6 +130,10 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs rollback:verify", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "ci-failure-response", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "rollback-verification", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/auto-revert.yml"), "auto-revert", "auto-revert.yml");
+  requireContains(read(root, ".github/workflows/pr-validation.yml"), "go test ./...", "pr-validation.yml");
+  requireContains(read(root, ".github/workflows/pr-validation.yml"), "npm test", "pr-validation.yml");
+  requireContains(read(root, ".mcp.json"), "mcp/synchub-validation/server.mjs", ".mcp.json");
   for (const entrypoint of ["package.json", "Makefile"]) {
     const content = read(root, entrypoint);
     requireContains(content, "node scripts/dev.mjs verify", entrypoint);

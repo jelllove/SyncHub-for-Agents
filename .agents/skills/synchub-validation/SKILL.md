@@ -29,6 +29,9 @@ Run commands from the repository root:
   dedicated fail-closed PR check.
 - `package.json`, `Makefile`, and `Taskfile.yml` expose the same validation
   commands for agents and scanners that discover different command formats.
+- POSIX pull-request validation runs `go test ./...` and `npm test`.
+- `.mcp.json` and `mcp/synchub-validation/server.mjs` ship the read-only
+  repository MCP server.
 
 ## Safety rules
 

@@ -12,6 +12,9 @@ test("repository MCP config points at the shipped SyncHub MCP server wrapper", (
   const config = JSON.parse(readFileSync(path.join(root, ".vscode", "mcp.json"), "utf8"));
   assert.equal(config.servers["synchub-validation"].command, "node");
   assert.deepEqual(config.servers["synchub-validation"].args, ["tools/mcp/synchub-mcp-server.mjs"]);
+  const shipped = JSON.parse(readFileSync(path.join(root, ".mcp.json"), "utf8"));
+  assert.equal(shipped.mcpServers["synchub-validation"].command, "node");
+  assert.deepEqual(shipped.mcpServers["synchub-validation"].args, ["mcp/synchub-validation/server.mjs"]);
 });
 
 function request(process, message) {
@@ -38,6 +41,26 @@ function request(process, message) {
     });
   });
 }
+
+test("shipped MCP server wrapper exposes the same read-only repository tools", async () => {
+  const shipped = path.join(root, "mcp", "synchub-validation", "server.mjs");
+  const child = spawn(process.execPath, [shipped], { cwd: root, stdio: ["pipe", "pipe", "pipe"] });
+  try {
+    await request(child, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+    });
+    const tools = await request(child, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+    assert.deepEqual(tools.result.tools.map(tool => tool.name), [
+      "repository_docs_check",
+      "repository_validation_commands",
+    ]);
+  } finally {
+    child.kill();
+  }
+});
 
 test("validation MCP server exposes read-only repository tools", async () => {
   const child = spawn(process.execPath, [server], { cwd: root, stdio: ["pipe", "pipe", "pipe"] });

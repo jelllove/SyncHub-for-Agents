@@ -29,6 +29,13 @@ the work observable; they do not claim production autonomous repair.
   `workflow_run` events or manual dispatch, runs `node scripts/dev.mjs propose`,
   and publishes a bounded repair and rollback handoff as `ci-failure-response`
   without write permissions.
+- `.github/workflows/auto-revert.yml`
+  ([workflow](../../.github/workflows/auto-revert.yml)) opens a review-only
+  auto-revert pull request when main CI fails after a push. It never merges
+  the revert.
+- `.github/workflows/pr-validation.yml`
+  ([workflow](../../.github/workflows/pr-validation.yml)) is a POSIX PR job
+  that runs `go test ./...` and `npm test` after setup.
 - `.github/workflows/codeql.yml`
   ([workflow](../../.github/workflows/codeql.yml)) runs pinned CodeQL
   JavaScript/TypeScript analysis for pull requests, default-branch pushes,
@@ -100,6 +107,8 @@ repair proposals as patches requiring review rather than automatic fixes.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
+- `.mcp.json` and `mcp/synchub-validation/server.mjs` ship the same read-only
+  repository MCP server as a repository-level MCP implementation.
 - `package.json`, `Makefile`, and `Taskfile.yml` expose common repository
   validation entry points for scanners and agents that discover different
   command formats.

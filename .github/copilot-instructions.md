@@ -17,6 +17,9 @@ Use the repository-local validation guidance in
   production self-healing.
 - Use `node scripts/dev.mjs rollback:verify` for a lightweight isolated check of
   review-only maintenance repair and rollback patches.
+- POSIX pull-request validation also runs `go test ./...` and `npm test`.
+- Use `.mcp.json` and `mcp/synchub-validation/server.mjs` as the shipped
+  repository MCP server.
 
 ## Safety boundaries
 
