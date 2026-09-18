@@ -496,6 +496,51 @@ func TestRecurringCopilotReviewWorkflowIsStaticallyDiscoverable(t *testing.T) {
 		}
 	}
 }
+
+func TestAgenticLearningLifecycleIsDocumented(t *testing.T) {
+	for _, relative := range []string{
+		"docs/operations/agentic-learning-lifecycle.md",
+		"docs/reports/agentic-review-findings.md",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+	lifecycle, err := os.ReadFile(filepath.Join("..", "..", "docs", "operations", "agentic-learning-lifecycle.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifeText := string(lifecycle)
+	for _, required := range []string{
+		"candidate",
+		"active",
+		"retired",
+		"rejected",
+		"Recurring Copilot review",
+		"regression validation",
+		"agentic-review-findings.md",
+	} {
+		if !strings.Contains(lifeText, required) {
+			t.Fatalf("agentic learning lifecycle must mention %q", required)
+		}
+	}
+	findings, err := os.ReadFile(filepath.Join("..", "..", "docs", "reports", "agentic-review-findings.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	findingsText := string(findings)
+	for _, required := range []string{
+		"PR #16",
+		"Copilot review finding",
+		"follow-up validation",
+		"Recurring Copilot review",
+	} {
+		if !strings.Contains(findingsText, required) {
+			t.Fatalf("agentic review findings index must mention %q", required)
+		}
+	}
+}
+
 func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 	workflow := loadWorkflow(t, "self-healing.yml")
 	if _, ok := workflow.On["workflow_run"]; !ok {

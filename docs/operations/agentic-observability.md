@@ -48,7 +48,7 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/recurring-copilot-review.yml`
   ([workflow](../../.github/workflows/recurring-copilot-review.yml)) calls the
   local `.github/actions/recurring-copilot-review/action.yml` action on pull
-  requests with a literal prompt-driven review contract for recurring review
+  requests with a literal prompt-driven review contract for Recurring Copilot review
   automation evidence.
 
 ## Artifact contracts
@@ -86,6 +86,11 @@ the work observable; they do not claim production autonomous repair.
 - Repository path `docs/runbooks/ci-failure-response.md`
   ([runbook](../runbooks/ci-failure-response.md)) defines detection,
   containment, remediation proposal, validation, and rollback handoff.
+- Repository path `docs/operations/agentic-learning-lifecycle.md`
+  ([lifecycle](agentic-learning-lifecycle.md)) and repository path
+  `docs/reports/agentic-review-findings.md`
+  ([findings](../reports/agentic-review-findings.md)) describe how recurring
+  Copilot review findings become candidate, active, retired, or rejected rules.
 
 ## Labels and handoff
 
