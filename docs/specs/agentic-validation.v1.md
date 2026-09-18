@@ -22,12 +22,18 @@ not define production incident response or autonomous repair of user sync data.
 - `.github/workflows/codeql.yml` runs CodeQL JavaScript/TypeScript analysis.
 - `.github/workflows/copilot-agent-review.yml` publishes `copilot-agent-review`
   from a read-only Copilot CLI pull-request audit.
+- `.github/workflows/copilot-setup-steps.yml` prepares the Copilot cloud-agent
+  environment before tasks.
+- The `Documentation drift` CI job runs `node scripts/dev.mjs docs` as a
+  dedicated pull-request status.
 
 ## Required review surfaces
 
 - `CODEOWNERS` declares the maintainer review route.
 - `.agents/skills/synchub-validation/SKILL.md` declares the repository-local
   validation and handoff skill.
+- `.github/copilot-instructions.md` declares repository-specific Copilot setup,
+  validation, and safety rules.
 - `.github/labels.yml` declares evidence-routing labels.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports to
   maintenance evidence.

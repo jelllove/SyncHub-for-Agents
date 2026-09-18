@@ -10,7 +10,13 @@ the work observable; they do not claim production autonomous repair.
   ([workflow](../../.github/workflows/ci.yml)) runs
   `node scripts/dev.mjs verify`, publishes `repository-validation`, and
   publishes `maintenance-proposal` only after a failed validation run produces a
-  bounded review-only patch.
+  bounded review-only patch. It also includes the dedicated
+  `Documentation drift` status, which runs `node scripts/dev.mjs docs` as a
+  fail-closed PR check.
+- `.github/workflows/copilot-setup-steps.yml`
+  ([workflow](../../.github/workflows/copilot-setup-steps.yml)) prepares the
+  GitHub Copilot cloud-agent environment with pinned Go, Node, Linux desktop
+  prerequisites, and `node scripts/dev.mjs setup`.
 - `.github/workflows/maintenance.yml`
   ([workflow](../../.github/workflows/maintenance.yml)) schedules the same
   repository/security and Linux test checks without write permissions or
@@ -84,10 +90,13 @@ repair proposals as patches requiring review rather than automatic fixes.
   requiring a second approver in this single-maintainer repository.
 - `.agents/skills/synchub-validation/SKILL.md` provides committed repository
   guidance for setup, check, verify, repair proof, and score-assessment handoff.
+- `.github/copilot-instructions.md` gives Copilot cloud agent and Copilot code
+  review the repository-specific setup, validation, safety, and handoff rules.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
 - `tools/mcp/validation-server.mjs` is a read-only stdio MCP server with tools
   for listing validation commands and running `node scripts/dev.mjs docs`.
+  Its tools set `annotations.readOnlyHint: true` for Copilot code review.
 - `.pre-commit-config.yaml` offers optional local pre-commit hooks for
   `node scripts/dev.mjs check` and `node scripts/dev.mjs docs`.

@@ -17,7 +17,9 @@ const requiredGuideEntries = [
   "docs/dashboards/agentic-readiness-dashboard.json",
   "docs/runbooks/ci-failure-response.md",
   ".agents/skills/synchub-validation/SKILL.md",
+  ".github/copilot-instructions.md",
   ".github/workflows/ci.yml",
+  ".github/workflows/copilot-setup-steps.yml",
   ".github/workflows/copilot-agent-review.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
@@ -27,6 +29,7 @@ const requiredGuideEntries = [
   ".vscode/mcp.json",
   "CODEOWNERS",
   "tools/mcp/validation-server.mjs",
+  "Documentation drift",
   "`repository-validation`",
   "`maintenance-proposal`",
   "`repair-verification`",
@@ -116,6 +119,12 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs check", ".pre-commit-config.yaml");
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs docs", ".pre-commit-config.yaml");
   requireContains(read(root, ".github/workflows/codeql.yml"), "javascript-typescript", "codeql.yml");
+  requireContains(read(root, ".github/copilot-instructions.md"), "node scripts/dev.mjs verify", ".github/copilot-instructions.md");
+  requireContains(read(root, ".github/copilot-instructions.md"), "Do not create releases or tags", ".github/copilot-instructions.md");
+  requireContains(read(root, ".github/workflows/copilot-setup-steps.yml"), "copilot-setup-steps", "copilot-setup-steps.yml");
+  requireContains(read(root, ".github/workflows/copilot-setup-steps.yml"), "node scripts/dev.mjs setup", "copilot-setup-steps.yml");
+  requireContains(read(root, ".github/workflows/ci.yml"), "Documentation drift", "ci.yml");
+  requireContains(read(root, ".github/workflows/ci.yml"), "node scripts/dev.mjs docs", "ci.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "npm install --global @github/copilot@1.0.84", "copilot-agent-review.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "Do not modify files", "copilot-agent-review.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "copilot-agent-review", "copilot-agent-review.yml");

@@ -21,6 +21,10 @@ Run commands from the repository root:
 - Pull requests also run the `Copilot agent review` workflow, which uploads the
   `copilot-agent-review` artifact and must not modify files or create GitHub
   resources.
+- GitHub Copilot cloud-agent tasks use `.github/copilot-instructions.md` and
+  `.github/workflows/copilot-setup-steps.yml` for repository-specific setup.
+- The `Documentation drift` status runs `node scripts/dev.mjs docs` as a
+  dedicated fail-closed PR check.
 
 ## Safety rules
 

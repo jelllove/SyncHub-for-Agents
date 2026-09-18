@@ -59,6 +59,7 @@ function evidenceFixture(root) {
     "",
   ].join("\n"));
   writeFileSync(path.join(root, "CODEOWNERS"), "* @jelllove\n");
+  writeFileSync(path.join(root, ".github", "copilot-instructions.md"), "node scripts/dev.mjs setup\nnode scripts/dev.mjs check\nnode scripts/dev.mjs verify\nnode scripts/dev.mjs docs\nDo not run application sync\nDo not create releases or tags\n");
   mkdirSync(path.join(root, ".agents", "skills", "synchub-validation"), { recursive: true });
   writeFileSync(path.join(root, ".agents", "skills", "synchub-validation", "SKILL.md"), "# SyncHub Validation\n");
   writeFileSync(path.join(root, ".pre-commit-config.yaml"), "repos:\n  - repo: local\n    hooks:\n      - entry: node scripts/dev.mjs check\n        pass_filenames: false\n      - entry: node scripts/dev.mjs docs\n        pass_filenames: false\n");
@@ -86,12 +87,13 @@ function evidenceFixture(root) {
     title: "SyncHub contained repair proof v1",
     required: ["schemaVersion", "scenario", "status", "steps", "snapshots", "originalSourceUnchanged"],
   }) + "\n");
-  writeFileSync(path.join(root, ".github", "workflows", "ci.yml"), "name: CI\nrepository-validation\nmaintenance-proposal\n");
+  writeFileSync(path.join(root, ".github", "workflows", "ci.yml"), "name: CI\nDocumentation drift\nnode scripts/dev.mjs docs\nrepository-validation\nmaintenance-proposal\n");
   writeFileSync(path.join(root, ".github", "workflows", "maintenance.yml"), "name: Repository maintenance\n");
   writeFileSync(path.join(root, ".github", "workflows", "repair-verification.yml"), "name: Repair verification\nrepair-verification\n");
   writeFileSync(path.join(root, ".github", "workflows", "self-healing.yml"), "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs propose\nci-failure-response\n");
   writeFileSync(path.join(root, ".github", "workflows", "codeql.yml"), "name: CodeQL\njavascript-typescript\n");
   writeFileSync(path.join(root, ".github", "workflows", "copilot-agent-review.yml"), "name: Copilot agent review\nnpm install --global @github/copilot@1.0.84\nYou are reviewing SyncHub for Agents\nDo not modify files\ncopilot-agent-review\n");
+  writeFileSync(path.join(root, ".github", "workflows", "copilot-setup-steps.yml"), "name: Copilot Setup Steps\ncopilot-setup-steps\nnode scripts/dev.mjs setup\n");
   writeFileSync(path.join(root, "docs", "specs", "README.md"), "# SyncHub versioned specifications\n");
   writeFileSync(path.join(root, "docs", "specs", "agentic-validation.v1.md"), "# Agentic validation specification v1\n");
   writeFileSync(path.join(root, "docs", "adr", "0001-validation-evidence.md"), "# ADR 0001: Version repository validation evidence\n");
@@ -110,11 +112,11 @@ function evidenceFixture(root) {
   writeFileSync(path.join(root, "docs", "operations", "agentic-observability.md"), [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
-    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml .github/workflows/copilot-setup-steps.yml Documentation drift",
     "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `copilot-agent-review`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
     "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
-    "CODEOWNERS .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
+    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs .github/workflows/codeql.yml",
     "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));
