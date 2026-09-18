@@ -11,6 +11,8 @@ human review.
 3. **Remediation proposal:** `node scripts/dev.mjs propose` may prepare a
    bounded `maintenance-proposal` or `ci-failure-response` artifact for Go
    formatting and generated-reference drift only.
+   Repair proposals are review-only and must not be applied automatically to
+   user data or production incidents.
 4. **Review:** a maintainer inspects the patch and report before applying any
    source change.
 5. **Validation:** `node scripts/dev.mjs verify` and hosted checks must pass
