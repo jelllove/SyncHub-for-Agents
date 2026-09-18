@@ -75,7 +75,7 @@ the work observable; they do not claim production autonomous repair.
 - `documentation-drift`: documentation/reference mismatches found by checks.
 
 Human reviewers should link failed and passing workflow runs in pull requests,
-verify the report `status` before trusting individual command rows, and treat
+trust the overall validation report `status` before individual check rows, and treat
 repair proposals as patches requiring review rather than automatic fixes.
 
 ## Agent execution surfaces
