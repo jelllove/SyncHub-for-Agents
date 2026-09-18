@@ -6,6 +6,7 @@
     "maintenance-proposal",
     "repair-verification",
     "ci-failure-response",
+    "rollback-verification",
     "copilot-agent-review"
   ],
   "workflows": [

@@ -3,7 +3,7 @@
     "synchub-validation": {
       "type": "stdio",
       "command": "node",
-      "args": ["tools/mcp/validation-server.mjs"]
+      "args": ["tools/mcp/synchub-mcp-server.mjs"]
     }
   }
 }

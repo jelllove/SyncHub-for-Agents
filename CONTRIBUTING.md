@@ -67,10 +67,11 @@ hook configuration as part of repository setup.
 maintenance audit is read-only. This is distinct from the application's scheduled
 trash cleanup and retention window.
 
-Failed validation can produce a review-only patch through
+Failed validation can produce review-only repair and rollback patches through
 `node scripts/dev.mjs propose`. Follow the [review and reverse-check procedure](docs/development.md)
-before applying it. The original CI failure is never changed to success by
-generating a proposal, and no source changes are applied automatically.
+before applying either patch. The original CI failure is never changed to
+success by generating a proposal, and no source changes are applied
+automatically.
 
 Dependabot proposes weekly GitHub Actions, Go, and frontend npm updates with
 bounded open PRs. Updates require human review and passing checks; no automatic

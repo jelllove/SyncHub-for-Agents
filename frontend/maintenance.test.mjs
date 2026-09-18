@@ -47,6 +47,7 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(report.status).toBe("no-changes");
     expect(report.changes).toEqual([]);
     expect(existsSync(path.join(directory, "repair.patch"))).toBe(false);
+    expect(existsSync(path.join(directory, "rollback.patch"))).toBe(false);
     expect(JSON.parse(readFileSync(path.join(directory, "proposal.json"), "utf8"))).toEqual(report);
     expect(run("git", ["status", "--porcelain=v1"], root)).toBe("");
   });
@@ -63,12 +64,24 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(report.status).toBe("proposed");
     expect(report.changes.map(change => change.path).sort()).toEqual(["docs/development.md", "main.go"]);
     expect(report.changes.every(change => /^[a-f0-9]{64}$/.test(change.beforeSha256) && /^[a-f0-9]{64}$/.test(change.afterSha256))).toBe(true);
-    expect(report.verification).toEqual({ patchApplies: true, canonical: true, scope: "format-and-generated-reference" });
+    expect(report.verification).toEqual({
+      patchApplies: true,
+      canonical: true,
+      rollbackApplies: true,
+      rollbackRestoresOriginal: true,
+      scope: "format-and-generated-reference",
+    });
     expect(readFileSync(path.join(root, "main.go"), "utf8")).toBe(originalGo);
     expect(readFileSync(path.join(root, "docs", "development.md"), "utf8")).toBe(originalDoc);
     expect(run("git", ["status", "--porcelain=v1"], root)).toBe(before);
     const patch = path.join(directory, "repair.patch");
+    const rollback = path.join(directory, "rollback.patch");
+    expect(existsSync(rollback)).toBe(true);
     run("git", ["apply", "--check", patch], root);
+    run("git", ["apply", patch], root);
+    run("git", ["apply", "--check", rollback], root);
+    run("git", ["apply", rollback], root);
+    expect(readFileSync(path.join(root, "main.go"), "utf8").replaceAll("\r\n", "\n")).toBe(originalGo.replaceAll("\r\n", "\n"));
     run("git", ["apply", patch], root);
     expect(readFileSync(path.join(root, "main.go"), "utf8").replaceAll("\r\n", "\n")).toBe("package example\n\nvar answer = 2\n");
     expect(() => checkReference(root)).not.toThrow();
@@ -87,6 +100,7 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(tooMany.report.status).toBe("failed");
     expect(tooMany.report.error).toContain("file limit");
     expect(existsSync(path.join(tooMany.directory, "repair.patch"))).toBe(false);
+    expect(existsSync(path.join(tooMany.directory, "rollback.patch"))).toBe(false);
     const allowed = propose(root, { maxFiles: 2 });
     expect(allowed.report.status).toBe("proposed");
     const size = readFileSync(path.join(allowed.directory, "repair.patch")).length;
@@ -95,6 +109,7 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(tooLarge.report.status).toBe("failed");
     expect(tooLarge.report.error).toContain("patch size limit");
     expect(existsSync(path.join(tooLarge.directory, "repair.patch"))).toBe(false);
+    expect(existsSync(path.join(tooLarge.directory, "rollback.patch"))).toBe(false);
   }, 20_000);
 
   it("reports unsupported syntax failures instead of claiming to repair arbitrary code", () => {
@@ -104,6 +119,7 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(report.status).toBe("failed");
     expect(report.error).toContain("gofmt");
     expect(existsSync(path.join(directory, "repair.patch"))).toBe(false);
+    expect(existsSync(path.join(directory, "rollback.patch"))).toBe(false);
     expect(readFileSync(path.join(root, "main.go"), "utf8")).toBe("this is not Go code\n");
   });
 
@@ -118,6 +134,24 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     run("git", ["apply", "--check", patch], root);
   });
 
+  it("verifies the review-only rollback handoff in an isolated fixture", () => {
+    const root = fixture();
+    expect(maintenance.verifyMaintenanceRollback).toBeTypeOf("function");
+    const { report, directory } = maintenance.verifyMaintenanceRollback(root);
+    expect(report.status, report.error).toBe("passed");
+    expect(report.kind).toBe("maintenance-rollback-verification");
+    expect(report.scenario).toBe("review-only-maintenance-rollback");
+    expect(report.productionIncident).toBe(false);
+    expect(report.verification).toEqual({
+      repairPatchApplies: true,
+      rollbackPatchApplies: true,
+      rollbackRestoresOriginal: true,
+    });
+    expect(existsSync(path.join(directory, "repair.patch"))).toBe(true);
+    expect(existsSync(path.join(directory, "rollback.patch"))).toBe(true);
+    expect(run("git", ["status", "--porcelain=v1"], root)).toBe("");
+  }, 20_000);
+
   it("refuses invalid UTF-8 without replacing or changing the original bytes", () => {
     const root = fixture();
     const bytes = Buffer.concat([Buffer.from("package example\n// "), Buffer.from([255]), Buffer.from("\nvar  answer=2\n")]);
@@ -127,6 +161,7 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     expect(report.error).toContain("non-UTF-8");
     expect(readFileSync(path.join(root, "main.go"))).toEqual(bytes);
     expect(existsSync(path.join(directory, "repair.patch"))).toBe(false);
+    expect(existsSync(path.join(directory, "rollback.patch"))).toBe(false);
   });
 
   it("rejects invalid limits and refuses linked artifact directories", () => {

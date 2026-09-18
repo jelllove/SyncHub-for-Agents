@@ -27,6 +27,7 @@ type job struct {
 }
 
 type step struct {
+	Name            string            `yaml:"name"`
 	ID              string            `yaml:"id"`
 	Run             string            `yaml:"run"`
 	Uses            string            `yaml:"uses"`
@@ -177,12 +178,63 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		"docs/reports/agentic-validation-reports.md",
 		"docs/dashboards/agentic-readiness-dashboard.json",
 		"docs/runbooks/ci-failure-response.md",
+		"Makefile",
+		"package.json",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
+		"tools/mcp/synchub-mcp-server.mjs",
 		".pre-commit-config.yaml",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestRootValidationEntrypointsAreDiscoverable(t *testing.T) {
+	for _, filename := range []string{"package.json", "Makefile"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, required := range []string{
+			"node scripts/dev.mjs setup",
+			"node scripts/dev.mjs check",
+			"node scripts/dev.mjs verify",
+			"node scripts/dev.mjs docs",
+			"node scripts/dev.mjs repair:verify",
+			"node scripts/dev.mjs rollback:verify",
+		} {
+			if !strings.Contains(text, required) {
+				t.Fatalf("%s must expose repository validation command %q", filename, required)
+			}
+		}
+	}
+}
+
+func TestRepositoryValidationTasksAreDiscoverable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Taskfile.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"repo:setup:",
+		"node scripts/dev.mjs setup",
+		"repo:check:",
+		"node scripts/dev.mjs check",
+		"repo:verify:",
+		"node scripts/dev.mjs verify",
+		"repo:docs:",
+		"node scripts/dev.mjs docs",
+		"repo:repair:verify:",
+		"node scripts/dev.mjs repair:verify",
+		"repo:rollback:verify:",
+		"node scripts/dev.mjs rollback:verify",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("Taskfile.yml must expose repository validation command %q", required)
 		}
 	}
 }
@@ -408,15 +460,22 @@ func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 		if s.ContinueOnError {
 			t.Fatal("self-healing diagnostics must not hide step failures")
 		}
-		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+		joined += "\n" + s.Name + "\n" + s.Run + "\n" + s.Uses + "\n"
+		for _, value := range s.With {
+			joined += value + "\n"
+		}
 	}
 	for _, forbidden := range []string{"git push", "gh issue create", "gh pr create", "pull-requests: write", "contents: write"} {
 		if strings.Contains(joined, forbidden) {
 			t.Fatalf("self-healing diagnostics must not mutate repository state with %q", forbidden)
 		}
 	}
-	if !strings.Contains(joined, "node scripts/dev.mjs propose") {
-		t.Fatal("self-healing diagnostics must publish the existing review-only proposal")
+	if !strings.Contains(joined, "node scripts/dev.mjs propose") ||
+		!strings.Contains(joined, "node scripts/dev.mjs rollback:verify") ||
+		!strings.Contains(joined, "bounded repair and rollback handoff") ||
+		!strings.Contains(joined, "ci-failure-response") ||
+		!strings.Contains(joined, "rollback-verification") {
+		t.Fatal("self-healing diagnostics must publish the existing bounded repair and rollback handoff")
 	}
 }
 

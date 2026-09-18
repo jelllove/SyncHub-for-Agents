@@ -117,34 +117,43 @@ function writeFixture(root, overrides = {}) {
       "",
       "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml, .github/workflows/codeql.yml, .github/workflows/copilot-agent-review.yml, .github/workflows/copilot-setup-steps.yml, Documentation drift.",
       "",
-      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `copilot-agent-review`.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `rollback-verification`, `copilot-agent-review`.",
       "",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
       "",
-      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
       "",
-      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
     "docs/specs/README.md": "# SyncHub versioned specifications\n",
     "docs/specs/agentic-validation.v1.md": "# Agentic validation specification v1\n",
     "docs/adr/0001-validation-evidence.md": "# ADR 0001: Version repository validation evidence\n",
-    "docs/reports/agentic-validation-reports.md": "# Reports\n\n`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `copilot-agent-review`\n",
+    "docs/reports/agentic-validation-reports.md": "# Reports\n\n`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`\n",
     "docs/dashboards/agentic-readiness-dashboard.json": JSON.stringify({
       schemaVersion: 1,
       title: "SyncHub agentic readiness dashboard",
-      signals: ["repository-validation", "maintenance-proposal", "repair-verification", "ci-failure-response", "copilot-agent-review"],
+      signals: ["repository-validation", "maintenance-proposal", "repair-verification", "ci-failure-response", "rollback-verification", "copilot-agent-review"],
     }) + "\n",
     "docs/runbooks/ci-failure-response.md": "# CI failure response\n\nDetection, containment, remediation, validation, and rollback stay review-only.\n",
     ".vscode/mcp.json": JSON.stringify({
       servers: {
         "synchub-validation": {
           command: "node",
-          args: ["tools/mcp/validation-server.mjs"],
+          args: ["tools/mcp/synchub-mcp-server.mjs"],
         },
       },
     }) + "\n",
     "tools/mcp/validation-server.mjs": "export const name = 'synchub-validation';\n",
+    "tools/mcp/synchub-mcp-server.mjs": "import './validation-server.mjs';\n",
+    "package.json": JSON.stringify({
+      scripts: {
+        verify: "node scripts/dev.mjs verify",
+        "rollback:verify": "node scripts/dev.mjs rollback:verify",
+      },
+    }) + "\n",
+    "Makefile": "verify:\n\tnode scripts/dev.mjs verify\n\nrollback-verify:\n\tnode scripts/dev.mjs rollback:verify\n",
     ".github/workflows/ci.yml": [
       "name: CI",
       "Documentation drift",
@@ -186,6 +195,10 @@ function writeFixture(root, overrides = {}) {
       "jobs:",
       "  response:",
       "    steps:",
+      "      - run: node scripts/dev.mjs rollback:verify",
+      "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "        with:",
+      "          name: rollback-verification",
       "      - run: node scripts/dev.mjs propose",
       "      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
       "        with:",
@@ -275,8 +288,9 @@ test("checkEvidenceDrift rejects undocumented repair artifact", () => {
       "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml, .github/workflows/codeql.yml, .github/workflows/copilot-agent-review.yml, .github/workflows/copilot-setup-steps.yml, Documentation drift.",
       "Artifacts: `repository-validation` and `maintenance-proposal`.",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
-      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
-      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
+      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
   });
@@ -293,10 +307,11 @@ test("checkEvidenceDrift rejects undocumented dashboard surface", () => {
       "# Agentic observability",
       "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
       "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml, .github/workflows/codeql.yml, .github/workflows/copilot-agent-review.yml, .github/workflows/copilot-setup-steps.yml, Documentation drift.",
-      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `copilot-agent-review`.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `rollback-verification`, `copilot-agent-review`.",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
-      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
-      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
+      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
   });
@@ -313,15 +328,37 @@ test("checkEvidenceDrift rejects undocumented Copilot agent review artifact", ()
       "# Agentic observability",
       "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
       "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml, .github/workflows/codeql.yml, .github/workflows/copilot-agent-review.yml, .github/workflows/copilot-setup-steps.yml, Documentation drift.",
-      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `rollback-verification`.",
       "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
-      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
-      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, and node scripts/dev.mjs propose.",
+      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, and node scripts/dev.mjs propose.",
       "",
     ].join("\n"),
   });
   assert.throws(
     () => checkEvidenceDrift(root),
     /agentic-observability.md must mention "`copilot-agent-review`"/,
+  );
+});
+
+test("checkEvidenceDrift rejects undocumented rollback verification artifact", () => {
+  const root = fixtureRoot();
+  writeFixture(root, {
+    "docs/operations/agentic-observability.md": [
+      "# Agentic observability",
+      "Labels: ai-readiness, validation, repair-proof, agent-review, documentation-drift.",
+      "Workflows: .github/workflows/ci.yml, .github/workflows/maintenance.yml, .github/workflows/repair-verification.yml, .github/workflows/self-healing.yml, .github/workflows/codeql.yml, .github/workflows/copilot-agent-review.yml, .github/workflows/copilot-setup-steps.yml, Documentation drift.",
+      "Artifacts: `repository-validation`, `maintenance-proposal`, `repair-verification`, `ci-failure-response`, `copilot-agent-review`.",
+      "Schemas: docs/specs/validation-receipt.v1.schema.json and docs/specs/repair-proof.v1.schema.json.",
+      "Surfaces: CODEOWNERS, .github/copilot-instructions.md, .agents/skills/synchub-validation/SKILL.md, .pre-commit-config.yaml, .github/ISSUE_TEMPLATE/config.yml, .vscode/mcp.json, Makefile, package.json, docs/specs/README.md, docs/specs/agentic-validation.v1.md, docs/adr/0001-validation-evidence.md, docs/reports/agentic-validation-reports.md, docs/dashboards/agentic-readiness-dashboard.json, docs/runbooks/ci-failure-response.md, tools/mcp/validation-server.mjs.",
+      "MCP wrapper: tools/mcp/synchub-mcp-server.mjs.",
+      "Commands: node scripts/dev.mjs verify, node scripts/dev.mjs repair:verify, node scripts/dev.mjs rollback:verify, and node scripts/dev.mjs propose.",
+      "",
+    ].join("\n"),
+  });
+  assert.throws(
+    () => checkEvidenceDrift(root),
+    /agentic-observability.md must mention "`rollback-verification`"/,
   );
 });
