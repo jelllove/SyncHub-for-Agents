@@ -29,7 +29,8 @@ the work observable; they do not claim production autonomous repair.
 - `.github/workflows/copilot-agent-review.yml`
   ([workflow](../../.github/workflows/copilot-agent-review.yml)) runs the pinned
   GitHub Copilot CLI as a read-only PR auditor and uploads
-  `copilot-agent-review`.
+  `copilot-agent-review`. It is a read-only, artifact-producing review gate, not
+  an automatic approval, merge, release, or production self-healing claim.
 
 ## Artifact contracts
 
