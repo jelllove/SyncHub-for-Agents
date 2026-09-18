@@ -26,6 +26,10 @@ the work observable; they do not claim production autonomous repair.
   ([workflow](../../.github/workflows/codeql.yml)) runs pinned CodeQL
   JavaScript/TypeScript analysis for pull requests, default-branch pushes,
   schedules, and manual dispatch.
+- `.github/workflows/copilot-agent-review.yml`
+  ([workflow](../../.github/workflows/copilot-agent-review.yml)) runs the pinned
+  GitHub Copilot CLI as a read-only PR auditor and uploads
+  `copilot-agent-review`.
 
 ## Artifact contracts
 
@@ -47,6 +51,8 @@ the work observable; they do not claim production autonomous repair.
   artifacts are retained by GitHub Actions for bounded review windows.
 - `ci-failure-response` captures the same bounded proposal format after CI
   failure detection.
+- `copilot-agent-review` captures the read-only Copilot PR auditor output. It is
+  designed to become a required status check after a hosted run has passed.
 - Repository path `docs/reports/agentic-validation-reports.md`
   ([report index](../reports/agentic-validation-reports.md)) lists the current
   machine-readable report artifacts.

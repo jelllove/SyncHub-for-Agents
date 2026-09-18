@@ -18,6 +18,7 @@ const requiredGuideEntries = [
   "docs/runbooks/ci-failure-response.md",
   ".agents/skills/synchub-validation/SKILL.md",
   ".github/workflows/ci.yml",
+  ".github/workflows/copilot-agent-review.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
   ".github/workflows/self-healing.yml",
@@ -30,6 +31,7 @@ const requiredGuideEntries = [
   "`maintenance-proposal`",
   "`repair-verification`",
   "`ci-failure-response`",
+  "`copilot-agent-review`",
   "node scripts/dev.mjs verify",
   "node scripts/dev.mjs repair:verify",
   "node scripts/dev.mjs propose",
@@ -114,4 +116,7 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs check", ".pre-commit-config.yaml");
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs docs", ".pre-commit-config.yaml");
   requireContains(read(root, ".github/workflows/codeql.yml"), "javascript-typescript", "codeql.yml");
+  requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "npm install --global @github/copilot@1.0.84", "copilot-agent-review.yml");
+  requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "Do not modify files", "copilot-agent-review.yml");
+  requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "copilot-agent-review", "copilot-agent-review.yml");
 }

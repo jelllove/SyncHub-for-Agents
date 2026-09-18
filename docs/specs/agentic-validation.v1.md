@@ -20,6 +20,8 @@ not define production incident response or autonomous repair of user sync data.
 - `.github/workflows/self-healing.yml` publishes `ci-failure-response` from a
   read-only workflow-run diagnostic path.
 - `.github/workflows/codeql.yml` runs CodeQL JavaScript/TypeScript analysis.
+- `.github/workflows/copilot-agent-review.yml` publishes `copilot-agent-review`
+  from a read-only Copilot CLI pull-request audit.
 
 ## Required review surfaces
 

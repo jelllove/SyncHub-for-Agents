@@ -18,6 +18,9 @@ Run commands from the repository root:
   rollback proof against committed inputs.
 - `node scripts/dev.mjs docs` checks documentation links, generated references,
   and evidence cross-references without rewriting files.
+- Pull requests also run the `Copilot agent review` workflow, which uploads the
+  `copilot-agent-review` artifact and must not modify files or create GitHub
+  resources.
 
 ## Safety rules
 
