@@ -38,16 +38,22 @@ function preparePatch(root, scratch, changes, maxPatchBytes) {
       writeFileSync(filename, text);
     }
   }
-  // Relative a/ and b/ trees produce a standard patch without temporary paths.
+  // Relative a/ and b/ trees produce standard patches without temporary paths.
   const patch = run("git", [
     "--no-pager", "-c", "core.autocrlf=false", "diff", "--no-color", "--no-index", "--no-prefix", "--binary",
     "--no-ext-diff", "--no-textconv", "--", "a", "b",
   ], scratch, { allowedExitCodes: [0, 1] });
-  if (!patch || Buffer.byteLength(patch) > maxPatchBytes) {
+  const rollback = run("git", [
+    "--no-pager", "-c", "core.autocrlf=false", "diff", "--no-color", "--no-index", "--no-prefix", "--binary",
+    "--no-ext-diff", "--no-textconv", "--", "b", "a",
+  ], scratch, { allowedExitCodes: [0, 1] });
+  if (!patch || !rollback || Buffer.byteLength(patch) > maxPatchBytes || Buffer.byteLength(rollback) > maxPatchBytes) {
     throw new Error(`Maintenance patch size limit exceeded or empty patch (${maxPatchBytes} bytes)`);
   }
   const patchFile = path.join(scratch, "candidate.patch");
+  const rollbackFile = path.join(scratch, "rollback.patch");
   writeFileSync(patchFile, patch);
+  writeFileSync(rollbackFile, rollback);
   // Apply only to an isolated snapshot, never the developer's working tree/index.
   run("git", ["init", "--quiet"], beforeRoot);
   run("git", ["-c", "core.autocrlf=false", "apply", "--check", patchFile], beforeRoot);
@@ -65,8 +71,14 @@ function preparePatch(root, scratch, changes, maxPatchBytes) {
       throw new Error(`Source changed while preparing proposal: ${change.path}`);
     }
   }
-  run("git", ["-c", "core.autocrlf=false", "apply", "--reverse", "--check", patchFile], beforeRoot);
-  return patch;
+  run("git", ["-c", "core.autocrlf=false", "apply", "--check", rollbackFile], beforeRoot);
+  run("git", ["-c", "core.autocrlf=false", "apply", rollbackFile], beforeRoot);
+  for (const change of changes) {
+    const restored = readText(path.join(beforeRoot, change.path));
+    if (restored !== change.before) throw new Error(`Rollback verification differs for ${change.path}`);
+  }
+  run("git", ["-c", "core.autocrlf=false", "apply", "--check", patchFile], beforeRoot);
+  return { patch, rollback };
 }
 
 export function proposeMaintenance(root, { maxFiles = 50, maxPatchBytes = 1024 * 1024 } = {}) {
@@ -84,7 +96,13 @@ export function proposeMaintenance(root, { maxFiles = 50, maxPatchBytes = 1024 *
     commit: null,
     limits: { maxFiles, maxPatchBytes },
     changes: [],
-    verification: { patchApplies: false, canonical: false, scope: "format-and-generated-reference" },
+    verification: {
+      patchApplies: false,
+      canonical: false,
+      rollbackApplies: false,
+      rollbackRestoresOriginal: false,
+      scope: "format-and-generated-reference",
+    },
   };
   const save = () => writeFileSync(path.join(directory, "proposal.json"), JSON.stringify(report, null, 2) + "\n");
   save();
@@ -99,10 +117,13 @@ export function proposeMaintenance(root, { maxFiles = 50, maxPatchBytes = 1024 *
     if (changes.length === 0) {
       report.status = "no-changes";
     } else {
-      const patch = preparePatch(root, scratch, changes, maxPatchBytes);
+      const { patch, rollback } = preparePatch(root, scratch, changes, maxPatchBytes);
       writeFileSync(path.join(directory, "repair.patch"), patch);
+      writeFileSync(path.join(directory, "rollback.patch"), rollback);
       report.verification.patchApplies = true;
       report.verification.canonical = true;
+      report.verification.rollbackApplies = true;
+      report.verification.rollbackRestoresOriginal = true;
       report.status = "proposed";
     }
   } catch (error) {
