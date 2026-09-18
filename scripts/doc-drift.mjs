@@ -23,6 +23,8 @@ const requiredGuideEntries = [
   ".github/workflows/ci.yml",
   ".github/workflows/copilot-setup-steps.yml",
   ".github/workflows/copilot-agent-review.yml",
+  ".github/workflows/recurring-copilot-review.yml",
+  ".github/actions/recurring-copilot-review/action.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
   ".github/workflows/self-healing.yml",

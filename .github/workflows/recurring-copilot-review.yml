@@ -1,0 +1,25 @@
+name: Recurring Copilot review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  copilot-requests: write
+
+concurrency:
+  group: recurring-copilot-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Recurring Copilot review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/recurring-copilot-review
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}

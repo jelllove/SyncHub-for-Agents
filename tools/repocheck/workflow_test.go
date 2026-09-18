@@ -457,6 +457,45 @@ func TestCopilotAgentReviewWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	}
 }
 
+func TestRecurringCopilotReviewWorkflowIsStaticallyDiscoverable(t *testing.T) {
+	workflow := loadWorkflow(t, "recurring-copilot-review.yml")
+	if _, ok := workflow.On["pull_request"]; !ok {
+		t.Fatal("recurring Copilot review must run on pull requests")
+	}
+	if workflow.Permissions["contents"] != "read" || workflow.Permissions["copilot-requests"] != "write" || len(workflow.Permissions) != 2 {
+		t.Fatal("recurring Copilot review must use read permissions plus copilot-requests write")
+	}
+	review := workflow.Jobs["review"]
+	if review.Name != "Recurring Copilot review" || review.Timeout <= 0 || review.ContinueOnError {
+		t.Fatal("recurring Copilot review must be named, time-bounded, and fail closed")
+	}
+	usesLocalAction := false
+	for _, s := range review.Steps {
+		if s.ContinueOnError {
+			t.Fatal("recurring Copilot review must not hide step failures")
+		}
+		if s.Uses == "./.github/actions/recurring-copilot-review" {
+			usesLocalAction = true
+		}
+	}
+	if !usesLocalAction {
+		t.Fatal("recurring Copilot review must call the local static review action")
+	}
+	action, err := os.ReadFile(filepath.Join("..", "..", ".github", "actions", "recurring-copilot-review", "action.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(action)
+	for _, required := range []string{
+		"npm install --global @github/copilot@1.0.84",
+		`copilot -p "Review pull request changed files and publish review output with scoped guards"`,
+		"using: composite",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("recurring Copilot review action must contain %q", required)
+		}
+	}
+}
 func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 	workflow := loadWorkflow(t, "self-healing.yml")
 	if _, ok := workflow.On["workflow_run"]; !ok {
