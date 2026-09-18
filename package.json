@@ -7,6 +7,7 @@
     "check": "node scripts/dev.mjs check",
     "lint": "node scripts/dev.mjs check",
     "test": "node scripts/dev.mjs verify",
+    "test:go": "go test ./...",
     "verify": "node scripts/dev.mjs verify",
     "docs": "node scripts/dev.mjs docs",
     "repair:verify": "node scripts/dev.mjs repair:verify",

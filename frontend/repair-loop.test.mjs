@@ -57,6 +57,8 @@ function evidenceFixture(root) {
   put(root, ".github/workflows/maintenance.yml", "name: Repository maintenance\n");
   put(root, ".github/workflows/repair-verification.yml", "name: Repair verification\nrepair-verification\n");
   put(root, ".github/workflows/self-healing.yml", "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs rollback:verify\nrollback-verification\nnode scripts/dev.mjs propose\nci-failure-response\n");
+  put(root, ".github/workflows/auto-revert.yml", "name: Auto-revert failed main\nauto-revert\n");
+  put(root, ".github/workflows/pr-validation.yml", "name: PR validation\ngo test ./...\nnpm test\n");
   put(root, ".github/workflows/codeql.yml", "name: CodeQL\njavascript-typescript\n");
   put(root, ".github/workflows/copilot-agent-review.yml", "name: Copilot agent review\nnpm install --global @github/copilot@1.0.84\nYou are reviewing SyncHub for Agents\nDo not modify files\ncopilot-agent-review\n");
   put(root, ".github/workflows/copilot-setup-steps.yml", "name: Copilot Setup Steps\ncopilot-setup-steps\nnode scripts/dev.mjs setup\n");
@@ -81,15 +83,19 @@ function evidenceFixture(root) {
     },
   }) + "\n");
   put(root, "Makefile", "verify:\n\tnode scripts/dev.mjs verify\n\nrollback-verify:\n\tnode scripts/dev.mjs rollback:verify\n");
+  put(root, ".mcp.json", JSON.stringify({
+    mcpServers: { "synchub-validation": { command: "node", args: ["mcp/synchub-validation/server.mjs"] } },
+  }) + "\n");
+  put(root, "mcp/synchub-validation/server.mjs", "export const name = 'synchub-validation';\n");
   put(root, "docs/operations/agentic-observability.md", [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
-    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml .github/workflows/copilot-setup-steps.yml Documentation drift",
+    ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/auto-revert.yml .github/workflows/pr-validation.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml .github/workflows/copilot-setup-steps.yml Documentation drift",
     "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
     "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
-    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json Makefile package.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .github/workflows/codeql.yml",
-    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs rollback:verify node scripts/dev.mjs propose",
+    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json Makefile package.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .mcp.json mcp/synchub-validation/server.mjs .github/workflows/codeql.yml",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs rollback:verify node scripts/dev.mjs propose go test ./... npm test",
     "",
   ].join("\n"));
 }

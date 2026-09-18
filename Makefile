@@ -1,4 +1,4 @@
-.PHONY: setup check lint test verify docs repair-verify rollback-verify
+.PHONY: setup check lint test gotest verify docs repair-verify rollback-verify
 
 setup:
 	node scripts/dev.mjs setup
@@ -11,6 +11,9 @@ lint:
 
 test:
 	node scripts/dev.mjs verify
+
+gotest:
+	go test ./...
 
 verify:
 	node scripts/dev.mjs verify

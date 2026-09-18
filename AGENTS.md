@@ -69,6 +69,9 @@ through a user-owned private Git repository.
   developer checkout, merge a PR, or establish production autonomy.
 - `node scripts/dev.mjs rollback:verify` checks the lightweight review-only
   maintenance repair/rollback handoff in an isolated fixture.
+- Pull-request POSIX validation also runs `go test ./...` and `npm test`.
+- `.mcp.json` and `mcp/synchub-validation/server.mjs` ship the read-only
+  repository MCP server.
 - For documentation-only edits, run `node scripts/dev.mjs docs`. This checks
   relative link target existence and generated versions/command references,
   not semantic accuracy; review the prose against code.

@@ -1,0 +1,63 @@
+name: Auto-revert failed main
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-revert-failed-main
+  cancel-in-progress: false
+
+jobs:
+  auto-revert:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') }}
+    name: Open auto-revert PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Open auto-revert PR for the failed main commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -eu
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "${FAILED_SHA:-}" ]; then
+            echo "auto-revert path is configured; no failed main commit to revert"
+            exit 0
+          fi
+          title="Auto-revert failed main ${FAILED_SHA}"
+          existing="$(gh pr list --base main --state open --search "auto-revert ${FAILED_SHA} in:title" --json number --jq 'length')"
+          if [ "$existing" != "0" ]; then
+            echo "auto-revert PR already open for ${FAILED_SHA}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch="auto-revert/${FAILED_SHA}"
+          git fetch origin main
+          git checkout -B "$branch" origin/main
+          if git rev-parse --verify -q "${FAILED_SHA}^2" >/dev/null; then
+            revert_cmd="git revert --no-edit --no-commit -m 1 ${FAILED_SHA}"
+          else
+            revert_cmd="git revert --no-edit --no-commit ${FAILED_SHA}"
+          fi
+          if ! $revert_cmd; then
+            echo "cannot auto-revert ${FAILED_SHA} without conflicts"
+            git revert --abort || true
+            exit 0
+          fi
+          git commit --message "auto-revert: restore last good main before ${FAILED_SHA}"
+          git push origin "HEAD:refs/heads/${branch}"
+          gh pr create --base main --head "$branch" --title "$title" --body "This auto-revert PR restores main after CI failed on ${FAILED_SHA}. It does not merge itself; a maintainer must review and merge the revert."

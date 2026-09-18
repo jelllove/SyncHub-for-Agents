@@ -183,6 +183,10 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
 		"tools/mcp/synchub-mcp-server.mjs",
+		"mcp/synchub-validation/server.mjs",
+		".mcp.json",
+		".github/workflows/auto-revert.yml",
+		".github/workflows/pr-validation.yml",
 		".pre-commit-config.yaml",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
@@ -584,5 +588,88 @@ func TestLinuxSmokeConsumesPackageListingBeforeSearching(t *testing.T) {
 	if !strings.Contains(script, `dpkg-deb --contents "$deb" > "$work_dir/deb-contents.txt"`) ||
 		!strings.Contains(script, `grep -q 'usr/bin/SyncHub' "$work_dir/deb-contents.txt"`) {
 		t.Fatal("the complete package listing must be captured and checked")
+	}
+}
+
+func TestAutoRevertWorkflowOpensReviewOnlyRevertPR(t *testing.T) {
+	workflow := loadWorkflow(t, "auto-revert.yml")
+	if _, ok := workflow.On["workflow_run"]; !ok {
+		t.Fatal("auto-revert must run from workflow_run failure signals")
+	}
+	if workflow.Permissions["contents"] != "write" || workflow.Permissions["pull-requests"] != "write" {
+		t.Fatal("auto-revert must be able to open a revert pull request")
+	}
+	job := workflow.Jobs["auto-revert"]
+	if job.If == "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("auto-revert must be conditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError {
+			t.Fatal("auto-revert must not hide step failures")
+		}
+		joined += "\n" + s.Name + "\n" + s.Run + "\n" + s.Uses + "\n"
+	}
+	for _, required := range []string{"auto-revert", "gh pr create", "revert"} {
+		if !strings.Contains(strings.ToLower(joined), required) {
+			t.Fatalf("auto-revert must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{"gh pr merge", "git push --force", "git reset --hard"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("auto-revert must not merge or force-reset with %q", forbidden)
+		}
+	}
+}
+
+func TestPosixPrValidationWorkflowExposesGoAndNpmTests(t *testing.T) {
+	workflow := loadWorkflow(t, "pr-validation.yml")
+	if _, ok := workflow.On["pull_request"]; !ok {
+		t.Fatal("PR validation must run on pull requests")
+	}
+	if workflow.Permissions["contents"] != "read" || len(workflow.Permissions) != 1 {
+		t.Fatal("PR validation must remain read-only")
+	}
+	if len(workflow.Jobs) != 1 {
+		t.Fatal("PR validation must be a single POSIX job")
+	}
+	job := workflow.Jobs["tests"]
+	if job.If != "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("PR validation must be unconditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.If != "" || s.ContinueOnError {
+			t.Fatal("PR validation steps must not be skipped or ignored")
+		}
+		joined += "\n" + s.Run + "\n"
+	}
+	for _, required := range []string{"go test ./...", "npm test"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("PR validation must run %q", required)
+		}
+	}
+}
+
+func TestShippedMcpServerLivesUnderMcpDirectory(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".mcp.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{"synchub-validation", "mcp/synchub-validation/server.mjs"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf(".mcp.json must mention %q", required)
+		}
+	}
+	server, err := os.ReadFile(filepath.Join("..", "..", "mcp", "synchub-validation", "server.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(server)
+	for _, required := range []string{"tools/list", "repository_validation_commands", "readOnlyHint"} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("shipped MCP server must contain %q", required)
+		}
 	}
 }
