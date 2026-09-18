@@ -134,6 +134,24 @@ describe("review-only maintenance proposals", { timeout: 20_000 }, () => {
     run("git", ["apply", "--check", patch], root);
   });
 
+  it("verifies the review-only rollback handoff in an isolated fixture", () => {
+    const root = fixture();
+    expect(maintenance.verifyMaintenanceRollback).toBeTypeOf("function");
+    const { report, directory } = maintenance.verifyMaintenanceRollback(root);
+    expect(report.status, report.error).toBe("passed");
+    expect(report.kind).toBe("maintenance-rollback-verification");
+    expect(report.scenario).toBe("review-only-maintenance-rollback");
+    expect(report.productionIncident).toBe(false);
+    expect(report.verification).toEqual({
+      repairPatchApplies: true,
+      rollbackPatchApplies: true,
+      rollbackRestoresOriginal: true,
+    });
+    expect(existsSync(path.join(directory, "repair.patch"))).toBe(true);
+    expect(existsSync(path.join(directory, "rollback.patch"))).toBe(true);
+    expect(run("git", ["status", "--porcelain=v1"], root)).toBe("");
+  }, 20_000);
+
   it("refuses invalid UTF-8 without replacing or changing the original bytes", () => {
     const root = fixture();
     const bytes = Buffer.concat([Buffer.from("package example\n// "), Buffer.from([255]), Buffer.from("\nvar  answer=2\n")]);

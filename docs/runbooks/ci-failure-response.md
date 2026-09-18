@@ -21,6 +21,9 @@ human review.
    reverse the exact proposed repair patch, while `node scripts/dev.mjs
    repair:verify` demonstrates the diagnostic repair cycle in an isolated clone
    and leaves the original source unchanged.
+   The self-healing workflow also runs `node scripts/dev.mjs rollback:verify`
+   and publishes `rollback-verification` as a lightweight proof of this
+   review-only handoff path.
 
 The `.github/workflows/self-healing.yml` workflow is intentionally read-only. It
 does not push commits, create issues, create pull requests, merge branches, or

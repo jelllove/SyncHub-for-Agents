@@ -15,6 +15,8 @@ Use the repository-local validation guidance in
   rollback patch proposals; do not apply, commit, or push them automatically.
 - Treat `node scripts/dev.mjs repair:verify` as a diagnostic proof, not as
   production self-healing.
+- Use `node scripts/dev.mjs rollback:verify` for a lightweight isolated check of
+  review-only maintenance repair and rollback patches.
 
 ## Safety boundaries
 

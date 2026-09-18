@@ -299,6 +299,7 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `node scripts/dev.mjs verify` | Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs. |
 | `node scripts/dev.mjs propose` | Prepare bounded, review-only Go formatting/reference repair and rollback patches; never apply or commit them. |
 | `node scripts/dev.mjs repair:verify` | Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container. |
+| `node scripts/dev.mjs rollback:verify` | Verify review-only maintenance repair and rollback patches in an isolated fixture. |
 | `node scripts/dev.mjs format` | Apply gofmt to repository-owned Go files only; never stage or commit. |
 | `node scripts/dev.mjs cleanup` | Run one bounded formatting repair pass; never delete files or touch sync data. |
 | `node scripts/dev.mjs docs` | Check local Markdown file links and the generated development reference. |

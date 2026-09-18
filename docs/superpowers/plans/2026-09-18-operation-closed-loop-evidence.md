@@ -13,9 +13,10 @@
 ## File structure
 
 - `scripts/maintenance.mjs`: Generate `rollback.patch`, verify it, and record structured rollback metadata in `proposal.json`.
+- `scripts/dev.mjs`, `scripts/dev-lib.mjs`: Expose `rollback:verify` as a lightweight isolated validation command.
 - `frontend/maintenance.test.mjs`: Assert rollback artifacts are present, applicable, reversible, size-bounded, and absent on no-change/failure reports.
 - `.github/workflows/self-healing.yml`: Rename the proposal step/artifact language to bounded repair plus rollback handoff while keeping read-only permissions.
-- `Taskfile.yml`: Add repository validation tasks that expose `setup`, `check`, `verify`, `docs`, and `repair:verify` commands.
+- `Taskfile.yml`, `package.json`, `Makefile`: Add repository validation tasks that expose `setup`, `check`, `verify`, `docs`, `repair:verify`, and `rollback:verify` commands.
 - `tools/mcp/synchub-mcp-server.mjs`: Add a committed wrapper whose filename makes the shipped repository MCP server discoverable while delegating to the existing implementation.
 - `.vscode/mcp.json`: Point the MCP config at the discoverable wrapper.
 - `tools/mcp/validation-server.mjs`: Keep the existing server implementation; no runtime logic changes unless tests require command text updates.

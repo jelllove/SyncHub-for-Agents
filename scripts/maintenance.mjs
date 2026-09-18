@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   artifactDirectory, developmentReference, formattedGo, goFormattingChanges, ownedFile,
-  readText, replaceReference, repositoryFiles, run,
+  readText, referenceEnd, referenceStart, replaceReference, repositoryFiles, run,
 } from "./dev-lib.mjs";
 
 const digest = text => createHash("sha256").update(text).digest("hex");
@@ -131,6 +131,110 @@ export function proposeMaintenance(root, { maxFiles = 50, maxPatchBytes = 1024 *
     report.error = error instanceof Error ? error.message : String(error);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
+    report.finishedAt = new Date().toISOString();
+    save();
+  }
+  return { report, directory };
+}
+
+function writeFixtureFile(root, file, content) {
+  const filename = path.join(root, file);
+  mkdirSync(path.dirname(filename), { recursive: true });
+  writeFileSync(filename, content);
+}
+
+function createRollbackFixture(root) {
+  writeFixtureFile(root, ".gitignore", ".artifacts/\n");
+  writeFixtureFile(root, ".node-version", "24.17.0\n");
+  writeFixtureFile(root, "go.mod", [
+    "module example.test/rollback",
+    "",
+    "go 1.26.6",
+    "require (",
+    " github.com/wailsapp/wails/v3 v3.0.0-beta.8",
+    ")",
+    "",
+  ].join("\n"));
+  writeFixtureFile(root, "frontend/package.json", JSON.stringify({ scripts: { test: "vitest run" } }) + "\n");
+  const referenceShell = [
+    "Rollback verification fixture.",
+    referenceStart,
+    referenceEnd,
+    "End fixture.",
+    "",
+  ].join("\n");
+  writeFixtureFile(root, "docs/development.md", replaceReference(referenceShell, developmentReference(root)));
+  writeFixtureFile(root, "main.go", "package example\n\nvar answer = 1\n");
+  run("git", ["init", "--quiet"], root);
+  run("git", ["add", "."], root);
+  run("git", [
+    "-c", "user.name=Rollback verification", "-c", "user.email=rollback@example.invalid",
+    "-c", "commit.gpgsign=false", "-c", "core.hooksPath=",
+    "commit", "--quiet", "-m", "fixture",
+  ], root);
+}
+
+export function verifyMaintenanceRollback(root) {
+  const directory = artifactDirectory(root, "rollback-verification");
+  const report = {
+    schemaVersion: 1,
+    kind: "maintenance-rollback-verification",
+    scenario: "review-only-maintenance-rollback",
+    productionIncident: false,
+    status: "running",
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    proposal: null,
+    verification: {
+      repairPatchApplies: false,
+      rollbackPatchApplies: false,
+      rollbackRestoresOriginal: false,
+    },
+    error: null,
+  };
+  const save = () => writeFileSync(path.join(directory, "rollback-verification.json"), JSON.stringify(report, null, 2) + "\n");
+  save();
+  const fixture = mkdtempSync(path.join(directory, "fixture-"));
+  try {
+    createRollbackFixture(fixture);
+    const original = "package example\r\nvar  answer=2\r\n";
+    writeFixtureFile(fixture, "main.go", original);
+    const { report: proposal, directory: proposalDirectory } = proposeMaintenance(fixture);
+    report.proposal = {
+      status: proposal.status,
+      changes: proposal.changes,
+      verification: proposal.verification,
+    };
+    if (proposal.status !== "proposed") {
+      throw new Error(`Expected a proposed maintenance rollback fixture, got ${proposal.status}`);
+    }
+    const repairPatch = path.join(proposalDirectory, "repair.patch");
+    const rollbackPatch = path.join(proposalDirectory, "rollback.patch");
+    const localRepair = path.join(directory, "repair.patch");
+    const localRollback = path.join(directory, "rollback.patch");
+    copyFileSync(repairPatch, localRepair);
+    copyFileSync(rollbackPatch, localRollback);
+    run("git", ["apply", "--check", localRepair], fixture);
+    run("git", ["apply", localRepair], fixture);
+    report.verification.repairPatchApplies = true;
+    const repaired = readText(path.join(fixture, "main.go")).replaceAll("\r\n", "\n");
+    if (repaired !== "package example\n\nvar answer = 2\n") {
+      throw new Error("Repair patch did not produce canonical Go formatting");
+    }
+    run("git", ["apply", "--check", localRollback], fixture);
+    run("git", ["apply", localRollback], fixture);
+    report.verification.rollbackPatchApplies = true;
+    const restored = readText(path.join(fixture, "main.go")).replaceAll("\r\n", "\n");
+    if (restored !== original.replaceAll("\r\n", "\n")) {
+      throw new Error("Rollback patch did not restore the original source");
+    }
+    report.verification.rollbackRestoresOriginal = true;
+    report.status = "passed";
+  } catch (error) {
+    report.status = "failed";
+    report.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
     report.finishedAt = new Date().toISOString();
     save();
   }

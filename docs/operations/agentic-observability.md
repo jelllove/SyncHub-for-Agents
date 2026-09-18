@@ -60,6 +60,9 @@ the work observable; they do not claim production autonomous repair.
 - `ci-failure-response` captures the same bounded proposal format after CI
   failure detection, including review-only `repair.patch` and `rollback.patch`
   artifacts when a supported repair is proposed.
+- `rollback-verification` captures a lightweight isolated proof that
+  `repair.patch` and `rollback.patch` can be generated, applied, and reversed
+  for the supported maintenance repair class.
 - `copilot-agent-review` captures the read-only Copilot PR auditor output. It is
   designed to become a required status check after a hosted run has passed.
 - Repository path `docs/reports/agentic-validation-reports.md`
@@ -97,6 +100,9 @@ repair proposals as patches requiring review rather than automatic fixes.
 - `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
   the maintenance evidence workflow.
 - `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
+- `package.json`, `Makefile`, and `Taskfile.yml` expose common repository
+  validation entry points for scanners and agents that discover different
+  command formats.
 - `tools/mcp/synchub-mcp-server.mjs` is the shipped repository MCP server
   wrapper configured by `.vscode/mcp.json`.
 - `tools/mcp/validation-server.mjs` is the read-only stdio MCP implementation
@@ -105,3 +111,5 @@ repair proposals as patches requiring review rather than automatic fixes.
   for Copilot code review.
 - `.pre-commit-config.yaml` offers optional local pre-commit hooks for
   `node scripts/dev.mjs check` and `node scripts/dev.mjs docs`.
+- `node scripts/dev.mjs rollback:verify` runs the lightweight review-only
+  rollback handoff proof without touching application sync data.

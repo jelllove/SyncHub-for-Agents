@@ -90,17 +90,17 @@ function evidenceFixture(root) {
   writeFileSync(path.join(root, ".github", "workflows", "ci.yml"), "name: CI\nDocumentation drift\nnode scripts/dev.mjs docs\nrepository-validation\nmaintenance-proposal\n");
   writeFileSync(path.join(root, ".github", "workflows", "maintenance.yml"), "name: Repository maintenance\n");
   writeFileSync(path.join(root, ".github", "workflows", "repair-verification.yml"), "name: Repair verification\nrepair-verification\n");
-  writeFileSync(path.join(root, ".github", "workflows", "self-healing.yml"), "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs propose\nci-failure-response\n");
+  writeFileSync(path.join(root, ".github", "workflows", "self-healing.yml"), "name: Self-healing diagnostics\nworkflow_run\nnode scripts/dev.mjs rollback:verify\nrollback-verification\nnode scripts/dev.mjs propose\nci-failure-response\n");
   writeFileSync(path.join(root, ".github", "workflows", "codeql.yml"), "name: CodeQL\njavascript-typescript\n");
   writeFileSync(path.join(root, ".github", "workflows", "copilot-agent-review.yml"), "name: Copilot agent review\nnpm install --global @github/copilot@1.0.84\nYou are reviewing SyncHub for Agents\nDo not modify files\ncopilot-agent-review\n");
   writeFileSync(path.join(root, ".github", "workflows", "copilot-setup-steps.yml"), "name: Copilot Setup Steps\ncopilot-setup-steps\nnode scripts/dev.mjs setup\n");
   writeFileSync(path.join(root, "docs", "specs", "README.md"), "# SyncHub versioned specifications\n");
   writeFileSync(path.join(root, "docs", "specs", "agentic-validation.v1.md"), "# Agentic validation specification v1\n");
   writeFileSync(path.join(root, "docs", "adr", "0001-validation-evidence.md"), "# ADR 0001: Version repository validation evidence\n");
-  writeFileSync(path.join(root, "docs", "reports", "agentic-validation-reports.md"), "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `copilot-agent-review`\n");
+  writeFileSync(path.join(root, "docs", "reports", "agentic-validation-reports.md"), "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`\n");
   writeFileSync(path.join(root, "docs", "dashboards", "agentic-readiness-dashboard.json"), JSON.stringify({
     schemaVersion: 1,
-    signals: ["ci-failure-response", "copilot-agent-review"],
+    signals: ["ci-failure-response", "rollback-verification", "copilot-agent-review"],
   }) + "\n");
   writeFileSync(path.join(root, "docs", "runbooks", "ci-failure-response.md"), "detection containment remediation validation rollback\n");
   mkdirSync(path.join(root, ".vscode"), { recursive: true });
@@ -110,15 +110,22 @@ function evidenceFixture(root) {
   mkdirSync(path.join(root, "tools", "mcp"), { recursive: true });
   writeFileSync(path.join(root, "tools", "mcp", "validation-server.mjs"), "export const name = 'synchub-validation';\n");
   writeFileSync(path.join(root, "tools", "mcp", "synchub-mcp-server.mjs"), "import './validation-server.mjs';\n");
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({
+    scripts: {
+      verify: "node scripts/dev.mjs verify",
+      "rollback:verify": "node scripts/dev.mjs rollback:verify",
+    },
+  }) + "\n");
+  writeFileSync(path.join(root, "Makefile"), "verify:\n\tnode scripts/dev.mjs verify\n\nrollback-verify:\n\tnode scripts/dev.mjs rollback:verify\n");
   writeFileSync(path.join(root, "docs", "operations", "agentic-observability.md"), [
     "# Agentic observability",
     "ai-readiness validation repair-proof agent-review documentation-drift",
     ".github/workflows/ci.yml .github/workflows/maintenance.yml .github/workflows/repair-verification.yml .github/workflows/self-healing.yml .github/workflows/codeql.yml .github/workflows/copilot-agent-review.yml .github/workflows/copilot-setup-steps.yml Documentation drift",
-    "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `copilot-agent-review`",
+    "`repository-validation` `maintenance-proposal` `repair-verification` `ci-failure-response` `rollback-verification` `copilot-agent-review`",
     "docs/specs/validation-receipt.v1.schema.json docs/specs/repair-proof.v1.schema.json docs/specs/README.md docs/specs/agentic-validation.v1.md docs/adr/0001-validation-evidence.md",
     "docs/reports/agentic-validation-reports.md docs/dashboards/agentic-readiness-dashboard.json docs/runbooks/ci-failure-response.md",
-    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .github/workflows/codeql.yml",
-    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs propose",
+    "CODEOWNERS .github/copilot-instructions.md .agents/skills/synchub-validation/SKILL.md .pre-commit-config.yaml .github/ISSUE_TEMPLATE/config.yml .vscode/mcp.json Makefile package.json tools/mcp/validation-server.mjs tools/mcp/synchub-mcp-server.mjs .github/workflows/codeql.yml",
+    "node scripts/dev.mjs verify node scripts/dev.mjs repair:verify node scripts/dev.mjs rollback:verify node scripts/dev.mjs propose",
     "",
   ].join("\n"));
 }

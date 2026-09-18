@@ -58,10 +58,14 @@ Implement the recommended path in three small surfaces:
 2. Update the self-healing workflow and runbook language so the CI failure
    response explicitly publishes a bounded repair plus rollback handoff artifact
    while remaining read-only.
-3. Add repository-level validation tasks to `Taskfile.yml` and improve MCP
-   server discoverability with a small committed wrapper named as a repository
-   MCP server. These surfaces point to existing commands instead of inventing
-   new validation semantics.
+3. Add repository-level validation tasks to `Taskfile.yml`, `package.json`, and
+   `Makefile`, then improve MCP server discoverability with a small committed
+   wrapper named as a repository MCP server. These surfaces point to existing
+   commands instead of inventing new validation semantics.
+4. Add `node scripts/dev.mjs rollback:verify` as a lightweight, isolated
+   verification of review-only `repair.patch` and `rollback.patch` handoff. The
+   self-healing workflow publishes its `rollback-verification` artifact without
+   write permissions.
 
 ## Safety constraints
 

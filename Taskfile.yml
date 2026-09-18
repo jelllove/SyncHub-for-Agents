@@ -88,3 +88,8 @@ tasks:
     summary: Verifies the diagnostic repair and rollback cycle in containment
     cmds:
       - node scripts/dev.mjs repair:verify
+
+  repo:rollback:verify:
+    summary: Verifies review-only maintenance repair and rollback patches
+    cmds:
+      - node scripts/dev.mjs rollback:verify

@@ -178,6 +178,8 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		"docs/reports/agentic-validation-reports.md",
 		"docs/dashboards/agentic-readiness-dashboard.json",
 		"docs/runbooks/ci-failure-response.md",
+		"Makefile",
+		"package.json",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
 		"tools/mcp/synchub-mcp-server.mjs",
@@ -185,6 +187,28 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestRootValidationEntrypointsAreDiscoverable(t *testing.T) {
+	for _, filename := range []string{"package.json", "Makefile"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, required := range []string{
+			"node scripts/dev.mjs setup",
+			"node scripts/dev.mjs check",
+			"node scripts/dev.mjs verify",
+			"node scripts/dev.mjs docs",
+			"node scripts/dev.mjs repair:verify",
+			"node scripts/dev.mjs rollback:verify",
+		} {
+			if !strings.Contains(text, required) {
+				t.Fatalf("%s must expose repository validation command %q", filename, required)
+			}
 		}
 	}
 }
@@ -206,6 +230,8 @@ func TestRepositoryValidationTasksAreDiscoverable(t *testing.T) {
 		"node scripts/dev.mjs docs",
 		"repo:repair:verify:",
 		"node scripts/dev.mjs repair:verify",
+		"repo:rollback:verify:",
+		"node scripts/dev.mjs rollback:verify",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("Taskfile.yml must expose repository validation command %q", required)
@@ -445,8 +471,10 @@ func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 		}
 	}
 	if !strings.Contains(joined, "node scripts/dev.mjs propose") ||
+		!strings.Contains(joined, "node scripts/dev.mjs rollback:verify") ||
 		!strings.Contains(joined, "bounded repair and rollback handoff") ||
-		!strings.Contains(joined, "ci-failure-response") {
+		!strings.Contains(joined, "ci-failure-response") ||
+		!strings.Contains(joined, "rollback-verification") {
 		t.Fatal("self-healing diagnostics must publish the existing bounded repair and rollback handoff")
 	}
 }

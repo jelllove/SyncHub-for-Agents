@@ -10,6 +10,7 @@ export const commands = {
   verify: "Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs.",
   propose: "Prepare bounded, review-only Go formatting/reference repair and rollback patches; never apply or commit them.",
   "repair:verify": "Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container.",
+  "rollback:verify": "Verify review-only maintenance repair and rollback patches in an isolated fixture.",
   format: "Apply gofmt to repository-owned Go files only; never stage or commit.",
   cleanup: "Run one bounded formatting repair pass; never delete files or touch sync data.",
   docs: "Check local Markdown file links and the generated development reference.",

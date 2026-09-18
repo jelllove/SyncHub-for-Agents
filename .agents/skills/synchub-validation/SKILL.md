@@ -16,6 +16,8 @@ Run commands from the repository root:
   writes JSON, JUnit XML, HTML, and command logs under ignored `.artifacts/`.
 - `node scripts/dev.mjs repair:verify` runs the contained diagnostic repair and
   rollback proof against committed inputs.
+- `node scripts/dev.mjs rollback:verify` runs the lightweight review-only
+  maintenance repair/rollback handoff proof.
 - `node scripts/dev.mjs docs` checks documentation links, generated references,
   and evidence cross-references without rewriting files.
 - Pull requests also run the `Copilot agent review` workflow, which uploads the
@@ -25,6 +27,8 @@ Run commands from the repository root:
   `.github/workflows/copilot-setup-steps.yml` for repository-specific setup.
 - The `Documentation drift` status runs `node scripts/dev.mjs docs` as a
   dedicated fail-closed PR check.
+- `package.json`, `Makefile`, and `Taskfile.yml` expose the same validation
+  commands for agents and scanners that discover different command formats.
 
 ## Safety rules
 

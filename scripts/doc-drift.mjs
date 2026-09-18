@@ -16,6 +16,8 @@ const requiredGuideEntries = [
   "docs/reports/agentic-validation-reports.md",
   "docs/dashboards/agentic-readiness-dashboard.json",
   "docs/runbooks/ci-failure-response.md",
+  "Makefile",
+  "package.json",
   ".agents/skills/synchub-validation/SKILL.md",
   ".github/copilot-instructions.md",
   ".github/workflows/ci.yml",
@@ -35,9 +37,11 @@ const requiredGuideEntries = [
   "`maintenance-proposal`",
   "`repair-verification`",
   "`ci-failure-response`",
+  "`rollback-verification`",
   "`copilot-agent-review`",
   "node scripts/dev.mjs verify",
   "node scripts/dev.mjs repair:verify",
+  "node scripts/dev.mjs rollback:verify",
   "node scripts/dev.mjs propose",
 ];
 
@@ -102,8 +106,9 @@ export function checkEvidenceDrift(root) {
   }
 
   const dashboard = JSON.parse(read(root, "docs/dashboards/agentic-readiness-dashboard.json"));
-  if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response")) {
-    throw new Error("agentic-readiness-dashboard.json must list the ci-failure-response signal");
+  if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response") ||
+    !dashboard.signals?.includes("rollback-verification")) {
+    throw new Error("agentic-readiness-dashboard.json must list ci-failure-response and rollback-verification signals");
   }
   const mcp = JSON.parse(read(root, ".vscode/mcp.json"));
   const server = mcp.servers?.["synchub-validation"];
@@ -116,7 +121,14 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".github/workflows/repair-verification.yml"), "repair-verification", "repair-verification.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "workflow_run", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs propose", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs rollback:verify", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "ci-failure-response", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "rollback-verification", "self-healing.yml");
+  for (const entrypoint of ["package.json", "Makefile"]) {
+    const content = read(root, entrypoint);
+    requireContains(content, "node scripts/dev.mjs verify", entrypoint);
+    requireContains(content, "node scripts/dev.mjs rollback:verify", entrypoint);
+  }
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs check", ".pre-commit-config.yaml");
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs docs", ".pre-commit-config.yaml");
   requireContains(read(root, ".github/workflows/codeql.yml"), "javascript-typescript", "codeql.yml");
