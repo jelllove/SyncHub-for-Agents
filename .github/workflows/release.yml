@@ -60,14 +60,14 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           go test . ./internal/updater ./internal/desktop ./internal/scheduler ./internal/daemon
           npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-windows
           path: |
             bin/SyncHub-for-Agents-Setup-x64.exe
             bin/SHA256SUMS.txt
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: windows-release-notes
           path: bin/WINDOWS-RELEASE-NOTES.txt
@@ -127,7 +127,7 @@ jobs:
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
           xcrun stapler staple bin/SyncHub.dmg
           xcrun stapler validate bin/SyncHub.dmg
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-macos
           path: bin/SyncHub.dmg
@@ -161,7 +161,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           wails3 package GOOS=linux ARCH=amd64 VERSION="$version" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-linux
           path: |
