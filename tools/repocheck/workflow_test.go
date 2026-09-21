@@ -443,6 +443,59 @@ func TestWindowsReleaseSigningIsDocumented(t *testing.T) {
 	}
 }
 
+func TestSignPathFoundationApplicationMaterialsAreDocumented(t *testing.T) {
+	for _, relative := range []string{
+		"docs/code-signing-policy.md",
+		"docs/signpath-foundation-application.md",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), "Code signing policy") ||
+		!strings.Contains(string(readme), "docs/code-signing-policy.md") {
+		t.Fatal("README must link to the Code signing policy")
+	}
+	policy, err := os.ReadFile(filepath.Join("..", "..", "docs", "code-signing-policy.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyText := string(policy)
+	for _, required := range []string{
+		"Code signing policy",
+		"Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org)",
+		"Committers and reviewers",
+		"Approvers",
+		"This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it",
+		"SyncHub-for-Agents-Setup-x64.exe",
+	} {
+		if !strings.Contains(policyText, required) {
+			t.Fatalf("Code signing policy must mention %q", required)
+		}
+	}
+	draft, err := os.ReadFile(filepath.Join("..", "..", "docs", "signpath-foundation-application.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	draftText := string(draft)
+	for _, required := range []string{
+		"qinqingxu/SyncHub-for-Agents",
+		"MIT License",
+		"v0.3.3",
+		"SignPath Foundation application draft",
+		"Maintainer-provided fields still needed",
+		"Do not submit guessed personal data",
+	} {
+		if !strings.Contains(draftText, required) {
+			t.Fatalf("SignPath application draft must mention %q", required)
+		}
+	}
+}
+
 func TestCopilotAgentReviewWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	workflow := loadWorkflow(t, "copilot-agent-review.yml")
 	if _, ok := workflow.On["pull_request"]; !ok {

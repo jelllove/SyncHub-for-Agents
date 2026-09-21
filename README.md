@@ -95,6 +95,12 @@ before submitting a change.
 - Product brand: **SyncHub for Agents**
 - Some internal identifiers and file names still use `SyncHub`/`synchub` for compatibility with existing installs and startup registrations.
 
+## Code signing policy
+
+SyncHub for Agents intends to use SignPath Foundation for open-source Windows
+code signing. See [docs/code-signing-policy.md](docs/code-signing-policy.md) for
+release signing scope, team roles, approval requirements, and privacy behavior.
+
 ## License
 
 SyncHub for Agents is released under the [MIT License](LICENSE).
