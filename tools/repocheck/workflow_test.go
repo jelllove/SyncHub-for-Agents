@@ -408,6 +408,41 @@ func TestStaticAnalysisAndPreCommitContracts(t *testing.T) {
 	}
 }
 
+func TestWindowsReleaseSigningIsDocumented(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "docs", "release-signing.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"WINDOWS_CERTIFICATE_BASE64",
+		"WINDOWS_CERTIFICATE_PASSWORD",
+		"WINDOWS_REQUIRE_SIGNING",
+		"WINDOWS_TIMESTAMP_SERVER",
+		"Get-AuthenticodeSignature",
+		"signtool verify /pa /all",
+		"SmartScreen",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("release signing guide must contain %q", required)
+		}
+	}
+	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"WINDOWS_CERTIFICATE_BASE64",
+		"WINDOWS_CERTIFICATE_PASSWORD",
+		"WINDOWS_REQUIRE_SIGNING",
+		"WINDOWS_TIMESTAMP_SERVER",
+	} {
+		if !strings.Contains(string(workflow), required) {
+			t.Fatalf("release workflow must keep signing input %q", required)
+		}
+	}
+}
+
 func TestCopilotAgentReviewWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	workflow := loadWorkflow(t, "copilot-agent-review.yml")
 	if _, ok := workflow.On["pull_request"]; !ok {
