@@ -28,10 +28,14 @@ func newBareRemote(t *testing.T) string {
 	root := t.TempDir()
 	bare := filepath.Join(root, "remote.git")
 	git(t, root, "init", "--bare", "-b", "main", bare)
+	git(t, root, "--git-dir", bare, "config", "gc.auto", "0")
+	git(t, root, "--git-dir", bare, "config", "maintenance.auto", "false")
 	seed := filepath.Join(root, "seed")
 	git(t, root, "clone", bare, seed)
 	git(t, seed, "config", "user.email", "s@e.com")
 	git(t, seed, "config", "user.name", "seed")
+	git(t, seed, "config", "gc.auto", "0")
+	git(t, seed, "config", "maintenance.auto", "false")
 	if err := os.WriteFile(filepath.Join(seed, "manifest.json"), []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
