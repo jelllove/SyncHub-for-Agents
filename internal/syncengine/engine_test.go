@@ -49,6 +49,8 @@ func cloneWorkspace(t *testing.T, bare, dir string) *gitclient.Client {
 	}
 	git(t, dir, "config", "user.email", "m@e.com")
 	git(t, dir, "config", "user.name", "machine")
+	git(t, dir, "config", "gc.auto", "0")
+	git(t, dir, "config", "maintenance.auto", "false")
 	return client
 }
 
