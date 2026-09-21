@@ -5,7 +5,7 @@ import {
   commands, run, repositoryFiles, formatGo, checkMarkdownLinks, checkReference, checkEvidenceDrift, readText,
 } from "./dev-lib.mjs";
 import { runValidation, validationChecks } from "./validation.mjs";
-import { proposeMaintenance } from "./maintenance.mjs";
+import { proposeMaintenance, verifyMaintenanceRollback } from "./maintenance.mjs";
 import { runContainerRepairProbe } from "./repair-container.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,6 +54,11 @@ try {
     publishReportDirectory(directory);
     console.log(`Contained repair verification: ${report.status}. Artifacts: ${directory}`);
     if (report.status !== "passed") throw new Error(report.errors.join("\n"));
+  } else if (command === "rollback:verify") {
+    const { report, directory } = verifyMaintenanceRollback(root);
+    publishReportDirectory(directory);
+    console.log(`Rollback verification: ${report.status}. Artifacts: ${directory}`);
+    if (report.status !== "passed") throw new Error(report.error || "Rollback verification failed");
   } else {
     const files = repositoryFiles(root);
     switch (command) {

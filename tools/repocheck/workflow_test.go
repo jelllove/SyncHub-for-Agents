@@ -19,6 +19,7 @@ type job struct {
 	Name            string                 `yaml:"name"`
 	If              string                 `yaml:"if"`
 	Uses            string                 `yaml:"uses"`
+	Permissions     map[string]string      `yaml:"permissions"`
 	Timeout         int                    `yaml:"timeout-minutes"`
 	ContinueOnError bool                   `yaml:"continue-on-error"`
 	With            map[string]interface{} `yaml:"with"`
@@ -26,6 +27,7 @@ type job struct {
 }
 
 type step struct {
+	Name            string            `yaml:"name"`
 	ID              string            `yaml:"id"`
 	Run             string            `yaml:"run"`
 	Uses            string            `yaml:"uses"`
@@ -162,6 +164,8 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 	for _, relative := range []string{
 		".env.example",
 		".github/labels.yml",
+		".github/copilot-instructions.md",
+		".github/workflows/copilot-setup-steps.yml",
 		".agents/skills/synchub-validation/SKILL.md",
 		"CODEOWNERS",
 		".github/ISSUE_TEMPLATE/config.yml",
@@ -174,12 +178,164 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		"docs/reports/agentic-validation-reports.md",
 		"docs/dashboards/agentic-readiness-dashboard.json",
 		"docs/runbooks/ci-failure-response.md",
+		"Makefile",
+		"package.json",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
+		"tools/mcp/synchub-mcp-server.mjs",
+		"mcp/synchub-validation/server.mjs",
+		".mcp.json",
+		".github/workflows/auto-revert.yml",
+		".github/workflows/pr-validation.yml",
 		".pre-commit-config.yaml",
 	} {
 		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
 			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+}
+
+func TestCodeownersCoverBothMaintainerAccounts(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "CODEOWNERS"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{"* ", "@qinqingxu", "@jelllove"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("CODEOWNERS must include %q", required)
+		}
+	}
+}
+
+func TestRootValidationEntrypointsAreDiscoverable(t *testing.T) {
+	for _, filename := range []string{"package.json", "Makefile"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", filename))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, required := range []string{
+			"node scripts/dev.mjs setup",
+			"node scripts/dev.mjs check",
+			"node scripts/dev.mjs verify",
+			"node scripts/dev.mjs docs",
+			"node scripts/dev.mjs repair:verify",
+			"node scripts/dev.mjs rollback:verify",
+		} {
+			if !strings.Contains(text, required) {
+				t.Fatalf("%s must expose repository validation command %q", filename, required)
+			}
+		}
+	}
+}
+
+func TestRepositoryValidationTasksAreDiscoverable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "Taskfile.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"repo:setup:",
+		"node scripts/dev.mjs setup",
+		"repo:check:",
+		"node scripts/dev.mjs check",
+		"repo:verify:",
+		"node scripts/dev.mjs verify",
+		"repo:docs:",
+		"node scripts/dev.mjs docs",
+		"repo:repair:verify:",
+		"node scripts/dev.mjs repair:verify",
+		"repo:rollback:verify:",
+		"node scripts/dev.mjs rollback:verify",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("Taskfile.yml must expose repository validation command %q", required)
+		}
+	}
+}
+
+func TestCopilotInstructionsAreCommitted(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "copilot-instructions.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"node scripts/dev.mjs setup",
+		"node scripts/dev.mjs check",
+		"node scripts/dev.mjs verify",
+		"node scripts/dev.mjs docs",
+		"Do not run application sync",
+		"Do not create releases or tags",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("Copilot instructions must contain %q", required)
+		}
+	}
+}
+
+func TestCopilotSetupStepsAreBoundedAndDeterministic(t *testing.T) {
+	workflow := loadWorkflow(t, "copilot-setup-steps.yml")
+	job := workflow.Jobs["copilot-setup-steps"]
+	if len(workflow.Jobs) != 1 || job.Timeout <= 0 || job.Timeout > 59 || job.ContinueOnError {
+		t.Fatal("Copilot setup steps must have one bounded fail-closed job")
+	}
+	if job.Permissions["contents"] != "read" || len(job.Permissions) != 1 {
+		t.Fatal("Copilot setup steps must use read-only contents permission")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError {
+			t.Fatal("Copilot setup steps must not ignore failures")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+		if strings.HasPrefix(s.Uses, "actions/setup-go@") && s.With["go-version-file"] != "go.mod" {
+			t.Fatal("Copilot setup must read Go version from go.mod")
+		}
+		if strings.HasPrefix(s.Uses, "actions/setup-node@") && s.With["node-version-file"] != ".node-version" {
+			t.Fatal("Copilot setup must read Node version from .node-version")
+		}
+	}
+	for _, required := range []string{
+		"actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+		"actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+		"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+		"libgtk-4-dev libwebkitgtk-6.0-dev",
+		"node scripts/dev.mjs setup",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("Copilot setup steps must contain %q", required)
+		}
+	}
+}
+
+func TestDocumentationDriftGateIsDedicatedAndFailClosed(t *testing.T) {
+	ci := loadWorkflow(t, "ci.yml")
+	job := ci.Jobs["documentation-drift"]
+	if job.Name != "Documentation drift" || job.If != "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("Documentation drift must be a dedicated unconditional fail-closed job")
+	}
+	if ci.Permissions["contents"] != "read" || len(ci.Permissions) != 1 {
+		t.Fatal("Documentation drift must inherit read-only workflow permissions")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError || s.If != "" {
+			t.Fatal("Documentation drift steps must not be skipped or ignored")
+		}
+		joined += "\n" + s.Uses + "\n" + s.Run + "\n"
+	}
+	for _, required := range []string{
+		"actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+		"actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5",
+		"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+		"node scripts/dev.mjs setup",
+		"node scripts/dev.mjs docs",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("Documentation drift job must contain %q", required)
 		}
 	}
 }
@@ -301,6 +457,90 @@ func TestCopilotAgentReviewWorkflowIsReadOnlyAndFailClosed(t *testing.T) {
 	}
 }
 
+func TestRecurringCopilotReviewWorkflowIsStaticallyDiscoverable(t *testing.T) {
+	workflow := loadWorkflow(t, "recurring-copilot-review.yml")
+	if _, ok := workflow.On["pull_request"]; !ok {
+		t.Fatal("recurring Copilot review must run on pull requests")
+	}
+	if workflow.Permissions["contents"] != "read" || workflow.Permissions["copilot-requests"] != "write" || len(workflow.Permissions) != 2 {
+		t.Fatal("recurring Copilot review must use read permissions plus copilot-requests write")
+	}
+	review := workflow.Jobs["review"]
+	if review.Name != "Recurring Copilot review" || review.Timeout <= 0 || review.ContinueOnError {
+		t.Fatal("recurring Copilot review must be named, time-bounded, and fail closed")
+	}
+	usesLocalAction := false
+	for _, s := range review.Steps {
+		if s.ContinueOnError {
+			t.Fatal("recurring Copilot review must not hide step failures")
+		}
+		if s.Uses == "./.github/actions/recurring-copilot-review" {
+			usesLocalAction = true
+		}
+	}
+	if !usesLocalAction {
+		t.Fatal("recurring Copilot review must call the local static review action")
+	}
+	action, err := os.ReadFile(filepath.Join("..", "..", ".github", "actions", "recurring-copilot-review", "action.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(action)
+	for _, required := range []string{
+		"npm install --global @github/copilot@1.0.84",
+		`copilot -p "Review pull request changed files and publish review output with scoped guards"`,
+		"using: composite",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("recurring Copilot review action must contain %q", required)
+		}
+	}
+}
+
+func TestAgenticLearningLifecycleIsDocumented(t *testing.T) {
+	for _, relative := range []string{
+		"docs/operations/agentic-learning-lifecycle.md",
+		"docs/reports/agentic-review-findings.md",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+	lifecycle, err := os.ReadFile(filepath.Join("..", "..", "docs", "operations", "agentic-learning-lifecycle.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lifeText := string(lifecycle)
+	for _, required := range []string{
+		"candidate",
+		"active",
+		"retired",
+		"rejected",
+		"Recurring Copilot review",
+		"regression validation",
+		"agentic-review-findings.md",
+	} {
+		if !strings.Contains(lifeText, required) {
+			t.Fatalf("agentic learning lifecycle must mention %q", required)
+		}
+	}
+	findings, err := os.ReadFile(filepath.Join("..", "..", "docs", "reports", "agentic-review-findings.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	findingsText := string(findings)
+	for _, required := range []string{
+		"PR #16",
+		"Copilot review finding",
+		"follow-up validation",
+		"Recurring Copilot review",
+	} {
+		if !strings.Contains(findingsText, required) {
+			t.Fatalf("agentic review findings index must mention %q", required)
+		}
+	}
+}
+
 func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 	workflow := loadWorkflow(t, "self-healing.yml")
 	if _, ok := workflow.On["workflow_run"]; !ok {
@@ -321,15 +561,22 @@ func TestSelfHealingDiagnosticsWorkflowIsReadOnlyAndReviewOnly(t *testing.T) {
 		if s.ContinueOnError {
 			t.Fatal("self-healing diagnostics must not hide step failures")
 		}
-		joined += "\n" + s.Run + "\n" + s.Uses + "\n"
+		joined += "\n" + s.Name + "\n" + s.Run + "\n" + s.Uses + "\n"
+		for _, value := range s.With {
+			joined += value + "\n"
+		}
 	}
 	for _, forbidden := range []string{"git push", "gh issue create", "gh pr create", "pull-requests: write", "contents: write"} {
 		if strings.Contains(joined, forbidden) {
 			t.Fatalf("self-healing diagnostics must not mutate repository state with %q", forbidden)
 		}
 	}
-	if !strings.Contains(joined, "node scripts/dev.mjs propose") {
-		t.Fatal("self-healing diagnostics must publish the existing review-only proposal")
+	if !strings.Contains(joined, "node scripts/dev.mjs propose") ||
+		!strings.Contains(joined, "node scripts/dev.mjs rollback:verify") ||
+		!strings.Contains(joined, "bounded repair and rollback handoff") ||
+		!strings.Contains(joined, "ci-failure-response") ||
+		!strings.Contains(joined, "rollback-verification") {
+		t.Fatal("self-healing diagnostics must publish the existing bounded repair and rollback handoff")
 	}
 }
 
@@ -425,5 +672,95 @@ func TestLinuxSmokeConsumesPackageListingBeforeSearching(t *testing.T) {
 	if !strings.Contains(script, `dpkg-deb --contents "$deb" > "$work_dir/deb-contents.txt"`) ||
 		!strings.Contains(script, `grep -q 'usr/bin/SyncHub' "$work_dir/deb-contents.txt"`) {
 		t.Fatal("the complete package listing must be captured and checked")
+	}
+}
+
+func TestAutoRevertWorkflowOpensReviewOnlyRevertPR(t *testing.T) {
+	workflow := loadWorkflow(t, "auto-revert.yml")
+	if _, ok := workflow.On["workflow_run"]; !ok {
+		t.Fatal("auto-revert must run from workflow_run failure signals")
+	}
+	if workflow.Permissions["contents"] != "write" || workflow.Permissions["pull-requests"] != "write" {
+		t.Fatal("auto-revert must be able to open a revert pull request")
+	}
+	job := workflow.Jobs["auto-revert"]
+	if job.If == "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("auto-revert must be conditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.ContinueOnError {
+			t.Fatal("auto-revert must not hide step failures")
+		}
+		joined += "\n" + s.Name + "\n" + s.Run + "\n" + s.Uses + "\n"
+	}
+	for _, required := range []string{"auto-revert", "gh pr create", "revert"} {
+		if !strings.Contains(strings.ToLower(joined), required) {
+			t.Fatalf("auto-revert must contain %q", required)
+		}
+	}
+	for _, forbidden := range []string{"gh pr merge", "git push --force", "git reset --hard"} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("auto-revert must not merge or force-reset with %q", forbidden)
+		}
+	}
+}
+
+func TestPosixPrValidationWorkflowExposesGoAndNpmTests(t *testing.T) {
+	workflow := loadWorkflow(t, "pr-validation.yml")
+	if _, ok := workflow.On["pull_request"]; !ok {
+		t.Fatal("PR validation must run on pull requests")
+	}
+	if workflow.Permissions["contents"] != "read" || len(workflow.Permissions) != 1 {
+		t.Fatal("PR validation must remain read-only")
+	}
+	if len(workflow.Jobs) != 1 {
+		t.Fatal("PR validation must be a single POSIX job")
+	}
+	job := workflow.Jobs["tests"]
+	if job.If != "" || job.Timeout <= 0 || job.ContinueOnError {
+		t.Fatal("PR validation must be unconditional, time-bounded, and fail closed")
+	}
+	joined := ""
+	for _, s := range job.Steps {
+		if s.If != "" || s.ContinueOnError {
+			t.Fatal("PR validation steps must not be skipped or ignored")
+		}
+		joined += "\n" + s.Run + "\n"
+	}
+	for _, required := range []string{"go test ./...", "npm test"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("PR validation must run %q", required)
+		}
+	}
+}
+
+func TestShippedMcpServerLivesUnderMcpDirectory(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".mcp.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{"synchub-validation", "mcp/synchub-validation/server.mjs"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf(".mcp.json must mention %q", required)
+		}
+	}
+	server, err := os.ReadFile(filepath.Join("..", "..", "mcp", "synchub-validation", "server.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(server), `import "../../tools/mcp/validation-server.mjs"`) {
+		t.Fatal("shipped MCP server must delegate to tools/mcp/validation-server.mjs")
+	}
+	impl, err := os.ReadFile(filepath.Join("..", "..", "tools", "mcp", "validation-server.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(impl)
+	for _, required := range []string{"tools/list", "repository_validation_commands", "readOnlyHint"} {
+		if !strings.Contains(body, required) {
+			t.Fatalf("MCP implementation must contain %q", required)
+		}
 	}
 }

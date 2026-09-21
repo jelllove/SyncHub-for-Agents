@@ -14,27 +14,50 @@ const requiredGuideEntries = [
   "docs/specs/agentic-validation.v1.md",
   "docs/adr/0001-validation-evidence.md",
   "docs/reports/agentic-validation-reports.md",
+  "docs/reports/agentic-review-findings.md",
   "docs/dashboards/agentic-readiness-dashboard.json",
+  "docs/operations/agentic-learning-lifecycle.md",
   "docs/runbooks/ci-failure-response.md",
+  "Makefile",
+  "package.json",
   ".agents/skills/synchub-validation/SKILL.md",
+  ".github/copilot-instructions.md",
   ".github/workflows/ci.yml",
+  ".github/workflows/copilot-setup-steps.yml",
   ".github/workflows/copilot-agent-review.yml",
+  ".github/workflows/recurring-copilot-review.yml",
+  ".github/actions/recurring-copilot-review/action.yml",
   ".github/workflows/maintenance.yml",
   ".github/workflows/repair-verification.yml",
   ".github/workflows/self-healing.yml",
+  ".github/workflows/auto-revert.yml",
+  ".github/workflows/pr-validation.yml",
   ".github/workflows/codeql.yml",
+  ".mcp.json",
+  "mcp/synchub-validation/server.mjs",
   ".github/ISSUE_TEMPLATE/config.yml",
   ".vscode/mcp.json",
   "CODEOWNERS",
   "tools/mcp/validation-server.mjs",
+  "tools/mcp/synchub-mcp-server.mjs",
+  "Documentation drift",
   "`repository-validation`",
   "`maintenance-proposal`",
   "`repair-verification`",
   "`ci-failure-response`",
+  "`rollback-verification`",
   "`copilot-agent-review`",
   "node scripts/dev.mjs verify",
   "node scripts/dev.mjs repair:verify",
+  "node scripts/dev.mjs rollback:verify",
   "node scripts/dev.mjs propose",
+  "go test ./...",
+  "npm test",
+  "candidate",
+  "active",
+  "retired",
+  "rejected",
+  "Recurring Copilot review",
 ];
 
 function read(root, relative) {
@@ -96,15 +119,26 @@ export function checkEvidenceDrift(root) {
   for (const entry of requiredLabels.concat(requiredGuideEntries)) {
     requireContains(guide, entry, "agentic-observability.md");
   }
+  const lifecycle = read(root, "docs/operations/agentic-learning-lifecycle.md");
+  for (const state of ["candidate", "active", "retired", "rejected"]) {
+    requireContains(lifecycle, state, "agentic-learning-lifecycle.md");
+  }
+  requireContains(lifecycle, "regression validation", "agentic-learning-lifecycle.md");
+  requireContains(lifecycle, "agentic-review-findings.md", "agentic-learning-lifecycle.md");
+  const findings = read(root, "docs/reports/agentic-review-findings.md");
+  requireContains(findings, "Copilot review finding", "agentic-review-findings.md");
+  requireContains(findings, "follow-up validation", "agentic-review-findings.md");
+  requireContains(findings, "Recurring Copilot review", "agentic-review-findings.md");
 
   const dashboard = JSON.parse(read(root, "docs/dashboards/agentic-readiness-dashboard.json"));
-  if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response")) {
-    throw new Error("agentic-readiness-dashboard.json must list the ci-failure-response signal");
+  if (dashboard.schemaVersion !== 1 || !dashboard.signals?.includes("ci-failure-response") ||
+    !dashboard.signals?.includes("rollback-verification")) {
+    throw new Error("agentic-readiness-dashboard.json must list ci-failure-response and rollback-verification signals");
   }
   const mcp = JSON.parse(read(root, ".vscode/mcp.json"));
   const server = mcp.servers?.["synchub-validation"];
-  if (server?.command !== "node" || !server.args?.includes("tools/mcp/validation-server.mjs")) {
-    throw new Error(".vscode/mcp.json must expose tools/mcp/validation-server.mjs");
+  if (server?.command !== "node" || !server.args?.includes("tools/mcp/synchub-mcp-server.mjs")) {
+    throw new Error(".vscode/mcp.json must expose tools/mcp/synchub-mcp-server.mjs");
   }
 
   requireContains(read(root, ".github/workflows/ci.yml"), "repository-validation", "ci.yml");
@@ -112,10 +146,27 @@ export function checkEvidenceDrift(root) {
   requireContains(read(root, ".github/workflows/repair-verification.yml"), "repair-verification", "repair-verification.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "workflow_run", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs propose", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "node scripts/dev.mjs rollback:verify", "self-healing.yml");
   requireContains(read(root, ".github/workflows/self-healing.yml"), "ci-failure-response", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/self-healing.yml"), "rollback-verification", "self-healing.yml");
+  requireContains(read(root, ".github/workflows/auto-revert.yml"), "auto-revert", "auto-revert.yml");
+  requireContains(read(root, ".github/workflows/pr-validation.yml"), "go test ./...", "pr-validation.yml");
+  requireContains(read(root, ".github/workflows/pr-validation.yml"), "npm test", "pr-validation.yml");
+  requireContains(read(root, ".mcp.json"), "mcp/synchub-validation/server.mjs", ".mcp.json");
+  for (const entrypoint of ["package.json", "Makefile"]) {
+    const content = read(root, entrypoint);
+    requireContains(content, "node scripts/dev.mjs verify", entrypoint);
+    requireContains(content, "node scripts/dev.mjs rollback:verify", entrypoint);
+  }
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs check", ".pre-commit-config.yaml");
   requireContains(read(root, ".pre-commit-config.yaml"), "node scripts/dev.mjs docs", ".pre-commit-config.yaml");
   requireContains(read(root, ".github/workflows/codeql.yml"), "javascript-typescript", "codeql.yml");
+  requireContains(read(root, ".github/copilot-instructions.md"), "node scripts/dev.mjs verify", ".github/copilot-instructions.md");
+  requireContains(read(root, ".github/copilot-instructions.md"), "Do not create releases or tags", ".github/copilot-instructions.md");
+  requireContains(read(root, ".github/workflows/copilot-setup-steps.yml"), "copilot-setup-steps", "copilot-setup-steps.yml");
+  requireContains(read(root, ".github/workflows/copilot-setup-steps.yml"), "node scripts/dev.mjs setup", "copilot-setup-steps.yml");
+  requireContains(read(root, ".github/workflows/ci.yml"), "Documentation drift", "ci.yml");
+  requireContains(read(root, ".github/workflows/ci.yml"), "node scripts/dev.mjs docs", "ci.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "npm install --global @github/copilot@1.0.84", "copilot-agent-review.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "Do not modify files", "copilot-agent-review.yml");
   requireContains(read(root, ".github/workflows/copilot-agent-review.yml"), "copilot-agent-review", "copilot-agent-review.yml");

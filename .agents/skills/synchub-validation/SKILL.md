@@ -16,18 +16,29 @@ Run commands from the repository root:
   writes JSON, JUnit XML, HTML, and command logs under ignored `.artifacts/`.
 - `node scripts/dev.mjs repair:verify` runs the contained diagnostic repair and
   rollback proof against committed inputs.
+- `node scripts/dev.mjs rollback:verify` runs the lightweight review-only
+  maintenance repair/rollback handoff proof.
 - `node scripts/dev.mjs docs` checks documentation links, generated references,
   and evidence cross-references without rewriting files.
 - Pull requests also run the `Copilot agent review` workflow, which uploads the
   `copilot-agent-review` artifact and must not modify files or create GitHub
   resources.
+- GitHub Copilot cloud-agent tasks use `.github/copilot-instructions.md` and
+  `.github/workflows/copilot-setup-steps.yml` for repository-specific setup.
+- The `Documentation drift` status runs `node scripts/dev.mjs docs` as a
+  dedicated fail-closed PR check.
+- `package.json`, `Makefile`, and `Taskfile.yml` expose the same validation
+  commands for agents and scanners that discover different command formats.
+- POSIX pull-request validation runs `go test ./...` and `npm test`.
+- `.mcp.json` and `mcp/synchub-validation/server.mjs` ship the read-only
+  repository MCP server.
 
 ## Safety rules
 
 - Do not run application sync, trash cleanup, installer smoke tests, or repair
   loops against real user agent homes, credentials, or sync repositories.
-- Treat `node scripts/dev.mjs propose` output as a review-only patch proposal,
-  not an automatic source repair.
+- Treat `node scripts/dev.mjs propose` output as review-only repair and
+  rollback patch proposals, not automatic source repair.
 - Preserve source-bound validation failures and report artifacts exactly; never
   edit reports to make checks look successful.
 - Keep releases, tags, merges, and stricter branch protection changes separate
