@@ -10,24 +10,29 @@ import (
 
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 // CycleResult describes one completed sync and cleanup cycle.
 type CycleResult struct {
-	Actions         int
-	Blocked         int
-	Pushed          bool
-	Purged          int
-	Restored        int
-	Reinstalled     int
-	Skipped         int
-	Conflicts       int
-	PendingInstalls int
-	NeedsAttention  bool
-	Error           string
-	FinishedAt      time.Time
+	Actions             int
+	Blocked             int
+	Pushed              bool
+	Purged              int
+	Restored            int
+	Reinstalled         int
+	Skipped             int
+	Conflicts           int
+	PendingInstalls     int
+	NeedsAttention      bool
+	Error               string
+	FinishedAt          time.Time
+	IssueDetailsVersion int
+	Issues              []resource.Issue
+	SkippedIssues       []resource.Issue
+	BlockedIssues       []resource.Issue
 }
 
 // Daemon runs the sync scheduler for a given synchub home.
@@ -84,6 +89,20 @@ func (d *Daemon) syncJob() error {
 		if d.OnCycle != nil {
 			d.OnCycle(result)
 		}
+		if result.Error == "" && d.OnProgress != nil {
+			label := "Synchronization complete"
+			if result.NeedsAttention {
+				label = "Synchronization needs attention"
+			}
+			d.OnProgress(syncengine.Progress{
+				Stage: syncengine.StageComplete, Label: label, Percentage: 100,
+				CompletedActions: result.Actions, TotalActions: result.Actions,
+				BlockedFiles: result.Blocked, Pushed: result.Pushed,
+				Restored: result.Restored, Reinstalled: result.Reinstalled,
+				Skipped: result.Skipped, Conflicts: result.Conflicts,
+				PendingInstalls: result.PendingInstalls, NeedsAttention: result.NeedsAttention,
+			})
+		}
 	}()
 
 	res, err := d.sync(d.Home, d.GOOS, d.OnProgress)
@@ -101,6 +120,10 @@ func (d *Daemon) syncJob() error {
 	result.Conflicts = res.Conflicts
 	result.PendingInstalls = res.PendingInstalls
 	result.NeedsAttention = res.NeedsAttention
+	result.IssueDetailsVersion = 1
+	result.Issues = append([]resource.Issue(nil), res.Issues...)
+	result.SkippedIssues = append([]resource.Issue(nil), res.SkippedIssues...)
+	result.BlockedIssues = append([]resource.Issue(nil), res.BlockedIssues...)
 	d.Logger.Printf(
 		"sync ok: %d actions, %d blocked, %d skipped, %d conflicts, pushed=%v",
 		result.Actions,
@@ -119,27 +142,6 @@ func (d *Daemon) syncJob() error {
 	result.Purged = len(purged)
 	if result.Purged > 0 {
 		d.Logger.Printf("purged %d expired trash entries", result.Purged)
-	}
-	if d.OnProgress != nil {
-		label := "Synchronization complete"
-		if result.NeedsAttention {
-			label = "Synchronization needs attention"
-		}
-		d.OnProgress(syncengine.Progress{
-			Stage:            syncengine.StageComplete,
-			Label:            label,
-			Percentage:       100,
-			CompletedActions: result.Actions,
-			TotalActions:     result.Actions,
-			BlockedFiles:     result.Blocked,
-			Pushed:           result.Pushed,
-			Restored:         result.Restored,
-			Reinstalled:      result.Reinstalled,
-			Skipped:          result.Skipped,
-			Conflicts:        result.Conflicts,
-			PendingInstalls:  result.PendingInstalls,
-			NeedsAttention:   result.NeedsAttention,
-		})
 	}
 	return nil
 }

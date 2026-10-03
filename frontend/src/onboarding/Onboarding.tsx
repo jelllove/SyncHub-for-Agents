@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Browser, Events } from '@wailsio/runtime'
 import {
   CancelOnboarding,
   CompleteOnboarding,
   OnboardingState,
+  ReturnToRepository,
   SetRepository,
   StartGitHubLogin,
   VerifySSH,
@@ -15,6 +16,7 @@ import {
   type State,
 } from '../../bindings/github.com/qinqingxu/synchub-for-agents/internal/onboarding/models'
 import { BrandMark } from '../BrandMark'
+import { ResetPanel } from '../ResetPanel'
 
 type WizardState = Omit<State, 'agents'> & { agents: Agent[] }
 
@@ -34,16 +36,22 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    void OnboardingState().then((value) => setState(normalize(value))).catch((cause) => setError(message(cause)))
-    return Events.On('onboarding:state', (event) => {
-      const next = normalize(event.data as State)
-      setState(next)
-      if (next.step === Step.Agents) {
-        setEnabled(Object.fromEntries(next.agents.map((agent) => [agent.name, agent.enabled])))
-      }
-    })
+  const applyState = useCallback((next: WizardState) => {
+    setState(next)
+    if (next.step === Step.Repository) {
+      setRepository(next.repositoryUrl)
+    }
+    if (next.step === Step.Agents) {
+      setEnabled(Object.fromEntries(next.agents.map((agent) => [agent.name, agent.enabled])))
+    }
   }, [])
+
+  useEffect(() => {
+    void OnboardingState().then((value) => applyState(normalize(value))).catch((cause) => setError(message(cause)))
+    return Events.On('onboarding:state', (event) => {
+      applyState(normalize(event.data as State))
+    })
+  }, [applyState])
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -61,19 +69,17 @@ export default function Onboarding({ complete }: { complete: () => void }) {
     event.preventDefault()
     await run(async () => {
       await SetRepository(repository)
-      setState(normalize(await OnboardingState()))
+      applyState(normalize(await OnboardingState()))
     })
   }
 
   const startLogin = async () => {
     await run(async () => {
       const started = normalize(await StartGitHubLogin())
-      setState(started)
+      applyState(started)
       void WaitGitHubLogin()
         .then((next) => {
-          const normalized = normalize(next)
-          setState(normalized)
-          setEnabled(Object.fromEntries(normalized.agents.map((agent) => [agent.name, agent.enabled])))
+          applyState(normalize(next))
         })
         .catch((cause) => setError(message(cause)))
     })
@@ -81,9 +87,13 @@ export default function Onboarding({ complete }: { complete: () => void }) {
 
   const verifySSH = async () => {
     await run(async () => {
-      const next = normalize(await VerifySSH())
-      setState(next)
-      setEnabled(Object.fromEntries(next.agents.map((agent) => [agent.name, agent.enabled])))
+      applyState(normalize(await VerifySSH()))
+    })
+  }
+
+  const editRepository = async () => {
+    await run(async () => {
+      applyState(normalize(await ReturnToRepository()))
     })
   }
 
@@ -92,6 +102,14 @@ export default function Onboarding({ complete }: { complete: () => void }) {
       await CompleteOnboarding(enabled)
       complete()
     })
+  }
+
+  const resetComplete = () => {
+    setShowRepository(false)
+    setRepository('')
+    setEnabled({})
+    setError('')
+    void OnboardingState().then((value) => applyState(normalize(value))).catch((cause) => setError(message(cause)))
   }
 
   if (!state) {
@@ -115,7 +133,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
 
   if (state.step === Step.Welcome || state.step === Step.Repository) {
     return (
-      <WizardFrame step={1} title="Connect your private repository" subtitle="SyncHub for Agents uses this repository as an encrypted-in-transit bridge between your computers." error={error}>
+      <WizardFrame step={1} title="Connect your private repository" subtitle="SyncHub for Agents uses this repository as an encrypted-in-transit bridge between your computers." error={error} busy={busy} resetComplete={resetComplete} resetBusyChanged={setBusy}>
         <form className="wizard-form" onSubmit={(event) => void submitRepository(event)}>
           <label>
             GitHub repository URL
@@ -129,6 +147,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
           </label>
           <div className="url-examples">
             <span><strong>SSH</strong> git@github.com:you/sync.git</span>
+            <span><strong>SSH alias</strong> git@github-work:you/sync.git</span>
             <span><strong>HTTPS</strong> https://github.com/you/sync.git</span>
           </div>
           <button className="primary wide" disabled={busy}>Continue</button>
@@ -140,7 +159,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   if (state.step === Step.Authentication || state.step === Step.Verification) {
     const isSSH = state.authMode === 'ssh'
     return (
-      <WizardFrame step={2} title={isSSH ? 'Verify SSH access' : 'Sign in with GitHub'} subtitle={isSSH ? 'We will check your SSH agent and verify access to the actual repository without opening a terminal.' : 'Authorize SyncHub for Agents using GitHub Device Flow. Your token is stored only in the system keyring.'} error={error}>
+      <WizardFrame step={2} title={isSSH ? 'Verify SSH access' : 'Sign in with GitHub'} subtitle={isSSH ? 'We will check your SSH agent and verify access to the actual repository without opening a terminal.' : 'Authorize SyncHub for Agents using GitHub Device Flow. Your token is stored only in the system keyring.'} error={error} busy={busy} resetComplete={resetComplete} resetBusyChanged={setBusy}>
         <div className="auth-summary">
           <span>Repository</span>
           <strong>{state.repositoryUrl}</strong>
@@ -155,6 +174,11 @@ export default function Onboarding({ complete }: { complete: () => void }) {
             <button className="primary wide" disabled={busy} onClick={() => void verifySSH()}>
               {busy ? 'Verifying…' : 'Verify SSH access'}
             </button>
+            {error && (
+              <button className="secondary wide" disabled={busy} onClick={() => void editRepository()} type="button">
+                Edit repository URL
+              </button>
+            )}
           </>
         ) : state.userCode ? (
           <div className="device-flow">
@@ -174,7 +198,7 @@ export default function Onboarding({ complete }: { complete: () => void }) {
 
   if (state.step === Step.Agents) {
     return (
-      <WizardFrame step={3} title="Choose what to synchronize" subtitle="All detected agents are enabled by default. You can change this later in Settings." error={error}>
+      <WizardFrame step={3} title="Choose what to synchronize" subtitle="All detected agents are enabled by default. You can change this later in Settings." error={error} busy={busy} resetComplete={resetComplete} resetBusyChanged={setBusy}>
         <div className="wizard-agent-list">
           {state.agents.map((agent) => (
             <label className="wizard-agent" key={agent.name}>
@@ -194,17 +218,18 @@ export default function Onboarding({ complete }: { complete: () => void }) {
   return <main className="loading"><BrandMark label="SyncHub for Agents" /><p>Setup complete</p></main>
 }
 
-function WizardFrame({ step, title, subtitle, error, children }: { step: number; title: string; subtitle: string; error: string; children: React.ReactNode }) {
+function WizardFrame({ step, title, subtitle, error, busy, resetComplete, resetBusyChanged, children }: { step: number; title: string; subtitle: string; error: string; busy: boolean; resetComplete: () => void; resetBusyChanged: (working: boolean) => void; children: React.ReactNode }) {
   const cancel = () => void CancelOnboarding()
   return (
     <div className="onboarding-shell">
-      <button className="onboarding-brand" onClick={cancel}><BrandMark /> SyncHub for Agents</button>
+      <button className="onboarding-brand" disabled={busy} onClick={cancel}><BrandMark /> SyncHub for Agents</button>
       <section className="onboarding-card">
         <div className="stepper"><span className={step >= 1 ? 'done' : ''}>1</span><i /><span className={step >= 2 ? 'done' : ''}>2</span><i /><span className={step >= 3 ? 'done' : ''}>3</span></div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
         {children}
         {error && <div className="inline-error" role="alert">{error}</div>}
+        <ResetPanel busy={busy} complete={resetComplete} workingChanged={resetBusyChanged} />
       </section>
     </div>
   )
