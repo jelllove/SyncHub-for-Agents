@@ -88,7 +88,7 @@ jobs:
             mkdir -p "$evidence/$format-home" "$evidence/$format-config"
             HOME="$evidence/$format-home" XDG_CONFIG_HOME="$evidence/$format-config" \
               GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 SSH_AUTH_SOCK= \
-              xvfb-run -a bash -c '
+              xvfb-run -a bash -euo pipefail -c '
                 "$1" > "$2" 2>&1 &
                 pid=$!
                 trap "kill $pid; wait $pid" EXIT
