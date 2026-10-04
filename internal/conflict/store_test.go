@@ -208,8 +208,14 @@ func TestStoreApplyPendingBatchCommitsAllSelections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.ApplyPendingBatch(); err != nil {
+	applied, err := store.ApplyPendingBatch()
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(applied) != 2 ||
+		applied[0].Record.ID != "one" || applied[0].Choice != ChoiceLocal ||
+		applied[1].Record.ID != "two" || applied[1].Choice != ChoiceMerged {
+		t.Fatalf("applied resolutions = %#v", applied)
 	}
 	for _, record := range records {
 		data, err := os.ReadFile(filepath.Join(repoDir, filepath.FromSlash(record.RepoRel)))
@@ -267,7 +273,7 @@ func TestStoreApplyPendingBatchRollsBackAndRecovers(t *testing.T) {
 		t.Fatal(err)
 	}
 	fail = true
-	if err := store.ApplyPendingBatch(); err == nil {
+	if _, err := store.ApplyPendingBatch(); err == nil {
 		t.Fatal("ApplyPendingBatch() error = nil")
 	}
 	data, err := os.ReadFile(filepath.Join(repoDir, filepath.FromSlash(records[0].RepoRel)))

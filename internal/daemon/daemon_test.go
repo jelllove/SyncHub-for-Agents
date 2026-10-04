@@ -198,6 +198,10 @@ func TestDaemonCompletesCleanupWhenSyncNeedsAttention(t *testing.T) {
 				Code:        "secret-detected",
 				Message:     "blocked",
 			}},
+			BlockedIssues: []resource.Issue{{
+				ResourceKey: "demo/config", Path: "secret.json",
+				Code: "secret-detected", Message: "blocked",
+			}},
 			NeedsAttention: true,
 		}, nil
 	}
@@ -223,6 +227,12 @@ func TestDaemonCompletesCleanupWhenSyncNeedsAttention(t *testing.T) {
 	}
 	if !cycle.NeedsAttention || cycle.Restored != 1 || cycle.Blocked != 1 {
 		t.Fatalf("cycle = %#v", cycle)
+	}
+	if cycle.IssueDetailsVersion != 1 || len(cycle.Issues) != 1 || cycle.Issues[0].Path != "secret.json" {
+		t.Fatalf("cycle dropped exact issues: %#v", cycle)
+	}
+	if len(cycle.BlockedIssues) != 1 || cycle.BlockedIssues[0] != cycle.Issues[0] {
+		t.Fatalf("cycle dropped issue classification: %#v", cycle)
 	}
 	last := progress[len(progress)-1]
 	if last.Stage != syncengine.StageComplete ||
