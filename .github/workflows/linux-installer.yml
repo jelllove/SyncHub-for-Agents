@@ -50,7 +50,7 @@ jobs:
       - name: Install native packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package the original tag and verify source manifests
@@ -116,7 +116,7 @@ jobs:
             mkdir -p "$evidence/$format-home" "$evidence/$format-config"
             HOME="$evidence/$format-home" XDG_CONFIG_HOME="$evidence/$format-config" \
               GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 SSH_AUTH_SOCK= \
-              xvfb-run -a bash -euxo pipefail -c '
+              xvfb-run -a dbus-run-session -- bash -euxo pipefail -c '
                 "$1" > "$2" 2>&1 &
                 pid=$!
                 cleanup() {

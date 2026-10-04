@@ -86,7 +86,8 @@ bash scripts/smoke/macos-native.sh "$RUNNER_TEMP/macos-package" "$RUNNER_TEMP/na
 The [Linux installer workflow](../.github/workflows/linux-installer.yml) packages
 an existing release tag on Ubuntu 24.04 x64 using the existing Wails tasks. It
 rejects dependency-manifest drift, checks package versions, extracts both the
-AppImage and Debian package, and launches each extracted app under Xvfb with
+AppImage and Debian package, and launches each extracted app under Xvfb in a
+private D-Bus session with
 isolated HOME/XDG directories and no SSH agent or global Git configuration.
 It checks the actual application process and its visible native window by PID,
 not only the Xvfb wrapper, and leaves onboarding unconfigured.
