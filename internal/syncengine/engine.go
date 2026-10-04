@@ -24,6 +24,8 @@ type Result struct {
 	Actions         []Action
 	Blocked         []string
 	Issues          []resource.Issue
+	SkippedIssues   []resource.Issue
+	BlockedIssues   []resource.Issue
 	Pushed          bool
 	Restored        int
 	Reinstalled     int
@@ -109,6 +111,28 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		return Result{}, fmt.Errorf("pull: %w", err)
 	}
 
+	baseSnapshot, err := state.Load(e.StatePath)
+	if err != nil {
+		return Result{}, fmt.Errorf("load state: %w", err)
+	}
+	remote, err := e.loadRemote(codecs)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := conflicts.MirrorFromRepo(
+		conflictIDsForIssues(append(remote.ownershipBlocked, remote.validationBlocked...)),
+	); err != nil {
+		return Result{}, fmt.Errorf("mirror conflicts: %w", err)
+	}
+	applier := &ResourceApplier{
+		RepoDir:  e.RepoDir,
+		Home:     e.Home,
+		GOOS:     e.GOOS,
+		UserHome: e.UserHome,
+		Codecs:   codecs,
+		Base:     baseStore,
+		Now:      now,
+	}
 	stageParent := filepath.Join(e.RepoDir, ".git", "synchub-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Result{}, fmt.Errorf("create resource stage parent: %w", err)
@@ -133,41 +157,72 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	defer func() {
 		retErr = errors.Join(retErr, collected.Close())
 	}()
-	result.Issues = append(result.Issues, collected.Blocked...)
-	result.Issues = append(result.Issues, collected.Skipped...)
-	result.Skipped = len(collected.Skipped)
 
-	baseSnapshot, err := state.Load(e.StatePath)
-	if err != nil {
-		return Result{}, fmt.Errorf("load state: %w", err)
-	}
-	remoteSnapshot, err := SnapshotRepo(e.RepoDir)
-	if err != nil {
-		return Result{}, fmt.Errorf("snapshot repo: %w", err)
-	}
-	remoteOwned, _, ownershipBlocked := SplitRemoteSnapshot(remoteSnapshot, e.Resources)
-	result.Issues = append(result.Issues, ownershipBlocked...)
-	validRemote, validationBlocked := ValidateRemoteResources(
-		e.RepoDir,
-		remoteOwned,
-		e.Resources,
-		codecs,
-		e.GOOS,
-		e.UserHome,
-	)
-	result.Issues = append(result.Issues, validationBlocked...)
-	if err := conflicts.MirrorFromRepo(
-		conflictIDsForIssues(append(ownershipBlocked, validationBlocked...)),
-	); err != nil {
-		return Result{}, fmt.Errorf("mirror conflicts: %w", err)
-	}
+	planBase := baseSnapshot
+	var resolutionIssues []resource.Issue
+	heldResolutions := map[string]struct{}{}
 	if pending, err := conflicts.PendingBatch(); err != nil {
 		return Result{}, fmt.Errorf("load pending conflict batch: %w", err)
 	} else if pending != nil && pending.Status == "queued" {
-		if err := conflicts.ApplyPendingBatch(); err != nil {
-			return Result{}, fmt.Errorf("apply pending conflict batch: %w", err)
+		issues, held, err := e.preflightResolutionBatch(conflicts, pending, collected)
+		if err != nil {
+			return Result{}, err
+		}
+		if len(issues) != 0 {
+			resolutionIssues = issues
+			heldResolutions = held
+		} else {
+			applied, err := conflicts.ApplyPendingBatch()
+			if err != nil {
+				return Result{}, fmt.Errorf("apply pending conflict batch: %w", err)
+			}
+			if len(applied) != 0 {
+				// Adopt the resolved repository content as the merge base, then
+				// recollect permitted restores instead of planning against stale files.
+				if remote, err = e.loadRemote(codecs); err != nil {
+					return Result{}, err
+				}
+				planBase = cloneSnapshot(baseSnapshot)
+				for _, resolution := range applied {
+					repoRel := resolution.Record.RepoRel
+					adoptBase, issue := e.restoreResolution(applier, resolution)
+					if issue != nil {
+						resolutionIssues = append(resolutionIssues, *issue)
+						heldResolutions[repoRel] = struct{}{}
+						continue
+					}
+					if adoptBase {
+						if meta, ok := remote.valid[repoRel]; ok {
+							planBase[repoRel] = meta
+						}
+					}
+				}
+				refreshed, err := collector.Collect(sortedResourceSpecs(e.Resources))
+				if err != nil {
+					return Result{}, fmt.Errorf("recollect resolved resources: %w", err)
+				}
+				closeErr := collected.Close()
+				collected = refreshed
+				if closeErr != nil {
+					return Result{}, fmt.Errorf("close pre-resolution resource stage: %w", closeErr)
+				}
+			}
 		}
 	}
+
+	result.Issues = append(result.Issues, collected.Blocked...)
+	result.Issues = append(result.Issues, collected.Skipped...)
+	result.SkippedIssues = append([]resource.Issue(nil), collected.Skipped...)
+	result.Skipped = len(collected.Skipped)
+
+	remoteSnapshot := remote.snapshot
+	remoteOwned := remote.owned
+	ownershipBlocked := remote.ownershipBlocked
+	validationBlocked := remote.validationBlocked
+	validRemote := remote.valid
+	result.Issues = append(result.Issues, ownershipBlocked...)
+	result.Issues = append(result.Issues, validationBlocked...)
+	result.Issues = append(result.Issues, resolutionIssues...)
 
 	e.publish(Progress{
 		Stage:        StageComparing,
@@ -181,8 +236,9 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		collected.Blocked...),
 		ownershipBlocked...),
 		validationBlocked...)
+	result.BlockedIssues = append([]resource.Issue(nil), blocked...)
 	plan := prepareResourcePlan(
-		baseSnapshot,
+		planBase,
 		collected.Snapshot,
 		remoteSnapshot,
 		validRemote,
@@ -199,15 +255,6 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 	}
 	result.Actions = actions
 
-	applier := &ResourceApplier{
-		RepoDir:  e.RepoDir,
-		Home:     e.Home,
-		GOOS:     e.GOOS,
-		UserHome: e.UserHome,
-		Codecs:   codecs,
-		Base:     baseStore,
-		Now:      now,
-	}
 	existingConflictRecords, err := conflicts.List()
 	if err != nil {
 		return Result{}, fmt.Errorf("list conflicts: %w", err)
@@ -248,7 +295,13 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 			}
 		}
 	}
+	for repoRel := range heldResolutions {
+		preserve[repoRel] = struct{}{}
+	}
 	for index, action := range actions {
+		if _, held := heldResolutions[action.RepoRel]; held {
+			continue
+		}
 		if _, unresolved := existingConflictPaths[action.RepoRel]; unresolved &&
 			action.Type != MergeBoth &&
 			action.Type != RemoveRemote {
@@ -467,6 +520,107 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 
 	result.NeedsAttention = len(result.Issues) > 0 || result.Conflicts > 0 || result.PendingInstalls > 0
 	return result, nil
+}
+
+type remoteView struct {
+	snapshot          state.Snapshot
+	owned             state.Snapshot
+	valid             state.Snapshot
+	ownershipBlocked  []resource.Issue
+	validationBlocked []resource.Issue
+}
+
+func (e *Engine) loadRemote(codecs *portableconfig.Registry) (remoteView, error) {
+	snapshot, err := SnapshotRepo(e.RepoDir)
+	if err != nil {
+		return remoteView{}, fmt.Errorf("snapshot repo: %w", err)
+	}
+	owned, _, ownershipBlocked := SplitRemoteSnapshot(snapshot, e.Resources)
+	valid, validationBlocked := ValidateRemoteResources(
+		e.RepoDir,
+		owned,
+		e.Resources,
+		codecs,
+		e.GOOS,
+		e.UserHome,
+	)
+	return remoteView{
+		snapshot:          snapshot,
+		owned:             owned,
+		valid:             valid,
+		ownershipBlocked:  ownershipBlocked,
+		validationBlocked: validationBlocked,
+	}, nil
+}
+
+func (e *Engine) preflightResolutionBatch(
+	conflicts *conflict.Store,
+	pending *conflict.ResolutionBatch,
+	collected resourcecollect.Result,
+) ([]resource.Issue, map[string]struct{}, error) {
+	prefixes := append(
+		skippedRepoPrefixes(collected.Skipped, e.Resources),
+		blockedRepoPaths(collected.Blocked, e.Resources)...,
+	)
+	if len(prefixes) == 0 {
+		return nil, nil, nil
+	}
+	records, err := conflicts.List()
+	if err != nil {
+		return nil, nil, fmt.Errorf("preflight conflict batch: %w", err)
+	}
+	selected := map[string]struct{}{}
+	for _, selection := range pending.Selections {
+		selected[selection.ID] = struct{}{}
+	}
+	held := map[string]struct{}{}
+	var issues []resource.Issue
+	for _, record := range records {
+		if _, ok := selected[record.ID]; !ok {
+			continue
+		}
+		held[record.RepoRel] = struct{}{}
+		for _, prefix := range prefixes {
+			if pathHasPrefix(record.RepoRel, prefix) {
+				issues = append(issues, applyIssue(
+					record.ResourceKey,
+					record.RepoRel,
+					"resolution-preflight-blocked",
+					fmt.Errorf("queued conflict batch is waiting because this local resource is blocked or skipped; address its collection issue before applying the batch"),
+				))
+				break
+			}
+		}
+	}
+	return issues, held, nil
+}
+
+// restoreResolution makes the local agent files match a resolved conflict and
+// reports whether the resolved content can become the path's merge base. A
+// local choice already matches the local files, so they are left untouched.
+func (e *Engine) restoreResolution(
+	applier *ResourceApplier,
+	resolution conflict.AppliedResolution,
+) (bool, *resource.Issue) {
+	record := resolution.Record
+	if resolution.Choice == conflict.ChoiceLocal {
+		return true, nil
+	}
+	spec, err := specForRepoPath(e.Resources, record.RepoRel)
+	if err != nil {
+		issue := applyIssue(record.ResourceKey, record.RepoRel, "resolution-restore-failed", err)
+		return false, &issue
+	}
+	if spec.Strategy == resource.StrategyInstallManifest {
+		// Install manifests are reconciled through approved install plans rather
+		// than restored, so keep the previous base for the normal merge path.
+		return false, nil
+	}
+	if err := applier.Restore(spec, record.RepoRel); err != nil {
+		issue := applyIssue(spec.Key, record.RepoRel, "resolution-restore-failed", err)
+		return false, &issue
+	}
+	return true, nil
 }
 
 func (e *Engine) validate() error {
