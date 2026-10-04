@@ -1,0 +1,137 @@
+# Agentic observability
+
+SyncHub records agent-assisted repository work through pull requests, hosted
+checks, validation artifacts, labels, and human review notes. These surfaces make
+the work observable; they do not claim production autonomous repair.
+
+## Workflows and commands
+
+- `.github/workflows/ci.yml`
+  ([workflow](../../.github/workflows/ci.yml)) runs
+  `node scripts/dev.mjs verify`, publishes `repository-validation`, and
+  publishes `maintenance-proposal` only after a failed validation run produces a
+  bounded review-only patch. It also includes the dedicated
+  `Documentation drift` status, which runs `node scripts/dev.mjs docs` as a
+  fail-closed PR check.
+- `.github/workflows/copilot-setup-steps.yml`
+  ([workflow](../../.github/workflows/copilot-setup-steps.yml)) prepares the
+  GitHub Copilot cloud-agent environment with pinned Go, Node, Linux desktop
+  prerequisites, and `node scripts/dev.mjs setup`.
+- `.github/workflows/maintenance.yml`
+  ([workflow](../../.github/workflows/maintenance.yml)) schedules the same
+  repository/security and Linux test checks without write permissions or
+  packaging.
+- `.github/workflows/repair-verification.yml`
+  ([workflow](../../.github/workflows/repair-verification.yml)) runs
+  `node scripts/dev.mjs repair:verify` and publishes `repair-verification`.
+- `.github/workflows/self-healing.yml`
+  ([workflow](../../.github/workflows/self-healing.yml)) listens to failed CI
+  `workflow_run` events or manual dispatch, runs `node scripts/dev.mjs propose`,
+  and publishes a bounded repair and rollback handoff as `ci-failure-response`
+  without write permissions.
+- `.github/workflows/auto-revert.yml`
+  ([workflow](../../.github/workflows/auto-revert.yml)) opens a review-only
+  auto-revert pull request when main CI fails after a push. It never merges
+  the revert.
+- `.github/workflows/pr-validation.yml`
+  ([workflow](../../.github/workflows/pr-validation.yml)) is a POSIX PR job
+  that runs `go test ./...` and `npm test` after setup.
+- `.github/workflows/codeql.yml`
+  ([workflow](../../.github/workflows/codeql.yml)) runs pinned CodeQL
+  JavaScript/TypeScript analysis for pull requests, default-branch pushes,
+  schedules, and manual dispatch.
+- `.github/workflows/copilot-agent-review.yml`
+  ([workflow](../../.github/workflows/copilot-agent-review.yml)) runs the pinned
+  GitHub Copilot CLI as a read-only PR auditor and uploads
+  `copilot-agent-review`. It is a read-only, artifact-producing review gate, not
+  an automatic approval, merge, release, or production self-healing claim.
+- `.github/workflows/recurring-copilot-review.yml`
+  ([workflow](../../.github/workflows/recurring-copilot-review.yml)) calls the
+  local `.github/actions/recurring-copilot-review/action.yml` action on pull
+  requests with a literal prompt-driven review contract for Recurring Copilot review
+  automation evidence.
+
+## Artifact contracts
+
+- Repository path `docs/specs/validation-receipt.v1.schema.json`
+  ([schema](../specs/validation-receipt.v1.schema.json)) describes validation
+  receipts written by `node scripts/dev.mjs verify`.
+- Repository path `docs/specs/repair-proof.v1.schema.json`
+  ([schema](../specs/repair-proof.v1.schema.json)) describes diagnostic repair
+  proof receipts written by `node scripts/dev.mjs repair:verify`.
+- Repository path `docs/specs/README.md`
+  ([spec index](../specs/README.md)) and repository path
+  `docs/specs/agentic-validation.v1.md`
+  ([specification](../specs/agentic-validation.v1.md)) define the versioned
+  validation evidence set.
+- Repository path `docs/adr/0001-validation-evidence.md`
+  ([ADR](../adr/0001-validation-evidence.md)) records why the evidence contracts
+  are versioned.
+- `repository-validation`, `maintenance-proposal`, and `repair-verification`
+  artifacts are retained by GitHub Actions for bounded review windows.
+- `ci-failure-response` captures the same bounded proposal format after CI
+  failure detection, including review-only `repair.patch` and `rollback.patch`
+  artifacts when a supported repair is proposed.
+- `rollback-verification` captures a lightweight isolated proof that
+  `repair.patch` and `rollback.patch` can be generated, applied, and reversed
+  for the supported maintenance repair class.
+- `copilot-agent-review` captures the read-only Copilot PR auditor output. It is
+  designed to become a required status check after a hosted run has passed.
+- Repository path `docs/reports/agentic-validation-reports.md`
+  ([report index](../reports/agentic-validation-reports.md)) lists the current
+  machine-readable report artifacts.
+- Repository path `docs/dashboards/agentic-readiness-dashboard.json`
+  ([dashboard](../dashboards/agentic-readiness-dashboard.json)) mirrors the
+  workflow and artifact names for automation.
+- Repository path `docs/runbooks/ci-failure-response.md`
+  ([runbook](../runbooks/ci-failure-response.md)) defines detection,
+  containment, remediation proposal, validation, and rollback handoff.
+- Repository path `docs/operations/agentic-learning-lifecycle.md`
+  ([lifecycle](agentic-learning-lifecycle.md)) and repository path
+  `docs/reports/agentic-review-findings.md`
+  ([findings](../reports/agentic-review-findings.md)) describe how recurring
+  Copilot review findings become candidate, active, retired, or rejected rules.
+
+## Labels and handoff
+
+- `ai-readiness`: score reports, evidence gaps, and methodology work.
+- `validation`: native checks, CI failures, and packaging evidence.
+- `repair-proof`: diagnostic fault injection, repair validation, and rollback
+  evidence.
+- `agent-review`: agent-assisted review comments, prompts, and supervised
+  handoff.
+- `documentation-drift`: documentation/reference mismatches found by checks.
+
+Human reviewers should link failed and passing workflow runs in pull requests,
+trust the overall validation report `status` before individual check rows, and treat
+repair proposals as patches requiring review rather than automatic fixes.
+
+## Agent execution surfaces
+
+- `CODEOWNERS` routes repository-wide review ownership to the maintainer without
+  requiring a second approver in this single-maintainer repository.
+- `.agents/skills/synchub-validation/SKILL.md` provides committed repository
+  guidance for setup, check, verify, repair proof, and score-assessment handoff.
+- `.github/copilot-instructions.md` gives Copilot cloud agent and Copilot code
+  review the repository-specific setup, validation, safety, and handoff rules.
+- `.github/actions/recurring-copilot-review/action.yml` provides a static local
+  composite action whose literal Copilot prompt, review output, and scoped guard
+  wording can be inspected by automation.
+- `.github/ISSUE_TEMPLATE/config.yml` points stale-validation reports toward
+  the maintenance evidence workflow.
+- `.vscode/mcp.json` exposes the local `synchub-validation` MCP server.
+- `.mcp.json` and `mcp/synchub-validation/server.mjs` ship the same read-only
+  repository MCP server as a repository-level MCP implementation.
+- `package.json`, `Makefile`, and `Taskfile.yml` expose common repository
+  validation entry points for scanners and agents that discover different
+  command formats.
+- `tools/mcp/synchub-mcp-server.mjs` is the shipped repository MCP server
+  wrapper configured by `.vscode/mcp.json`.
+- `tools/mcp/validation-server.mjs` is the read-only stdio MCP implementation
+  with tools for listing validation commands and running
+  `node scripts/dev.mjs docs`. Its tools set `annotations.readOnlyHint: true`
+  for Copilot code review.
+- `.pre-commit-config.yaml` offers optional local pre-commit hooks for
+  `node scripts/dev.mjs check` and `node scripts/dev.mjs docs`.
+- `node scripts/dev.mjs rollback:verify` runs the lightweight review-only
+  rollback handoff proof without touching application sync data.

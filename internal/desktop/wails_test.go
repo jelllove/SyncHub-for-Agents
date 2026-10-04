@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 )
 
 func TestWailsServiceDelegatesToDesktopCore(t *testing.T) {
@@ -38,5 +40,20 @@ func TestWaitForDesktopRunTimesOutInsteadOfBlockingQuit(t *testing.T) {
 	}
 	if elapsed := time.Since(started); elapsed > time.Second {
 		t.Fatalf("shutdown waited too long: %v", elapsed)
+	}
+}
+
+func TestWailsServiceReturnsOnboardingToRepositoryStep(t *testing.T) {
+	onboardingService := onboarding.New(onboarding.Dependencies{})
+	if err := onboardingService.SetRepository("git@github.com:acme/wrong.git"); err != nil {
+		t.Fatal(err)
+	}
+	service := NewWailsService(nil, nil, onboardingService, nil)
+
+	state := service.ReturnToRepository()
+
+	if state.Step != onboarding.Repository ||
+		state.RepositoryURL != "git@github.com:acme/wrong.git" {
+		t.Fatalf("state = %#v", state)
 	}
 }

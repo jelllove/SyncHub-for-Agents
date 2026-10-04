@@ -7,6 +7,7 @@ import type {
   ResourceIssue,
   ResourcePreview,
   Snapshot,
+  SyncNotices,
 } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 
 export type AppAgent = Omit<Agent, 'exclude' | 'resources'> & {
@@ -40,16 +41,22 @@ export type AppSyncDiagnostic = {
   steps: AppSyncFixStep[]
 }
 
+export type AppSyncNotices = Omit<SyncNotices, 'issues'> & {
+  issues: NonNullable<SyncNotices['issues']>
+}
+
 export type AppSnapshot = Omit<
   Snapshot,
-  'agents' | 'preview' | 'conflicts' | 'customResources' | 'pendingInstallPlan'
+  'agents' | 'preview' | 'conflicts' | 'customResources' | 'pendingInstallPlan' | 'syncNotices' | 'revision'
 > & {
+  revision: number
   agents: AppAgent[]
   preview: AppPreview
   conflicts: NonNullable<Snapshot['conflicts']>
   customResources: CustomResourceInput[]
   pendingInstallPlan?: AppInstallPlan | null
   syncDiagnostic?: AppSyncDiagnostic | null
+  syncNotices: AppSyncNotices
 }
 
 export function normalizePreview(preview: ResourcePreview): AppPreview {
@@ -63,6 +70,7 @@ export function normalizePreview(preview: ResourcePreview): AppPreview {
 export function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
   return {
     ...snapshot,
+    revision: snapshot.revision ?? 0,
     agents: (snapshot.agents ?? []).map((agent) => ({
       ...agent,
       exclude: agent.exclude ?? [],
@@ -71,6 +79,13 @@ export function normalizeSnapshot(snapshot: Snapshot): AppSnapshot {
     preview: normalizePreview(snapshot.preview),
     conflicts: snapshot.conflicts ?? [],
     customResources: snapshot.customResources ?? [],
+    syncNotices: snapshot.syncNotices
+      ? { ...snapshot.syncNotices, issues: snapshot.syncNotices.issues ?? [] }
+      : {
+          version: 0, fingerprint: '', finishedAt: snapshot.lastSync,
+          skipped: snapshot.progress.skipped, blocked: snapshot.blockedFiles,
+          detailsAvailable: false, reviewed: false, issues: [],
+        },
     pendingInstallPlan: snapshot.pendingInstallPlan
       ? {
           ...snapshot.pendingInstallPlan,

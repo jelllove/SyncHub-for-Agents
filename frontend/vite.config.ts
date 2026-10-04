@@ -13,7 +13,7 @@ export default defineConfig({
   },
   plugins: [react(), wails("./bindings")],
   test: {
-    exclude: [...configDefaults.exclude, "lint.test.mjs"],
+    exclude: [...configDefaults.exclude, "lint.test.mjs", "doc-drift.test.mjs", "mcp-server.test.mjs"],
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     clearMocks: true,

@@ -102,6 +102,25 @@ func (s *Service) SetRepository(raw string) error {
 	return nil
 }
 
+func (s *Service) ReturnToRepository() State {
+	s.Cancel()
+	s.mu.Lock()
+	s.state.Step = Repository
+	s.state.Message = ""
+	state := cloneState(s.state)
+	s.mu.Unlock()
+	return state
+}
+
+func (s *Service) Reset(agents []Agent) State {
+	s.Cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.account = auth.Account{}
+	s.state = State{Step: Welcome, Agents: append([]Agent(nil), agents...)}
+	return cloneState(s.state)
+}
+
 func (s *Service) StartGitHubLogin(ctx context.Context) (State, error) {
 	s.mu.RLock()
 	mode := s.state.AuthMode

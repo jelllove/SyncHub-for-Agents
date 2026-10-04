@@ -1,6 +1,67 @@
 package auth
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+type failingDeleteBackend struct {
+	memoryBackend
+	failService string
+}
+
+func (b failingDeleteBackend) Delete(service, user string) error {
+	if service == b.failService {
+		return errors.New("synthetic deletion failure")
+	}
+	return b.memoryBackend.Delete(service, user)
+}
+
+func TestForgetRestoresCredentialsWhenEitherDeletionFails(t *testing.T) {
+	for _, failed := range []string{keyringService, legacyKeyringService} {
+		t.Run(failed, func(t *testing.T) {
+			backend := failingDeleteBackend{memoryBackend: memoryBackend{}, failService: failed}
+			for _, service := range []string{keyringService, legacyKeyringService} {
+				if err := backend.Set(service, accountKey(42), service+"-token"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := NewStore(backend).Forget(42); err == nil {
+				t.Fatal("credential deletion failure was hidden")
+			}
+			for _, service := range []string{keyringService, legacyKeyringService} {
+				value, err := backend.Get(service, accountKey(42))
+				if err != nil || value != service+"-token" {
+					t.Fatalf("%s credential was not restored: %v", service, err)
+				}
+			}
+		})
+	}
+}
+
+func TestForgetRemovesCurrentAndLegacyCredentialOnlyForSelectedAccount(t *testing.T) {
+	backend := memoryBackend{}
+	for _, service := range []string{keyringService, legacyKeyringService} {
+		if err := backend.Set(service, accountKey(42), "synthetic"); err != nil {
+			t.Fatal(err)
+		}
+		if err := backend.Set(service, accountKey(43), "preserved"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := NewStore(backend)
+	if err := store.Forget(42); err != nil {
+		t.Fatal(err)
+	}
+	for _, service := range []string{keyringService, legacyKeyringService} {
+		if _, err := backend.Get(service, accountKey(42)); err != ErrNotFound {
+			t.Fatalf("%s still has removed account", service)
+		}
+		if value, err := backend.Get(service, accountKey(43)); err != nil || value != "preserved" {
+			t.Fatal("another account was removed")
+		}
+	}
+}
 
 type memoryBackend map[string]string
 
