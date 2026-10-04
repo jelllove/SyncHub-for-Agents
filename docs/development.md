@@ -50,12 +50,17 @@ receipts, and `xcodebuild.log`, including failed runs. `macos-adhoc-package`
 retains the DMG, its checksum manifest, and immutable source/digest receipt.
 Playwright is not used as a proxy: it cannot directly control the production
 Wails WKWebView. Native XCTest drives the actual macOS app.
+Screenshots are exported from XCTest attachments by the host script; the
+sandboxed test runner does not write outside its container. The host also
+checks that invalid input leaves the isolated profile unconfigured.
 
 The publication job requires both native jobs to pass and rechecks the exact
 DMG digest, successful test summaries without skips, and all three screenshots
 for each architecture. It adds explicitly labeled ad-hoc assets to the selected
 published release only on an explicit `publish=true` dispatch. It refuses to
 replace existing assets, does not rewrite tags, and preserves Windows assets.
+Before uploading, it resolves the live tag (including annotated tags) and
+rejects a missing or moved tag that differs from the verified source commit.
 Failed builds, installation, UI assertions, missing screenshots or invalid
 receipts block publication. The release notes link the run and disclose the
 unnotarized status.

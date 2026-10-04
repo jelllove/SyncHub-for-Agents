@@ -55,10 +55,15 @@ set -e
 if [[ -d "$evidence/native.xcresult" ]]; then
   xcrun xcresulttool get test-results summary --path "$evidence/native.xcresult" \
     --format json > "$evidence/test-summary.json"
+  xcrun xcresulttool export attachments --path "$evidence/native.xcresult" \
+    --output-path "$evidence/screenshots/attachments"
 fi
 cat "$evidence/xcodebuild.log"
 if [[ "$status" != 0 ]]; then
   echo "Native installed-app UI tests failed; preserving xcresult, screenshots, and logs." >&2
   exit "$status"
 fi
+[[ -d "$evidence/profile/.synchub" ]]
+[[ ! -f "$evidence/profile/.synchub/config.yaml" ]]
+node "$tools/macos-evidence.mjs" screenshots "$evidence"
 node "$tools/macos-evidence.mjs" verify "$evidence" "$tag" "$architecture"
