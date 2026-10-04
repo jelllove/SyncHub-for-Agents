@@ -180,6 +180,9 @@ func TestEvidenceConfigurationFilesAreCommitted(t *testing.T) {
 		"docs/runbooks/ci-failure-response.md",
 		"Makefile",
 		"package.json",
+		"internal/doc.go",
+		"scripts/index.mjs",
+		"mcp/index.mjs",
 		".vscode/mcp.json",
 		"tools/mcp/validation-server.mjs",
 		"tools/mcp/synchub-mcp-server.mjs",
@@ -405,6 +408,94 @@ func TestStaticAnalysisAndPreCommitContracts(t *testing.T) {
 	}
 	if !languages {
 		t.Fatal("CodeQL workflow must analyze JavaScript/TypeScript")
+	}
+}
+
+func TestWindowsReleaseSigningIsDocumented(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "docs", "release-signing.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"WINDOWS_CERTIFICATE_BASE64",
+		"WINDOWS_CERTIFICATE_PASSWORD",
+		"WINDOWS_REQUIRE_SIGNING",
+		"WINDOWS_TIMESTAMP_SERVER",
+		"Get-AuthenticodeSignature",
+		"signtool verify /pa /all",
+		"SmartScreen",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("release signing guide must contain %q", required)
+		}
+	}
+	workflow, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"WINDOWS_CERTIFICATE_BASE64",
+		"WINDOWS_CERTIFICATE_PASSWORD",
+		"WINDOWS_REQUIRE_SIGNING",
+		"WINDOWS_TIMESTAMP_SERVER",
+	} {
+		if !strings.Contains(string(workflow), required) {
+			t.Fatalf("release workflow must keep signing input %q", required)
+		}
+	}
+}
+
+func TestSignPathFoundationApplicationMaterialsAreDocumented(t *testing.T) {
+	for _, relative := range []string{
+		"docs/code-signing-policy.md",
+		"docs/signpath-foundation-application.md",
+	} {
+		if _, err := os.Stat(filepath.Join("..", "..", relative)); err != nil {
+			t.Fatalf("%s must exist: %v", relative, err)
+		}
+	}
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), "Code signing policy") ||
+		!strings.Contains(string(readme), "docs/code-signing-policy.md") {
+		t.Fatal("README must link to the Code signing policy")
+	}
+	policy, err := os.ReadFile(filepath.Join("..", "..", "docs", "code-signing-policy.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyText := string(policy)
+	for _, required := range []string{
+		"Code signing policy",
+		"Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org)",
+		"Committers and reviewers",
+		"Approvers",
+		"This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it",
+		"SyncHub-for-Agents-Setup-x64.exe",
+	} {
+		if !strings.Contains(policyText, required) {
+			t.Fatalf("Code signing policy must mention %q", required)
+		}
+	}
+	draft, err := os.ReadFile(filepath.Join("..", "..", "docs", "signpath-foundation-application.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	draftText := string(draft)
+	for _, required := range []string{
+		"qinqingxu/SyncHub-for-Agents",
+		"MIT License",
+		"v0.3.3",
+		"SignPath Foundation application draft",
+		"Maintainer-provided fields still needed",
+		"Do not submit guessed personal data",
+	} {
+		if !strings.Contains(draftText, required) {
+			t.Fatalf("SignPath application draft must mention %q", required)
+		}
 	}
 }
 

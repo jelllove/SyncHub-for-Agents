@@ -309,32 +309,41 @@ func writeJSONAtomic(filename string, value any) error {
 	return writeAtomic(filename, data, 0o600)
 }
 
-// ApplyPendingBatch applies the queued batch as one recoverable transaction.
-func (s *Store) ApplyPendingBatch() error {
+// AppliedResolution describes one conflict whose chosen content was written to
+// its canonical repository path by ApplyPendingBatch.
+type AppliedResolution struct {
+	Record Record
+	Choice Choice
+}
+
+// ApplyPendingBatch applies the queued batch as one recoverable transaction and
+// returns the resolutions it committed.
+func (s *Store) ApplyPendingBatch() ([]AppliedResolution, error) {
 	s.locks.transaction.Lock()
 	defer s.locks.transaction.Unlock()
 	s.locks.metadata.Lock()
 	defer s.locks.metadata.Unlock()
 	batch, err := s.readBatchUnlocked("pending.json")
 	if err != nil || batch == nil {
-		return err
+		return nil, err
 	}
 	if batch.Status != "queued" {
-		return fmt.Errorf("resolution batch %q has invalid status %q", batch.ID, batch.Status)
+		return nil, fmt.Errorf("resolution batch %q has invalid status %q", batch.ID, batch.Status)
 	}
 	view, err := s.listVisibleUnlocked()
 	if err != nil {
-		return fmt.Errorf("snapshot conflicts for batch %s: %w", batch.ID, err)
+		return nil, fmt.Errorf("snapshot conflicts for batch %s: %w", batch.ID, err)
 	}
 	if err := writeJSONAtomic(s.metadataPath("applying-view.json"), view); err != nil {
-		return fmt.Errorf("publish applying conflict view: %w", err)
+		return nil, fmt.Errorf("publish applying conflict view: %w", err)
 	}
 	batch.Status = "applying"
 	if err := writeJSONAtomic(s.metadataPath("pending.json"), batch); err != nil {
-		return fmt.Errorf("mark resolution batch applying: %w", err)
+		return nil, fmt.Errorf("mark resolution batch applying: %w", err)
 	}
 	journal := transactionJournal{BatchID: batch.ID}
-	fail := func(cause error) error {
+	applied := make([]AppliedResolution, 0, len(batch.Selections))
+	fail := func(cause error) ([]AppliedResolution, error) {
 		rollbackErr := rollbackEntries(journal.Entries)
 		batch.Status = "failed"
 		batch.Error = errors.Join(cause, rollbackErr).Error()
@@ -344,7 +353,7 @@ func (s *Store) ApplyPendingBatch() error {
 			s.metadataPath("applying-view.json"),
 			s.metadataPath("transaction.json"),
 		)
-		return errors.Join(cause, rollbackErr, writeErr, clearErr)
+		return nil, errors.Join(cause, rollbackErr, writeErr, clearErr)
 	}
 	for _, selection := range batch.Selections {
 		record, err := s.readRecord(selection.ID)
@@ -387,6 +396,7 @@ func (s *Store) ApplyPendingBatch() error {
 		if err := writeAtomic(canonical, data, 0o600); err != nil {
 			return fail(fmt.Errorf("write resolved conflict %s: %w", selection.ID, err))
 		}
+		applied = append(applied, AppliedResolution{Record: record, Choice: selection.Choice})
 	}
 	for _, selection := range batch.Selections {
 		if err := os.RemoveAll(filepath.Join(s.localRoot, selection.ID)); err != nil {
@@ -404,9 +414,9 @@ func (s *Store) ApplyPendingBatch() error {
 		s.metadataPath("applying-view.json"),
 		s.metadataPath("transaction.json"),
 	); err != nil {
-		return err
+		return applied, err
 	}
-	return nil
+	return applied, nil
 }
 
 // RecoverTransactions rolls back an interrupted applying batch.
