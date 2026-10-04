@@ -119,7 +119,23 @@ jobs:
               xvfb-run -a bash -euo pipefail -c '
                 "$1" > "$2" 2>&1 &
                 pid=$!
-                trap "kill $pid; wait $pid" EXIT
+                cleanup() {
+                  result=$?
+                  if kill -0 "$pid" 2>/dev/null; then
+                    kill "$pid"
+                    if wait "$pid"; then
+                      :
+                    else
+                      stopped=$?
+                      if [[ "$stopped" != 143 ]]; then
+                        echo "Unexpected shutdown status: $stopped" >&2
+                        exit "$stopped"
+                      fi
+                    fi
+                  fi
+                  exit "$result"
+                }
+                trap cleanup EXIT
                 sleep 10
                 kill -0 "$pid"
                 test -d "$HOME/.synchub"
