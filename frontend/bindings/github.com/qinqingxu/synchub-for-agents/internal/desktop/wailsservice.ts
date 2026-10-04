@@ -21,6 +21,10 @@ import * as updater$0 from "../updater/models.js";
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
+export function AcknowledgeSyncNotices(fingerprint: string): $CancellablePromise<$models.Snapshot> {
+    return $Call.ByID(992847316, fingerprint);
+}
+
 export function ApproveInstallPlan(id: string): $CancellablePromise<void> {
     return $Call.ByID(1695820935, id);
 }
@@ -57,6 +61,14 @@ export function QueueConflictBatch(selections: $models.ConflictSelection[] | nul
     return $Call.ByID(2823790371, selections);
 }
 
+export function ResetLocalSetup(confirmation: string, repoPath: string): $CancellablePromise<void> {
+    return $Call.ByID(3414701819, confirmation, repoPath);
+}
+
+export function ResetPreview(): $CancellablePromise<$models.ResetPreview> {
+    return $Call.ByID(2755306697);
+}
+
 export function ResolveConflict(input: $models.ConflictResolution): $CancellablePromise<void> {
     return $Call.ByID(3976618230, input);
 }
@@ -79,6 +91,10 @@ export function RetryConflictBatch(id: string): $CancellablePromise<void> {
 
 export function RetryInstallPlan(id: string): $CancellablePromise<void> {
     return $Call.ByID(829636702, id);
+}
+
+export function ReturnToRepository(): $CancellablePromise<onboarding$0.State> {
+    return $Call.ByID(275441407);
 }
 
 export function SaveSettings(input: $models.SettingsInput): $CancellablePromise<void> {

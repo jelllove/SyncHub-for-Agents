@@ -28,10 +28,14 @@ func newBareRemote(t *testing.T) string {
 	root := t.TempDir()
 	bare := filepath.Join(root, "remote.git")
 	git(t, root, "init", "--bare", "-b", "main", bare)
+	git(t, root, "--git-dir", bare, "config", "gc.auto", "0")
+	git(t, root, "--git-dir", bare, "config", "maintenance.auto", "false")
 	seed := filepath.Join(root, "seed")
 	git(t, root, "clone", bare, seed)
 	git(t, seed, "config", "user.email", "s@e.com")
 	git(t, seed, "config", "user.name", "seed")
+	git(t, seed, "config", "gc.auto", "0")
+	git(t, seed, "config", "maintenance.auto", "false")
 	if err := os.WriteFile(filepath.Join(seed, "manifest.json"), []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +53,8 @@ func cloneWorkspace(t *testing.T, bare, dir string) *gitclient.Client {
 	}
 	git(t, dir, "config", "user.email", "m@e.com")
 	git(t, dir, "config", "user.name", "machine")
+	git(t, dir, "config", "gc.auto", "0")
+	git(t, dir, "config", "maintenance.auto", "false")
 	return client
 }
 
@@ -179,6 +185,36 @@ func TestEnginePublishesProgress(t *testing.T) {
 	}
 }
 
+func TestSyncOnceRetainsExactPolicyIssueGroups(t *testing.T) {
+	bare := newBareRemote(t)
+	repo, root := filepath.Join(t.TempDir(), "repo"), t.TempDir()
+	engine := engineFor(cloneWorkspace(t, bare, repo), repo, filepath.Join(t.TempDir(), "state.json"), root)
+	spec := engine.Resources["demo/legacy-config"]
+	spec.Include = []string{"**"}
+	spec.KeyPatterns = []string{"token"}
+	engine.Resources[spec.Key] = spec
+	writeFile(t, filepath.Join(root, "cache.tmp"), "synthetic cache")
+	writeFile(t, filepath.Join(root, "secret.json"), `{"accessToken":"synthetic"}`)
+	result, err := engine.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.SkippedIssues) != 1 || len(result.BlockedIssues) != 1 || len(result.Issues) != 2 {
+		t.Fatalf("exact issue groups = %#v", result)
+	}
+	if got := result.SkippedIssues[0]; got.Path != "cache.tmp" || got.Code != "generated-content" || got.ResourceKey != spec.Key {
+		t.Fatalf("skipped issue = %#v", got)
+	}
+	if got := result.BlockedIssues[0]; got.Path != "secret.json" || got.Code != "secret-detected" || got.ResourceKey != spec.Key {
+		t.Fatalf("blocked issue = %#v", got)
+	}
+	for _, name := range []string{"cache.tmp", "secret.json"} {
+		if _, err := os.Stat(filepath.Join(repo, "agents", "demo", "config", name)); !os.IsNotExist(err) {
+			t.Fatalf("excluded content was staged: %s: %v", name, err)
+		}
+	}
+}
+
 func TestSyncOncePreservesConcurrentBinaryEditsAsConflict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -242,6 +278,9 @@ func TestSyncOnceDoesNotAdvanceUnavailableResourceBase(t *testing.T) {
 	}
 	if !result.NeedsAttention || result.Skipped == 0 {
 		t.Fatalf("result = %#v", result)
+	}
+	if len(result.SkippedIssues) != result.Skipped || result.SkippedIssues[0].Code != "root-unavailable" {
+		t.Fatalf("skipped diagnostics were lost: %#v", result)
 	}
 	snapshot, err := state.Load(stateB)
 	if err != nil {

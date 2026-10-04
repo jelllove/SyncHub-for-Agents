@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Browser, Events } from '@wailsio/runtime'
 import {
   ApproveInstallPlan,
+  AcknowledgeSyncNotices,
   Pause,
   NeedsOnboarding,
   QueueConflictBatch,
@@ -22,6 +23,7 @@ import './style.css'
 import { BrandMark } from './BrandMark'
 import {
   type AppSnapshot,
+  type AppSyncNotices,
   hasGeneratedPreview,
   normalizePreview,
   normalizeSnapshot,
@@ -31,6 +33,8 @@ import { SettingsPanel } from './SettingsPanel'
 import { ConflictPanel } from './resources/ConflictPanel'
 import { InstallPlanPanel } from './resources/InstallPlanPanel'
 import { ResultSummary } from './resources/ResultSummary'
+import { FirstSyncDialog, type FirstSyncStrategy } from './FirstSyncDialog'
+import { SyncNoticesDialog, type SyncNoticeFilter } from './SyncNoticesDialog'
 
 const stateLabels: Record<string, string> = {
   idle: 'Ready',
@@ -74,21 +78,55 @@ function completionMessage(progress: Progress) {
 
 function App() {
   const [snapshot, setSnapshot] = useState<AppSnapshot>()
+  const latestSnapshot = useRef<AppSnapshot | undefined>(undefined)
+  const latestRevision = useRef(0)
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [firstSyncDialogOpen, setFirstSyncDialogOpen] = useState(false)
+  const [noticeLog, setNoticeLog] = useState<{ notices: AppSyncNotices; filter: SyncNoticeFilter }>()
   const [busy, setBusy] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const firstSyncRequired = needsOnboarding === false && snapshot?.configured === true && snapshot.firstSyncRequired
   const previewRefresh = useRef<{
     request: ReturnType<typeof ResourcePreview>
     task: Promise<void>
   } | null>(null)
 
+  const acceptDesktopUpdate = (update:
+    | { kind: 'snapshot'; value: Snapshot }
+    | { kind: 'progress'; value: Progress }
+  ) => {
+    const revision = update.value.revision ?? 0
+    if (revision < latestRevision.current || (revision > 0 && revision === latestRevision.current)) return false
+    latestRevision.current = revision
+    let updated: AppSnapshot
+    if (update.kind === 'snapshot') {
+      updated = normalizeSnapshot(update.value)
+    } else {
+      const current = latestSnapshot.current
+      if (!current) return false
+      updated = {
+        ...current,
+        revision,
+        progress: {
+          ...update.value,
+          needsAttention: update.value.needsAttention || Boolean(current.lastError)
+            || current.conflicts.length > 0 || Boolean(current.pendingInstallPlan)
+            || Boolean(current.conflictResolution && current.conflictResolution.status !== 'completed'),
+        },
+        state: update.value.stage === 'complete' ? current.state : 'updating',
+      }
+    }
+    latestSnapshot.current = updated
+    setSnapshot(updated)
+    return true
+  }
+
   const refresh = async () => {
     try {
-      setSnapshot(normalizeSnapshot(await loadSnapshot()))
-      setError('')
+      if (acceptDesktopUpdate({ kind: 'snapshot', value: await loadSnapshot() })) setError('')
     } catch (cause) {
       setError(errorMessage(cause))
     }
@@ -115,10 +153,12 @@ function App() {
       try {
         const preview = await request
         if (previewRefresh.current?.request !== request) return
-        setSnapshot((current) => current ? {
-          ...current,
-          preview: normalizePreview(preview),
-        } : current)
+        const current = latestSnapshot.current
+        if (current) {
+          const updated = { ...current, preview: normalizePreview(preview) }
+          latestSnapshot.current = updated
+          setSnapshot(updated)
+        }
         setError('')
       } catch (cause) {
         if (previewRefresh.current?.request === request) {
@@ -143,16 +183,15 @@ function App() {
       })
       .catch((cause) => setError(errorMessage(cause)))
     const unsubscribeSnapshot = Events.On('desktop:snapshot', (event) => {
-      setSnapshot(normalizeSnapshot(event.data as Snapshot))
+      acceptDesktopUpdate({ kind: 'snapshot', value: event.data as Snapshot })
     })
     const unsubscribeProgress = Events.On('desktop:progress', (event) => {
       const progress = event.data as Progress
-      setSnapshot((current) => current ? {
-        ...current,
-        progress,
-        state: progress.stage === 'complete' ? current.state : 'updating',
-      } : current)
-      if (progress.stage === 'complete') setNotice(completionMessage(progress))
+      if (acceptDesktopUpdate({ kind: 'progress', value: progress })) {
+        if (progress.stage === 'complete') setNotice(completionMessage(latestSnapshot.current!.progress))
+      } else if (!latestSnapshot.current) {
+        void refresh()
+      }
     })
     return () => {
       unsubscribeSnapshot()
@@ -169,6 +208,10 @@ function App() {
     }
     return cancelPreviewRefresh
   }, [settingsOpen, snapshot?.configured, snapshot?.preview.generatedAt])
+
+  useEffect(() => {
+    setFirstSyncDialogOpen(firstSyncRequired)
+  }, [firstSyncRequired, snapshot?.repositoryUrl])
 
   const enabledAgents = useMemo(
     () => snapshot?.agents.filter((agent) => agent.enabled).length ?? 0,
@@ -197,24 +240,55 @@ function App() {
     setSettingsOpen(false)
   }
 
-  const saveFirstSyncStrategy = async (strategy: string) => perform(async () => {
-    if (!snapshot) return
-    await SaveSettings({
-      repositoryUrl: snapshot.repositoryUrl,
-      repositoryDir: snapshot.repoPath,
-      repoPathMode: 'reclone',
-      firstSyncStrategy: strategy,
-      intervalMinutes: snapshot.intervalMinutes,
-      trashGraceDays: snapshot.trashGraceDays,
-      agents: Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
-      categories: Object.fromEntries(snapshot.agents.map((agent) => [
-        agent.name,
-        Object.fromEntries(agent.resources.map((resource) => [resource.category, resource.enabled])),
-      ])),
-      customResources: snapshot.customResources,
-    })
-    await TriggerSync()
-  }, 'First sync strategy saved')
+  const runSyncNow = async () => {
+    if (snapshot?.firstSyncRequired) {
+      closeSettings()
+      setFirstSyncDialogOpen(true)
+      return false
+    }
+    return perform(TriggerSync, 'Synchronization queued')
+  }
+
+  const saveFirstSyncStrategy = async (strategy: FirstSyncStrategy) => {
+    if (!snapshot) throw new Error('Reload SyncHub before choosing a first sync strategy.')
+    setBusy(true)
+    setNotice('')
+    setError('')
+    try {
+      if (snapshot.state === 'paused') await Resume()
+      await SaveSettings({
+        repositoryUrl: snapshot.repositoryUrl,
+        repositoryDir: snapshot.repoPath,
+        repoPathMode: 'reclone',
+        firstSyncStrategy: strategy,
+        intervalMinutes: snapshot.intervalMinutes,
+        trashGraceDays: snapshot.trashGraceDays,
+        agents: Object.fromEntries(snapshot.agents.map((agent) => [agent.name, agent.enabled])),
+        categories: Object.fromEntries(snapshot.agents.map((agent) => [
+          agent.name,
+          Object.fromEntries(agent.resources.map((resource) => [resource.category, resource.enabled])),
+        ])),
+        customResources: snapshot.customResources,
+      })
+      setFirstSyncDialogOpen(false)
+      setNotice('First sync strategy saved; synchronization queued')
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const acknowledgeNotices = async (fingerprint: string) => {
+    const updated = normalizeSnapshot(await AcknowledgeSyncNotices(fingerprint))
+    acceptDesktopUpdate({ kind: 'snapshot', value: updated })
+    if (updated.syncNotices.fingerprint !== fingerprint) {
+      throw new Error('Sync notice set changed while saving; close and reopen the log to review the current records.')
+    }
+    setNoticeLog((current) => current?.notices.fingerprint === fingerprint
+      ? { ...current, notices: { ...current.notices, reviewed: updated.syncNotices.reviewed } }
+      : current)
+    setNotice('Safety notices reviewed; diagnostic records retained')
+  }
 
   if (needsOnboarding) {
     return <Onboarding complete={() => {
@@ -238,7 +312,9 @@ function App() {
   const statusMessage = state === 'updating'
     ? `${progress.label || 'Preparing synchronization'}${progress.totalActions > 0 ? ` · ${progress.completedActions} of ${progress.totalActions} changes` : ''}`
     : progress.stage === 'complete'
-      ? completionMessage(progress)
+      ? snapshot.syncNotices.reviewed && !progress.needsAttention
+        ? 'Notices acknowledged. Skipped and blocked files remain excluded.'
+        : completionMessage(progress)
       : `${enabledAgents} agents are protected across your connected computers.`
 
   return (
@@ -251,7 +327,7 @@ function App() {
             <span>Desktop</span>
           </div>
         </div>
-        <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings">
+        <button className="icon-button settings-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings" title="Sync settings">
           <SettingsIcon />
         </button>
       </header>
@@ -284,10 +360,20 @@ function App() {
                 </p>
               </div>
               <div className="hero-actions">
+                {snapshot.syncNotices.detailsAvailable && !snapshot.syncNotices.reviewed
+                  && snapshot.syncNotices.issues.some((issue) => issue.reviewable) && (
+                  <button
+                    className="secondary"
+                    disabled={busy || state === 'updating'}
+                    onClick={() => setNoticeLog({ notices: snapshot.syncNotices, filter: 'all' })}
+                  >
+                    Review notices
+                  </button>
+                )}
                 <button
                   className="primary"
                   disabled={busy || state === 'updating'}
-                  onClick={() => void perform(TriggerSync, 'Synchronization queued')}
+                  onClick={() => void runSyncNow()}
                 >
                   <SyncIcon /> {state === 'updating' ? 'Syncing…' : 'Sync now'}
                 </button>
@@ -309,27 +395,9 @@ function App() {
               <Metric label="Archive retention" value={formatArchiveRetention(snapshot.trashGraceDays)} />
             </section>
 
-            <ResultSummary progress={progress} />
-
-            {snapshot.firstSyncRequired && (
-              <section className="attention-panel">
-                <div className="attention-heading">
-                  <h2>Choose first sync strategy</h2>
-                </div>
-                <p>Select how SyncHub should handle your first synchronization between local and cloud data.</p>
-                <div className="inline-actions">
-                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('use-cloud')}>
-                    Use cloud
-                  </button>
-                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('merge-cloud-local')}>
-                    Merge cloud + local
-                  </button>
-                  <button className="secondary" disabled={busy} onClick={() => void saveFirstSyncStrategy('use-local')}>
-                    Use local
-                  </button>
-                </div>
-              </section>
-            )}
+            <ResultSummary progress={progress} notices={snapshot.syncNotices} openLog={(filter) => {
+              setNoticeLog({ notices: snapshot.syncNotices, filter })
+            }} />
 
             {snapshot.syncDiagnostic && (
               <section className="attention-panel">
@@ -428,11 +496,38 @@ function App() {
           previewLoading={previewLoading}
           close={closeSettings}
           refreshPreview={refreshResourcePreview}
-          runSyncNow={() => perform(TriggerSync, 'Synchronization queued')}
+          runSyncNow={runSyncNow}
+          resetComplete={() => {
+            closeSettings()
+            setSnapshot(undefined)
+            latestSnapshot.current = undefined
+            setNoticeLog(undefined)
+            setNotice('')
+            setError('')
+            setNeedsOnboarding(true)
+          }}
+          resetBusyChanged={setBusy}
           save={(input, startAtLogin, startAtLoginChanged) => perform(async () => {
             await SaveSettings(input)
             if (startAtLoginChanged) await SetStartAtLogin(startAtLogin)
           }, 'Settings saved')}
+        />
+      )}
+      {noticeLog && (
+        <SyncNoticesDialog
+          notices={noticeLog.notices}
+          initialFilter={noticeLog.filter}
+          acknowledge={acknowledgeNotices}
+          dismiss={() => setNoticeLog(undefined)}
+        />
+      )}
+      {firstSyncDialogOpen && firstSyncRequired && (
+        <FirstSyncDialog
+          busy={busy}
+          paused={snapshot.state === 'paused'}
+          repositoryUrl={snapshot.repositoryUrl}
+          confirm={saveFirstSyncStrategy}
+          dismiss={() => setFirstSyncDialogOpen(false)}
         />
       )}
     </div>
@@ -503,7 +598,12 @@ function StatusMark({ state }: { state: string }) {
 }
 
 function SettingsIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Zm7.1-2.5c.1-.6.1-1.2 0-1.8l2-1.5-2-3.4-2.5 1a8 8 0 0 0-1.5-.9L14.8 3h-4l-.4 3.3c-.5.2-1 .5-1.5.9l-2.5-1-2 3.4 2 1.5a7 7 0 0 0 0 1.8l-2 1.5 2 3.4 2.5-1c.5.4 1 .7 1.5.9l.4 3.3h4l.4-3.3c.5-.2 1-.5 1.5-.9l2.5 1 2-3.4-2.1-1.5Z" /></svg>
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.8 2.7h4.4l.6 2.5 1.8 1 2.5-.7 2.2 3.8-1.9 1.6v2.2l1.9 1.6-2.2 3.8-2.5-.7-1.8 1-.6 2.5H9.8l-.6-2.5-1.8-1-2.5.7-2.2-3.8 1.9-1.6v-2.2L2.7 9.3l2.2-3.8 2.5.7 1.8-1Z" />
+      <circle cx="12" cy="12" r="3.1" />
+    </svg>
+  )
 }
 
 function SyncIcon() {
