@@ -51,18 +51,23 @@ func (s *summaryStore) clearPreview() error {
 }
 
 func (s *summaryStore) load(name string, destination any) error {
+	_, err := s.loadExisting(name, destination)
+	return err
+}
+
+func (s *summaryStore) loadExisting(name string, destination any) (bool, error) {
 	target := filepath.Join(s.root, name)
 	data, err := os.ReadFile(target)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return fmt.Errorf("load desktop summary %q: %w", target, err)
+		return false, fmt.Errorf("load desktop summary %q: %w", target, err)
 	}
 	if err := json.Unmarshal(data, destination); err != nil {
-		return fmt.Errorf("parse desktop summary %q: %w", target, err)
+		return true, fmt.Errorf("parse desktop summary %q: %w", target, err)
 	}
-	return nil
+	return true, nil
 }
 
 func (s *summaryStore) save(name string, value any) error {

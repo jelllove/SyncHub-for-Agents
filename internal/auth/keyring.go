@@ -4,6 +4,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 
 	keyring "github.com/zalando/go-keyring"
@@ -93,4 +94,36 @@ func (s *Store) Delete(id int64) error {
 		return errors.New("account ID is required")
 	}
 	return s.backend.Delete(keyringService, accountKey(id))
+}
+
+// Forget removes both current and migrated SyncHub credentials for one account.
+func (s *Store) Forget(id int64) error {
+	if id == 0 {
+		return errors.New("account ID is required")
+	}
+	key := accountKey(id)
+	type credential struct{ service, token string }
+	var existing []credential
+	for _, service := range []string{keyringService, legacyKeyringService} {
+		token, err := s.backend.Get(service, key)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read credential before reset: %w", err)
+		}
+		existing = append(existing, credential{service, token})
+	}
+	for _, entry := range existing {
+		if err := s.backend.Delete(entry.service, key); err != nil && !errors.Is(err, ErrNotFound) {
+			result := fmt.Errorf("delete credential: %w", err)
+			for _, original := range existing {
+				if restoreErr := s.backend.Set(original.service, key, original.token); restoreErr != nil {
+					result = errors.Join(result, fmt.Errorf("restore credential after failed reset: %w", restoreErr))
+				}
+			}
+			return result
+		}
+	}
+	return nil
 }

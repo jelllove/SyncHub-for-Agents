@@ -16,11 +16,14 @@ export type {
     InstallOperation,
     InstallPlan,
     Progress,
+    ResetPreview,
     ResourceCategory,
     ResourceIssue,
     ResourcePreview,
     SettingsInput,
     Snapshot,
     SyncDiagnostic,
-    SyncFixStep
+    SyncFixStep,
+    SyncNoticeIssue,
+    SyncNotices
 } from "./models.js";

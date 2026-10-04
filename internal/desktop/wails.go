@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
@@ -23,14 +24,15 @@ const (
 
 // WailsService exposes the UI-safe desktop API to generated Wails bindings.
 type WailsService struct {
-	app                 *application.App
-	core                *Service
-	onboarding          *onboarding.Service
-	startup             *startup.Manager
-	done                chan error
-	unsubscribeProgress func()
-	updates             *updater.Manager
-	quitForUpdate       func()
+	app                  *application.App
+	core                 *Service
+	onboarding           *onboarding.Service
+	startup              *startup.Manager
+	done                 chan error
+	unsubscribeProgress  func()
+	updates              *updater.Manager
+	quitForUpdate        func()
+	onboardingOperations sync.Mutex
 }
 
 func NewWailsService(
@@ -90,6 +92,20 @@ func waitForDesktopRun(done <-chan error, timeout time.Duration) error {
 
 func (s *WailsService) Snapshot() (Snapshot, error) {
 	return s.core.Snapshot()
+}
+
+func (s *WailsService) AcknowledgeSyncNotices(fingerprint string) (Snapshot, error) {
+	if err := s.core.AcknowledgeSyncNotices(fingerprint); err != nil {
+		return Snapshot{}, err
+	}
+	snapshot, err := s.core.Snapshot()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if s.app != nil {
+		s.app.Event.Emit(SnapshotEvent, snapshot)
+	}
+	return snapshot, nil
 }
 
 func (s *WailsService) TriggerSync() error {
@@ -172,6 +188,8 @@ func (s *WailsService) OnboardingState() onboarding.State {
 }
 
 func (s *WailsService) SetRepository(raw string) error {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
 	if err := s.onboarding.SetRepository(raw); err != nil {
 		return err
 	}
@@ -179,7 +197,17 @@ func (s *WailsService) SetRepository(raw string) error {
 	return nil
 }
 
+func (s *WailsService) ReturnToRepository() onboarding.State {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
+	state := s.onboarding.ReturnToRepository()
+	s.emitOnboarding()
+	return state
+}
+
 func (s *WailsService) StartGitHubLogin(ctx context.Context) (onboarding.State, error) {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
 	state, err := s.onboarding.StartGitHubLogin(ctx)
 	if err == nil {
 		s.emitOnboarding()
@@ -188,18 +216,24 @@ func (s *WailsService) StartGitHubLogin(ctx context.Context) (onboarding.State, 
 }
 
 func (s *WailsService) WaitGitHubLogin(ctx context.Context) (onboarding.State, error) {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
 	state, err := s.onboarding.WaitGitHubLogin(ctx)
 	s.emitOnboarding()
 	return state, err
 }
 
 func (s *WailsService) VerifySSH(ctx context.Context) (onboarding.State, error) {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
 	state, err := s.onboarding.VerifySSH(ctx)
 	s.emitOnboarding()
 	return state, err
 }
 
 func (s *WailsService) CompleteOnboarding(ctx context.Context, enabled map[string]bool) error {
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
 	if err := s.onboarding.Complete(ctx, enabled); err != nil {
 		return err
 	}
@@ -210,6 +244,42 @@ func (s *WailsService) CompleteOnboarding(ctx context.Context, enabled map[strin
 func (s *WailsService) CancelOnboarding() {
 	s.onboarding.Cancel()
 	s.emitOnboarding()
+}
+
+func (s *WailsService) ResetPreview() (ResetPreview, error) {
+	return s.core.ResetPreview()
+}
+
+func (s *WailsService) ResetLocalSetup(ctx context.Context, confirmation, repoPath string) error {
+	if confirmation != "RESET" {
+		return fmt.Errorf("type RESET to confirm removing local SyncHub setup")
+	}
+	s.onboarding.Cancel()
+	s.onboardingOperations.Lock()
+	defer s.onboardingOperations.Unlock()
+	snapshot, err := s.core.unconfiguredSnapshot()
+	if err != nil {
+		return err
+	}
+	if err := s.core.resetLocalSetup(ctx, confirmation, repoPath, s.onboarding.State().RepositoryURL); err != nil {
+		return err
+	}
+	agents := make([]onboarding.Agent, 0, len(snapshot.Agents))
+	for _, agent := range snapshot.Agents {
+		agents = append(agents, onboarding.Agent{
+			Name: agent.Name, Enabled: agent.Enabled, Exclude: agent.Exclude,
+		})
+	}
+	s.onboarding.Reset(agents)
+	s.emitOnboarding()
+	snapshot, err = s.core.Snapshot()
+	if err != nil {
+		return err
+	}
+	if s.app != nil {
+		s.app.Event.Emit(SnapshotEvent, snapshot)
+	}
+	return nil
 }
 
 func (s *WailsService) emitOnboarding() {

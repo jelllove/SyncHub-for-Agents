@@ -10,11 +10,13 @@ const tools = [
     name: "repository_docs_check",
     description: "Run SyncHub's read-only documentation and evidence drift checks.",
     inputSchema: { type: "object", additionalProperties: false },
+    annotations: { readOnlyHint: true },
   },
   {
     name: "repository_validation_commands",
     description: "List the repository validation commands an agent should run before handoff.",
     inputSchema: { type: "object", additionalProperties: false },
+    annotations: { readOnlyHint: true },
   },
 ];
 

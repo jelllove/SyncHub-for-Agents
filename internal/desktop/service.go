@@ -41,14 +41,22 @@ const (
 
 // Service is the UI-independent desktop application facade.
 type Service struct {
-	home string
-	goos string
+	home            string
+	goos            string
+	operations      sync.Mutex
+	runMu           sync.Mutex
+	runCancel       context.CancelFunc
+	runDone         chan struct{}
+	resetCredential func(int64) error
 
-	mu       sync.RWMutex
-	daemon   *daemon.Daemon
-	start    chan *daemon.Daemon
-	last     daemon.CycleResult
-	progress Progress
+	mu              sync.RWMutex
+	daemon          *daemon.Daemon
+	start           chan *daemon.Daemon
+	last            daemon.CycleResult
+	progress        Progress
+	successfulCycle daemon.CycleResult
+	noticeReview    noticeReview
+	stateRevision   uint64
 
 	nextObserverID         uint64
 	stateObservers         map[uint64]*stateObserver
@@ -79,6 +87,16 @@ func New(home, goos string) (*Service, error) {
 		return nil, fmt.Errorf("load desktop cycle summary: %w", err)
 	}
 	service.last = last
+	store := newSummaryStore(home)
+	service.successfulCycle, err = store.loadSuccessfulCycle(last)
+	if err != nil {
+		return nil, fmt.Errorf("load successful desktop cycle: %w", err)
+	}
+	service.noticeReview, err = store.loadNoticeReview()
+	if err != nil {
+		return nil, fmt.Errorf("load sync notice acknowledgement: %w", err)
+	}
+	service.progress = cycleProgress(last)
 	if _, err := os.Stat(cli.ConfigPath(home)); err != nil {
 		if os.IsNotExist(err) {
 			return service, nil
@@ -94,6 +112,12 @@ func New(home, goos string) (*Service, error) {
 // StartConfigured creates the daemon after onboarding has persisted config.
 // Calling it more than once is a no-op.
 func (s *Service) StartConfigured() error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
+	return s.startConfigured()
+}
+
+func (s *Service) startConfigured() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.daemon != nil {
@@ -135,6 +159,14 @@ func (s *Service) recordProgress(update syncengine.Progress) {
 		NeedsAttention:   update.NeedsAttention,
 	}
 	s.mu.Lock()
+	s.stateRevision++
+	progress.Revision = s.stateRevision
+	if progress.Stage == "complete" {
+		progress.NeedsAttention = cycleNeedsAttention(s.last, s.noticeReview)
+		if !progress.NeedsAttention {
+			progress.Label = "Synchronization complete"
+		}
+	}
 	s.progress = progress
 	observers := make([]func(Progress), 0, len(s.progressObservers))
 	for _, observer := range s.progressObservers {
@@ -160,16 +192,28 @@ func (s *Service) SubscribeProgress(callback func(Progress)) func() {
 }
 
 func (s *Service) recordCycle(result daemon.CycleResult) {
-	if err := newSummaryStore(s.home).saveCycle(result); err != nil {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	store := newSummaryStore(s.home)
+	if result.Error == "" {
+		if err := store.save("successful-cycle.json", result); err != nil {
+			result.Error = appendCycleError(result.Error, fmt.Errorf("save successful desktop cycle: %w", err))
+			result.NeedsAttention = true
+		} else {
+			s.successfulCycle = result
+		}
+	}
+	if err := store.saveCycle(result); err != nil {
 		result.Error = appendCycleError(
 			result.Error,
 			fmt.Errorf("save desktop cycle summary: %w", err),
 		)
 		result.NeedsAttention = true
 	}
-	s.mu.Lock()
 	s.last = result
-	s.mu.Unlock()
+	if result.Error == "" {
+		s.progress = cycleProgress(result)
+	}
 }
 
 func appendCycleError(existing string, err error) string {
@@ -227,12 +271,23 @@ func (s *Service) Close() error {
 	return d.Close()
 }
 
-// Snapshot returns the current desktop-visible state.
+func (s *Service) nextStateRevision() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stateRevision++
+	return s.stateRevision
+}
+
+// Snapshot reserves its revision before reading state. Snapshots and progress
+// share one stream, so a slow capture cannot overtake a newer published update.
 func (s *Service) Snapshot() (Snapshot, error) {
+	revision := s.nextStateRevision()
 	cfg, err := config.Load(cli.ConfigPath(s.home))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return s.unconfiguredSnapshot()
+			snapshot, err := s.unconfiguredSnapshot()
+			snapshot.Revision = revision
+			return snapshot, err
 		}
 		return Snapshot{}, err
 	}
@@ -261,6 +316,8 @@ func (s *Service) Snapshot() (Snapshot, error) {
 	d := s.daemon
 	last := s.last
 	progress := s.progress
+	review := s.noticeReview
+	successfulCycle := s.successfulCycle
 	s.mu.RUnlock()
 	if d == nil {
 		return Snapshot{}, ErrNotConfigured
@@ -270,14 +327,26 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		pendingActions = 0
 	}
 	stateValue := d.Scheduler.State().String()
-	if last.NeedsAttention && (stateValue == "idle" || stateValue == "done") {
-		stateValue = "error"
+	attention := cycleNeedsAttention(last, review) || pending != nil || len(conflictRecords) > 0 ||
+		(resolution != nil && resolution.Status != "completed")
+	stateValue = terminalAttention(stateValue, attention)
+	if progress.Stage == "complete" || progress.Stage == "" {
+		progress.NeedsAttention = attention
+		if attention {
+			progress.Label = "Synchronization needs attention"
+		} else if progress.Stage == "complete" {
+			progress.Label = "Synchronization complete"
+		}
+	} else {
+		progress.NeedsAttention = progress.NeedsAttention || attention
 	}
+	notices := cycleNotices(successfulCycle, review)
 	agents, err := makeAgents(providers, cfg, s.goos, preview)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	return Snapshot{
+		Revision:           revision,
 		Configured:         true,
 		State:              stateValue,
 		RepositoryURL:      cfg.RepoURL,
@@ -293,6 +362,7 @@ func (s *Service) Snapshot() (Snapshot, error) {
 		RepoPath:           repoPath,
 		FirstSyncRequired:  cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose && !cfg.FirstSync.Completed,
 		SyncDiagnostic:     classifySyncDiagnostic(last.Error, repoPath),
+		SyncNotices:        &notices,
 		Progress:           progress,
 		Preview:            preview,
 		CustomResources:    desktopCustomResources(cfg.CustomResources),
@@ -408,6 +478,8 @@ func makeAgents(
 
 // SaveSettings persists edits and applies the interval to the running daemon.
 func (s *Service) SaveSettings(input SettingsInput) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	if err := validateTimingSettings(input.IntervalMinutes, input.TrashGraceDays); err != nil {
 		return err
 	}
@@ -505,14 +577,14 @@ func (s *Service) SaveSettings(input SettingsInput) error {
 	if err := s.invalidatePreview(); err != nil {
 		return err
 	}
-	if err := s.StartConfigured(); err != nil {
+	if err := s.startConfigured(); err != nil {
 		return err
 	}
 	s.Daemon().Scheduler.SetInterval(time.Duration(input.IntervalMinutes) * time.Minute)
 	if cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose && !cfg.FirstSync.Completed {
 		return nil
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func validateTimingSettings(intervalMinutes, retentionDays int) error {
@@ -535,6 +607,12 @@ func validateTimingSettings(intervalMinutes, retentionDays int) error {
 
 // Trigger requests an immediate sync.
 func (s *Service) Trigger() error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
+	return s.trigger()
+}
+
+func (s *Service) trigger() error {
 	d := s.Daemon()
 	if d == nil {
 		return ErrNotConfigured
@@ -545,6 +623,8 @@ func (s *Service) Trigger() error {
 
 // Pause pauses scheduled and triggered syncs.
 func (s *Service) Pause() error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	d := s.Daemon()
 	if d == nil {
 		return ErrNotConfigured
@@ -555,6 +635,8 @@ func (s *Service) Pause() error {
 
 // Resume resumes scheduled and triggered syncs.
 func (s *Service) Resume() error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	d := s.Daemon()
 	if d == nil {
 		return ErrNotConfigured

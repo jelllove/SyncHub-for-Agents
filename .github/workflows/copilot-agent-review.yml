@@ -1,0 +1,104 @@
+name: Copilot agent review
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  checks: read
+  contents: read
+  copilot-requests: write
+  pull-requests: read
+
+concurrency:
+  group: copilot-agent-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Copilot agent review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+      - name: Install pinned Copilot CLI
+        run: |
+          set -euo pipefail
+          npm install --global @github/copilot@1.0.84 --no-audit --no-fund
+          copilot --version
+      - name: Prepare review context
+        id: context
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/agent-review
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --name-status "${{ github.event.pull_request.base.sha }}...${{ github.sha }}" > .artifacts/agent-review/changed-files.txt
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            git diff --name-status "HEAD^...HEAD" > .artifacts/agent-review/changed-files.txt
+          else
+            git ls-files > .artifacts/agent-review/changed-files.txt
+          fi
+      - name: Run read-only Copilot agent review
+        shell: bash
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          report="$GITHUB_WORKSPACE/.artifacts/agent-review/copilot-agent-review.md"
+          prompt="$(cat <<'PROMPT'
+          You are reviewing SyncHub for Agents as an AI pull-request auditor.
+
+          Do not modify files. Do not create issues. Do not create pull requests. Do not
+          push commits, tags, releases, comments, or statuses. Read the checked-out
+          repository and the changed-files list, then write a concise Markdown review to
+          stdout.
+
+          Focus on correctness, validation coverage, security/privacy boundaries,
+          release-risk, and whether the change preserves the documented app behavior.
+          When no blocking issue is found, say so explicitly and list the evidence you
+          checked. Do not invent runtime evidence that is not present in the repository or
+          workflow context.
+          PROMPT
+          )"
+          {
+            echo "## Changed files"
+            cat "$GITHUB_WORKSPACE/.artifacts/agent-review/changed-files.txt"
+            echo
+            echo "## Copilot review"
+            copilot \
+              -C "$GITHUB_WORKSPACE" \
+              --yolo \
+              --no-ask-user \
+              --disable-builtin-mcps \
+              --no-remote-export \
+              --no-color \
+              --max-ai-credits 30 \
+              -p "$prompt"
+          } 2>&1 | tee "$report"
+          test -s "$report"
+          if ! git diff --quiet --exit-code; then
+            echo "Copilot agent review modified tracked files." >&2
+            git --no-pager diff --stat >&2
+            exit 1
+          fi
+          status="$(git status --porcelain=v1 --untracked-files=all -- . ':(exclude).artifacts')"
+          if [[ -n "$status" ]]; then
+            echo "Copilot agent review created unexpected untracked files." >&2
+            echo "$status" >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: copilot-agent-review
+          path: .artifacts/agent-review
+          retention-days: 14
+          if-no-files-found: error
