@@ -9,7 +9,7 @@ It uses a private Git repository you control as the synchronization bridge, with
 ## Core capabilities
 
 - Synchronize agent resources (sessions, config, instructions, skills, plugin declarations).
-- Run in the Windows system tray with clear status states: Ready, Updating, Sync complete, Paused, Needs attention.
+- Run as a desktop/tray app with clear status states: Ready, Updating, Sync complete, Paused, Needs attention.
 - Sync periodically in the background and on-demand.
 - Propagate deletions across machines with a configurable recovery window.
 - Resolve conflicts with local/remote/merged choices and batch apply.
@@ -27,6 +27,18 @@ It uses a private Git repository you control as the synchronization bridge, with
 - Plugin manifests/declarations
 - Shared common resources configured for supported agents
 
+Built-in adapters cover Claude Code, GitHub Copilot CLI, Gemini CLI, Cursor,
+VS Code/Copilot, and shared resources under the user-level `.agents` directory.
+Categories vary by adapter; selecting an agent does not imply every category
+is available. Instructions include supported command/prompt files.
+
+Most built-in sources are **user-level directories**, not arbitrary project
+directories. Project-local `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`,
+`.github/copilot-instructions.md`, and tool-specific project directories can
+be configured as explicit custom resources with reviewed source/restore paths.
+They are not automatically discovered across all projects. OpenCode, Z-Code,
+MiniMax Code, and OpenAI Codex do not yet have built-in adapters.
+
 ## What is never synchronized
 
 - Credentials, API keys, OAuth tokens, keyrings
@@ -37,11 +49,36 @@ It uses a private Git repository you control as the synchronization bridge, with
 
 See [docs/portable-resources.md](docs/portable-resources.md) for detailed rules.
 
-## Quick start (Windows)
+## Downloads and platform support
+
+Use the [official releases](https://github.com/jelllove/SyncHub-for-Agents/releases/latest)
+or the [qinqingxu mirror](https://github.com/qinqingxu/SyncHub-for-Agents/releases/latest).
+Check each release's asset list and notes; a packaging target does not mean an
+installer was published or tested on every OS version.
+
+| Platform | Package | Notes |
+| --- | --- | --- |
+| Windows x64 | `SyncHub-for-Agents-Setup-x64.exe` | Per-user installer; may be unsigned. Check SmartScreen/signing notes. |
+| macOS Apple Silicon / Intel | `SyncHub-macOS-universal-adhoc.dmg` | Universal ad-hoc build, **not Apple notarized**. Gatekeeper may block first launch. |
+| Linux x64 | `SyncHub-x86_64.AppImage`, `synchub_*.deb` | AppImage or Debian package; verify the release notes for tested distributions. |
+
+Verify Windows downloads with `SHA256SUMS.txt`, the ad-hoc macOS DMG with
+`SHA256SUMS-macOS.txt`, and separately added Linux packages with
+`SHA256SUMS-Linux.txt`. Do not assume an older checksum manifest covers assets
+added later. A standard Developer ID/notarized macOS build, if published, uses
+the separate `SyncHub.dmg` name.
+
+The v0.3.4 ad-hoc DMG passed installed-app native XCTest onboarding and
+invalid-repository tests on macOS 15.7.9, Apple Silicon and Intel.
+[The validation run](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37208710481)
+retains screenshots and logs as `macos-native-arm64` / `macos-native-x86_64`
+artifacts for 30 days. This does not establish Gatekeeper acceptance, live sync,
+keychain/login-item behavior, or runtime support on macOS 12.
+
+## Quick start
 
 1. Create an empty private GitHub repository.
-2. Download the installer from the latest release:
-   - `SyncHub-for-Agents-Setup-x64.exe`
+2. Download and verify the appropriate package from the release page.
 3. Install and launch **SyncHub for Agents**.
 4. Complete onboarding:
    - connect your private repository,
@@ -50,6 +87,10 @@ See [docs/portable-resources.md](docs/portable-resources.md) for detailed rules.
 5. Keep the app running in the tray on each computer you want to sync.
 
 Detailed install and onboarding guide: [docs/install.md](docs/install.md).
+On macOS, open the DMG and drag the app to Applications. On Linux, install the
+Debian package or make the AppImage executable and keep it at a permanent path.
+Approve an unnotarized macOS app only if you trust its source; do not disable
+system-wide security.
 
 ## Software updates
 

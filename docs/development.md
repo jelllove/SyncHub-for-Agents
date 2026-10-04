@@ -81,6 +81,24 @@ bash scripts/release/macos-adhoc.sh "$PWD" "$RUNNER_TEMP/macos-package" v0.3.4
 bash scripts/smoke/macos-native.sh "$RUNNER_TEMP/macos-package" "$RUNNER_TEMP/native-evidence" v0.3.4
 ```
 
+## Linux release-package validation
+
+The [Linux installer workflow](../.github/workflows/linux-installer.yml) packages
+an existing release tag on Ubuntu 24.04 x64 using the existing Wails tasks. It
+rejects dependency-manifest drift, checks package versions, extracts both the
+AppImage and Debian package, and launches each extracted app under Xvfb with
+isolated HOME/XDG directories and no SSH agent or global Git configuration.
+It checks the actual application process, not only the Xvfb wrapper, and leaves
+onboarding unconfigured. This is a startup smoke test, not native UI automation
+or a system-wide apt-install/dependency-resolution test.
+
+`linux-verified-package` contains both packages, `SHA256SUMS-Linux.txt`, and a
+source/test receipt; `linux-launch-evidence` retains logs including failures.
+The workflow does not publish automatically. Before attaching these exact
+artifacts to an existing release, require the hosted run to pass, resolve the
+destination's live tag to the receipt commit, verify checksums, refuse to replace
+existing assets, and retain existing platform assets and release notes.
+
 ## Local feedback and cleanup
 
 The shared check uses gofmt, go vet, ESLint, and TypeScript. It checks

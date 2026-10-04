@@ -56,6 +56,13 @@ for screenshots, tested behavior, and limitations.
 
 ## Linux
 
+Use the release's `SyncHub-x86_64.AppImage` or `synchub_*.deb` for Linux x64.
+Separately added Linux assets have their own `SHA256SUMS-Linux.txt`; verify those
+downloads against that manifest rather than an older Windows-only checksum file.
+The [Linux package workflow](development.md#linux-release-package-validation)
+checks extracted-package startup on Ubuntu 24.04 under Xvfb, not every Linux
+distribution or desktop environment.
+
 ### Debian or Ubuntu
 
 ```bash

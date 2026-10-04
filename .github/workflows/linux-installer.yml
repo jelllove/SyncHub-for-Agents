@@ -1,0 +1,121 @@
+name: Linux installer validation
+
+on:
+  push:
+    branches: [agents/macos-installer-smoke]
+    paths:
+      - ".github/workflows/linux-installer.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/linux-installer.yml"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing source release tag to package
+        required: true
+        default: v0.3.4
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-installer-${{ github.ref }}-${{ inputs.release_tag || 'v0.3.4' }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag || 'v0.3.4' }}
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: tooling
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: tooling/.node-version
+      - name: Validate release reference
+        run: node tooling/scripts/release/macos-evidence.mjs version "$RELEASE_TAG"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          path: app-source
+          fetch-depth: 0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: app-source/go.mod
+          cache-dependency-path: app-source/go.sum
+      - name: Install native packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
+      - name: Package the original tag and verify source manifests
+        working-directory: app-source
+        run: |
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test -z "$(git status --porcelain)"
+          sha256sum go.mod go.sum frontend/package.json frontend/package-lock.json > "$RUNNER_TEMP/source-manifests.txt"
+          npm ci --prefix frontend
+          wails3 package GOOS=linux ARCH=amd64 VERSION="${RELEASE_TAG#v}"
+          sha256sum --check "$RUNNER_TEMP/source-manifests.txt"
+      - name: Extract and launch both packages in isolated profiles
+        working-directory: app-source
+        run: |
+          evidence="$RUNNER_TEMP/linux-evidence"
+          mkdir -p "$evidence/appimage" "$evidence/deb"
+          mapfile -t debs < <(find bin -maxdepth 1 -name '*.deb' -type f)
+          test "${#debs[@]}" = 1
+          test "$(dpkg-deb --field "${debs[0]}" Version)" = "${RELEASE_TAG#v}"
+          test "$(dpkg-deb --field "${debs[0]}" Architecture)" = amd64
+          dpkg-deb --info "${debs[0]}" > "$evidence/deb-info.txt"
+          dpkg-deb --extract "${debs[0]}" "$evidence/deb"
+          image="$PWD/bin/SyncHub-x86_64.AppImage"
+          (cd "$evidence/appimage" && "$image" --appimage-extract > "$evidence/appimage-extract.log")
+          for format in appimage deb; do
+            if [[ "$format" == appimage ]]; then
+              binary="$evidence/appimage/squashfs-root/usr/bin/SyncHub"
+              launcher="$evidence/appimage/squashfs-root/AppRun"
+            else
+              binary="$evidence/deb/usr/bin/SyncHub"
+              launcher="$binary"
+            fi
+            test "$("$binary" --version)" = "${RELEASE_TAG#v}"
+            mkdir -p "$evidence/$format-home" "$evidence/$format-config"
+            HOME="$evidence/$format-home" XDG_CONFIG_HOME="$evidence/$format-config" \
+              GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 SSH_AUTH_SOCK= \
+              xvfb-run -a bash -c '
+                "$1" > "$2" 2>&1 &
+                pid=$!
+                trap "kill $pid; wait $pid" EXIT
+                sleep 10
+                kill -0 "$pid"
+                test -d "$HOME/.synchub"
+                test ! -f "$HOME/.synchub/config.yaml"
+              ' bash "$launcher" "$evidence/$format-launch.log"
+          done
+          mkdir -p "$RUNNER_TEMP/linux-package"
+          cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$RUNNER_TEMP/linux-package/"
+          cd "$RUNNER_TEMP/linux-package"
+          sha256sum SyncHub-x86_64.AppImage *.deb > SHA256SUMS-Linux.txt
+          jq -n --arg tag "$RELEASE_TAG" --arg commit "$(git -C "$GITHUB_WORKSPACE/app-source" rev-parse HEAD)" \
+            '{tag:$tag,sourceCommit:$commit,architecture:"amd64",os:"Ubuntu 24.04",
+              appimageLaunchPassed:true,debLaunchPassed:true,isolatedHome:true}' > build-receipt.json
+      - name: Retain exact packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: linux-verified-package
+          path: ${{ runner.temp }}/linux-package
+          if-no-files-found: error
+      - name: Retain launch evidence including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: linux-launch-evidence
+          path: |
+            ${{ runner.temp }}/linux-evidence/*.txt
+            ${{ runner.temp }}/linux-evidence/*.log
+          if-no-files-found: warn
