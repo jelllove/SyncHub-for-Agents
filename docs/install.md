@@ -56,7 +56,7 @@ for screenshots, tested behavior, and limitations.
 
 ## Linux
 
-Use the release's `SyncHub-x86_64.AppImage` or `synchub_*.deb` for Linux x64.
+Use the release's `SyncHub-x86_64.AppImage` or `SyncHub.deb` for Linux x64.
 Separately added Linux assets have their own `SHA256SUMS-Linux.txt`; verify those
 downloads against that manifest rather than an older Windows-only checksum file.
 The [Linux package workflow](development.md#linux-release-package-validation)
@@ -66,7 +66,7 @@ distribution or desktop environment.
 ### Debian or Ubuntu
 
 ```bash
-sudo apt install ./synchub_*.deb
+sudo apt install ./SyncHub.deb
 ```
 
 Start SyncHub from the application menu.

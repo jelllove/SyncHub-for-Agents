@@ -60,7 +60,7 @@ installer was published or tested on every OS version.
 | --- | --- | --- |
 | Windows x64 | `SyncHub-for-Agents-Setup-x64.exe` | Per-user installer; may be unsigned. Check SmartScreen/signing notes. |
 | macOS Apple Silicon / Intel | `SyncHub-macOS-universal-adhoc.dmg` | Universal ad-hoc build, **not Apple notarized**. Gatekeeper may block first launch. |
-| Linux x64 | `SyncHub-x86_64.AppImage`, `synchub_*.deb` | AppImage or Debian package; verify the release notes for tested distributions. |
+| Linux x64 | `SyncHub-x86_64.AppImage`, `SyncHub.deb` | AppImage or Debian package; extracted-package startup tested on Ubuntu 24.04 x64. |
 
 Verify Windows downloads with `SHA256SUMS.txt`, the ad-hoc macOS DMG with
 `SHA256SUMS-macOS.txt`, and separately added Linux packages with
@@ -74,6 +74,12 @@ invalid-repository tests on macOS 15.7.9, Apple Silicon and Intel.
 retains screenshots and logs as `macos-native-arm64` / `macos-native-x86_64`
 artifacts for 30 days. This does not establish Gatekeeper acceptance, live sync,
 keychain/login-item behavior, or runtime support on macOS 12.
+
+The v0.3.4 Linux packages passed version/architecture checks and isolated
+extracted-package startup on Ubuntu 24.04 x64 under Xvfb.
+[The Linux validation run](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37210714225)
+retains packages and startup logs. This is not a full UI test, system-wide
+Debian installation test, or a compatibility guarantee for every distribution.
 
 ## Quick start
 
