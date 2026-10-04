@@ -50,7 +50,7 @@ jobs:
       - name: Install native packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package the original tag and verify source manifests
@@ -138,6 +138,11 @@ jobs:
                 trap cleanup EXIT
                 sleep 10
                 kill -0 "$pid"
+                ps -o pid,ppid,comm -p "$pid"
+                if ! pgrep -a -P "$pid"; then
+                  echo "Launcher has no direct children"
+                fi
+                xwininfo -root -tree
                 window="$(xdotool search --all --onlyvisible --pid "$pid" --name "SyncHub for Agents")"
                 test -n "$window"
                 xdotool getwindowname "$window"
