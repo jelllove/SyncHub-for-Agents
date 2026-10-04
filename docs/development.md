@@ -290,7 +290,7 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 
 - Go minimum: `1.26.6` (from `go.mod`).
 - Node.js: `24.17.0` (from `.node-version`).
-- Wails CLI: `v3.0.0-beta.8` (from `go.mod`).
+- Wails CLI: `v3.0.0-beta.21` (from `go.mod`).
 
 | Repository command | Purpose |
 | --- | --- |
