@@ -10,6 +10,7 @@ import { CustomResourceEditor } from './resources/CustomResourceEditor'
 import { ResourceSettings, type CategorySettings } from './resources/ResourceSettings'
 import { RestorePreview } from './resources/RestorePreview'
 import { UpdatePanel } from './UpdatePanel'
+import { ResetPanel } from './ResetPanel'
 
 export type SettingsPanelProps = {
   snapshot: AppSnapshot
@@ -18,6 +19,8 @@ export type SettingsPanelProps = {
   close: () => void
   refreshPreview: () => Promise<void>
   runSyncNow: () => Promise<unknown>
+  resetComplete?: () => void
+  resetBusyChanged?: (working: boolean) => void
   save: (
     input: SettingsInput,
     startAtLogin: boolean,
@@ -44,6 +47,8 @@ export function SettingsPanel({
   close,
   refreshPreview,
   runSyncNow,
+  resetComplete,
+  resetBusyChanged,
   save,
 }: SettingsPanelProps) {
   const [repositoryUrl, setRepositoryUrl] = useState(snapshot.repositoryUrl)
@@ -258,6 +263,7 @@ export function SettingsPanel({
           </div>
         </form>
         <UpdatePanel syncBusy={busy || snapshot.state === 'updating'} />
+        <ResetPanel busy={busy || previewLoading || snapshot.state === 'updating'} complete={resetComplete ?? close} workingChanged={resetBusyChanged} />
       </aside>
     </div>
   )

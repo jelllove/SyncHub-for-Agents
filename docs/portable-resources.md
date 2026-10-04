@@ -48,6 +48,48 @@ session files, and declarative installation metadata.
 The first computer publishes its safe portable resources. Blocked and skipped
 files appear as safety notices and remain local.
 
+## Sync diagnostics and acknowledgement
+
+The dashboard **Skipped** and **Blocked** counters are keyboard-accessible
+buttons. Open either to view the **Sync diagnostics log** for the last successful
+sync-and-cleanup cycle. Filter by skipped, blocked, or operational issues to
+inspect the exact resource, reported path, reason, and code. File issues use the
+relative path reported by the cycle; resource-level failures may report the
+source root instead. The log never substitutes a newer settings preview for
+historical cycle details.
+
+Original counts and all per-resource records, including duplicates, are retained.
+Blocked counts measure protected paths and can differ from the number of issue
+records. A failed later cycle leaves the successful-cycle log available and its
+current error visible. Older summaries saved without details explicitly report
+that the historical records are unavailable; they cannot be acknowledged.
+
+Choose **Review notices** beside the dashboard status, or open a counter's log.
+Choose **Review safety notices** to show the entire recorded issue set, then
+**Confirm acknowledgement**. The log scrolls independently of its header and
+confirmation controls, so the buttons remain visible even with many records.
+Acknowledgement is local to this SyncHub setup and
+persists across restarts. A versioned fingerprint identifies the exact records,
+counts, and reasons, including duplicates. Unchanged exclusions remain reviewed
+when timestamps, record order, or file sizes change. Updated sizes remain in the
+log; new paths, reasons, codes, or counts require review.
+If the set changes before confirmation, the operation fails visibly: close and
+reopen the log to review the current records. Load and persistence failures are
+reported rather than silently treating notices as reviewed.
+
+Reviewed safety/exclusion notices no longer cause **Needs attention** by
+themselves. Their counters and log remain available with a reviewed indicator.
+Reported skipped/blocked exclusions for missing sources, unavailable links, or
+failed portable configuration projection can also be reviewed. Those resources
+remain excluded, and their failure details remain in the log; confirmation does
+not claim that they were synchronized. Operational failures outside these
+recorded exclusion groups (including I/O, scanner, write, and unknown failures),
+actual sync errors, unresolved conflicts, and pending/failed installation plans
+still require attention. Acknowledgement neither approves installation nor
+resolves conflicts. Opening, filtering, or acknowledging the log never triggers
+sync or changes secret, path, symbolic-link, or size protections. **Reset local
+setup** removes both the retained summaries and acknowledgement.
+
 ## A new computer
 
 1. Install SyncHub and connect the same private repository.
@@ -79,6 +121,10 @@ The dashboard offers:
 
 Merged content is scanned before it can replace the repository file. Deletion
 of an unresolved conflicted file is suspended until the conflict is resolved.
+Queued resolutions also check the current local resources before changing any
+files. If a selected path is blocked or skipped, the entire batch stays queued,
+the local files and conflict bundles are preserved, and the log explains why it
+is waiting. Address the collection issue and sync again to apply the batch.
 
 ## Custom resources
 
@@ -132,5 +178,8 @@ complete.
 
 ### Synchronization says Needs attention
 
-Review blocked files, pending installation plans, and conflicts. The state
-returns to **Up to date** only after a later clean synchronization cycle.
+Open the dashboard **Skipped** or **Blocked** log and review safety notices.
+After acknowledgement, an otherwise successful cycle no longer needs attention
+for those same notices. Fix actual sync/operational errors, resolve conflicts,
+and review pending installation plans separately; acknowledging notices cannot
+clear these gates.

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/processattr"
+	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 )
 
 type Runner interface {
@@ -46,6 +47,13 @@ func Check(ctx context.Context, runner Runner, repositoryURL string) (Status, er
 	if repositoryURL == "" {
 		return Status{}, errors.New("repository URL is required")
 	}
+	parsed, err := repository.ParseGitHubURL(repositoryURL)
+	if err != nil {
+		return Status{}, err
+	}
+	if parsed.Protocol != repository.SSH {
+		return Status{}, errors.New("SSH verification requires an SSH repository URL")
+	}
 	status := Status{}
 	if _, stderr, err := runner.Run(ctx, "ssh", "-V"); err != nil {
 		status.Message = commandMessage("OpenSSH is not available", stderr)
@@ -53,12 +61,27 @@ func Check(ctx context.Context, runner Runner, repositoryURL string) (Status, er
 	}
 	status.SSHAvailable = true
 
-	config, stderr, err := runner.Run(ctx, "ssh", "-G", "github.com")
+	configOutput, stderr, err := runner.Run(
+		ctx,
+		"ssh",
+		"-G",
+		"-l", "git",
+		parsed.SSHHost,
+	)
 	if err != nil {
 		status.Message = commandMessage("Could not read SSH configuration", stderr)
 		return status, nil
 	}
-	status.IdentityFiles = parseIdentityFiles(config)
+	config := parseConfig(configOutput)
+	status.IdentityFiles = config.identityFiles
+	if !strings.EqualFold(config.hostname, "github.com") {
+		status.Message = "SSH host alias must resolve to github.com"
+		return status, nil
+	}
+	if config.user != "git" {
+		status.Message = "SSH repository access must use the git user"
+		return status, nil
+	}
 	if keys, _, err := runner.Run(ctx, "ssh-add", "-L"); err == nil && strings.TrimSpace(keys) != "" {
 		status.AgentHasKeys = true
 	}
@@ -122,15 +145,29 @@ func GenerateKey(ctx context.Context, runner Runner, path, comment string) (stri
 	return result, nil
 }
 
-func parseIdentityFiles(config string) []string {
-	var result []string
-	for _, line := range strings.Split(config, "\n") {
+type effectiveConfig struct {
+	hostname      string
+	user          string
+	identityFiles []string
+}
+
+func parseConfig(output string) effectiveConfig {
+	var config effectiveConfig
+	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.EqualFold(fields[0], "identityfile") {
-			result = append(result, fields[1])
+		if len(fields) != 2 {
+			continue
+		}
+		switch strings.ToLower(fields[0]) {
+		case "hostname":
+			config.hostname = fields[1]
+		case "user":
+			config.user = fields[1]
+		case "identityfile":
+			config.identityFiles = append(config.identityFiles, fields[1])
 		}
 	}
-	return result
+	return config
 }
 
 func commandMessage(prefix, stderr string) string {

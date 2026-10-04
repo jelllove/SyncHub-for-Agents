@@ -1,0 +1,15 @@
+- name: ai-readiness
+  color: "5319e7"
+  description: AI readiness evaluation, evidence, or methodology work
+- name: validation
+  color: "0e8a16"
+  description: Native validation, CI, test, or packaging evidence
+- name: repair-proof
+  color: "d93f0b"
+  description: Diagnostic repair and rollback verification evidence
+- name: agent-review
+  color: "1d76db"
+  description: Agent-assisted review, prompt, or supervised handoff workflow
+- name: documentation-drift
+  color: "c5def5"
+  description: Documentation and executable behavior alignment

@@ -67,7 +67,11 @@ SyncHub records that stable path, not the temporary AppImage mount.
 
 1. Enter the private repository URL:
    - SSH: `git@github.com:your-name/agent-sync.git`
+   - SSH alias: `git@github-work:your-name/agent-sync.git`
    - HTTPS: `https://github.com/your-name/agent-sync.git`
+   SSH aliases may select a different GitHub key through `~/.ssh/config`. The
+   alias must resolve to `HostName github.com`; SyncHub verifies the effective
+   host before contacting the repository.
 2. Authenticate:
    - SSH verifies your local key, `ssh-agent`, GitHub host key, and access to
      the selected repository.
@@ -75,11 +79,53 @@ SyncHub records that stable path, not the temporary AppImage mount.
      operating-system keyring.
 3. Choose agents to synchronize. Detected agents are enabled by default.
 4. Select **Start synchronizing**.
+   If a first-sync choice is required, a **Choose first sync strategy** dialog
+   opens automatically. Choose **Use cloud**, **Merge cloud + local**, or
+   **Use local**, then confirm with **Start first sync**. No strategy is
+   preselected; local/cloud preferences can replace or remove differing files
+   on the other side. **Choose later** or Escape closes the dialog without
+   starting a sync; **Sync now** on the dashboard or in settings opens it again.
+   Confirmation also resumes synchronization if it was paused. Save failures
+   remain visible in the dialog so you can retry.
 5. Open **Sync settings** and review the resource categories, source-to-target
    mappings, excluded files, and restore totals.
 6. If the repository contains Plugin declarations or Skill dependencies,
    review the exact executable and arguments in the installation plan before
    approving it.
+
+### Reset and start over
+
+Use **Reset and start over** at the bottom of **Sync settings**, or in the
+onboarding steps if setup was not completed. Review the local clone path and
+type `RESET`, then choose **Delete local setup**.
+
+This removes SyncHub configuration, synchronization history/merge bases,
+pending conflicts and installation approvals, its saved OAuth login, and the
+selected local Git clone, including any unpushed changes. It returns to the
+Welcome screen without requiring an app restart. The operation cannot be
+undone.
+
+The remote repository, agent source files, SSH configuration/keys, custom
+provider definitions, logs, automatic update preferences, and start-at-login
+registration remain unchanged. Reset does not uninstall plugins or integrations.
+
+Reset is refused during a running synchronization or when the selected clone
+has an unsafe path, links, or unexpected top-level files. Custom clones must
+also have an origin exactly matching the current settings. The dedicated
+default clone can be reset even if its origin differs, is missing, or setup
+was not completed, so changing a repository URL or SSH alias does not prevent
+starting over.
+Move unrelated files out of that clone and retry; do not select your agent
+directory or home directory as the local clone. Custom clones are staged in
+their own parent directory, so resetting a clone on another volume does not
+require copying it. Inside the SyncHub data directory, only its default `repo`
+subdirectory is allowed as a reset clone.
+
+If staging or credential removal fails, SyncHub attempts to restore the local
+files and credentials. After file rollback succeeds, synchronization is
+available again with its previous paused state and no automatic startup sync.
+Recovery failures and any remaining staging paths are shown explicitly; do not
+delete recovery data until the error has been resolved.
 
 The app runs an initial synchronization and then checks every ten minutes.
 Closing the window keeps it running in the system tray. Use **Quit** from the

@@ -67,6 +67,7 @@ export interface InstallPlan {
 }
 
 export interface Progress {
+    "revision"?: number;
     "stage": string;
     "label": string;
     "percentage": number;
@@ -80,6 +81,10 @@ export interface Progress {
     "conflicts": number;
     "pendingInstalls": number;
     "needsAttention": boolean;
+}
+
+export interface ResetPreview {
+    "repoPath": string;
 }
 
 export interface ResourceCategory {
@@ -136,6 +141,7 @@ export interface SettingsInput {
  * Snapshot is the current desktop-visible sync state.
  */
 export interface Snapshot {
+    "revision"?: number;
     "configured": boolean;
     "state": string;
     "repositoryUrl": string;
@@ -151,6 +157,7 @@ export interface Snapshot {
     "repoPath": string;
     "firstSyncRequired": boolean;
     "syncDiagnostic"?: SyncDiagnostic | null;
+    "syncNotices"?: SyncNotices | null;
     "progress": Progress;
     "preview": ResourcePreview;
     "customResources": CustomResourceInput[] | null;
@@ -170,4 +177,25 @@ export interface SyncFixStep {
     "title": string;
     "command": string;
     "warning"?: string;
+}
+
+export interface SyncNoticeIssue {
+    "resourceKey": string;
+    "path": string;
+    "code": string;
+    "message": string;
+    "bytes": number;
+    "kind": string;
+    "reviewable": boolean;
+}
+
+export interface SyncNotices {
+    "version": number;
+    "fingerprint": string;
+    "finishedAt": string;
+    "skipped": number;
+    "blocked": number;
+    "detailsAvailable": boolean;
+    "reviewed": boolean;
+    "issues": SyncNoticeIssue[] | null;
 }

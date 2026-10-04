@@ -38,8 +38,9 @@ root. This is React/TypeScript with Vite, Vitest, and Testing Library.
   configuration. These Node tests exercise the actual configuration with
   in-memory TypeScript/TSX fixtures and check the ESLint CLI's exit status.
   Vitest retains default discovery for UI tests and root-level repository tooling
-  suites. Only the standalone `lint.test.mjs` is additionally excluded from
-  Vitest and runs separately through `test:lint`.
+  suites. Only the standalone `lint.test.mjs`, `doc-drift.test.mjs`, and
+  `mcp-server.test.mjs` suites are additionally excluded from Vitest and run
+  separately through `test:lint`.
 - Keep `package-lock.json` in sync with intentional dependency changes. Do not
   commit `node_modules` or `dist`; the build produces assets embedded by Go.
 - Browser/component tests do not prove native tray/window behavior. For desktop
