@@ -289,6 +289,8 @@ func resourceIdentity(provider, id, category string) string {
 }
 
 func (s *Service) ApproveInstallPlan(id string) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	store := installplan.NewStore(filepath.Join(s.home, "install"))
 	pending, err := store.Pending()
 	if err != nil {
@@ -305,10 +307,12 @@ func (s *Service) ApproveInstallPlan(id string) error {
 			return err
 		}
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func (s *Service) RetryInstallPlan(id string) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	store := installplan.NewStore(filepath.Join(s.home, "install"))
 	pending, err := store.Pending()
 	if err != nil {
@@ -323,10 +327,12 @@ func (s *Service) RetryInstallPlan(id string) error {
 	if len(pending.Errors) == 0 {
 		return fmt.Errorf("pending install plan has no failed operations")
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func (s *Service) ResolveConflict(input ConflictResolution) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	if input.Choice != "local" &&
 		input.Choice != "remote" &&
 		input.Choice != "merged" {
@@ -344,10 +350,12 @@ func (s *Service) ResolveConflict(input ConflictResolution) error {
 	if err != nil {
 		return err
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func (s *Service) QueueConflictBatch(selections []ConflictSelection) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	if len(selections) == 0 {
 		return fmt.Errorf("at least one conflict selection is required")
 	}
@@ -367,10 +375,12 @@ func (s *Service) QueueConflictBatch(selections []ConflictSelection) error {
 	if _, err := store.QueueBatch(queue); err != nil {
 		return err
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func (s *Service) RetryConflictBatch(id string) error {
+	s.operations.Lock()
+	defer s.operations.Unlock()
 	store, err := s.conflictStoreWithScanner()
 	if err != nil {
 		return err
@@ -388,7 +398,7 @@ func (s *Service) RetryConflictBatch(id string) error {
 	if _, err := store.QueueBatch(failed.Selections); err != nil {
 		return err
 	}
-	return s.Trigger()
+	return s.trigger()
 }
 
 func (s *Service) conflictStoreWithScanner() (*conflict.Store, error) {

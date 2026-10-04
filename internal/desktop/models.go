@@ -91,6 +91,7 @@ type ConflictSelection struct {
 }
 
 type Progress struct {
+	Revision         uint64 `json:"revision,omitempty"`
 	Stage            string `json:"stage"`
 	Label            string `json:"label"`
 	Percentage       int    `json:"percentage"`
@@ -119,8 +120,30 @@ type SyncDiagnostic struct {
 	Steps    []SyncFixStep `json:"steps"`
 }
 
+type SyncNoticeIssue struct {
+	ResourceKey string `json:"resourceKey"`
+	Path        string `json:"path"`
+	Code        string `json:"code"`
+	Message     string `json:"message"`
+	Bytes       int64  `json:"bytes"`
+	Kind        string `json:"kind"`
+	Reviewable  bool   `json:"reviewable"`
+}
+
+type SyncNotices struct {
+	Version          int               `json:"version"`
+	Fingerprint      string            `json:"fingerprint"`
+	FinishedAt       time.Time         `json:"finishedAt"`
+	Skipped          int               `json:"skipped"`
+	Blocked          int               `json:"blocked"`
+	DetailsAvailable bool              `json:"detailsAvailable"`
+	Reviewed         bool              `json:"reviewed"`
+	Issues           []SyncNoticeIssue `json:"issues"`
+}
+
 // Snapshot is the current desktop-visible sync state.
 type Snapshot struct {
+	Revision           uint64                    `json:"revision,omitempty"`
 	Configured         bool                      `json:"configured"`
 	State              string                    `json:"state"`
 	RepositoryURL      string                    `json:"repositoryUrl"`
@@ -136,6 +159,7 @@ type Snapshot struct {
 	RepoPath           string                    `json:"repoPath"`
 	FirstSyncRequired  bool                      `json:"firstSyncRequired"`
 	SyncDiagnostic     *SyncDiagnostic           `json:"syncDiagnostic,omitempty"`
+	SyncNotices        *SyncNotices              `json:"syncNotices,omitempty"`
 	Progress           Progress                  `json:"progress"`
 	Preview            ResourcePreview           `json:"preview"`
 	CustomResources    []CustomResourceInput     `json:"customResources"`
