@@ -59,7 +59,7 @@ jobs:
         run: ./scripts/release/test-windows.ps1
       - name: Publish validation results
         if: always() && steps.validation.outputs.report_directory != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: repository-validation
           path: ${{ steps.validation.outputs.report_directory }}
@@ -67,7 +67,7 @@ jobs:
           if-no-files-found: error
       - name: Publish maintenance proposal
         if: always() && steps.proposal.outputs.report_directory != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: maintenance-proposal
           path: ${{ steps.proposal.outputs.report_directory }}
@@ -185,7 +185,7 @@ jobs:
       - name: Smoke test Linux
         if: runner.os == 'Linux'
         run: ./scripts/smoke/linux.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: SyncHub-${{ matrix.name }}
           path: |
