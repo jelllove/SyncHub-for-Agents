@@ -92,6 +92,11 @@ isolated HOME/XDG directories and no SSH agent or global Git configuration.
 It checks the actual application process and its visible native window by PID,
 not only the Xvfb wrapper, and leaves onboarding unconfigured.
 Startup does not have to create a `.synchub` directory before user interaction.
+Ubuntu runner AppArmor restrictions otherwise block WebKit's sandbox helper.
+Each test loads a temporary AppArmor profile granting user namespaces only to
+that exact extracted application path, and removes it on success or failure.
+WebKit sandboxing remains enabled; no system-wide AppArmor/sysctl setting is
+disabled. This does not prove first launch under an unmodified Ubuntu policy.
 This is a startup smoke test, not native UI automation
 or a system-wide apt-install/dependency-resolution test.
 If that release already has all three Linux assets, it downloads and verifies

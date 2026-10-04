@@ -50,7 +50,7 @@ jobs:
       - name: Install native packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11 apparmor
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package the original tag and verify source manifests
@@ -114,6 +114,11 @@ jobs:
             fi
             test "$("$binary" --version)" = "${RELEASE_TAG#v}"
             mkdir -p "$evidence/$format-home" "$evidence/$format-config"
+            profile="$evidence/$format-apparmor"
+            printf 'abi <abi/4.0>,\nprofile synchub-ci-%s "%s" flags=(unconfined) {\n  userns,\n}\n' \
+              "$format" "$binary" > "$profile"
+            sudo apparmor_parser --replace "$profile"
+            trap 'sudo apparmor_parser --remove "$profile"' EXIT
             HOME="$evidence/$format-home" XDG_CONFIG_HOME="$evidence/$format-config" \
               GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 SSH_AUTH_SOCK= \
               xvfb-run -a dbus-run-session -- bash -euxo pipefail -c '
@@ -148,6 +153,8 @@ jobs:
                 xdotool getwindowname "$window"
                 test ! -f "$HOME/.synchub/config.yaml"
               ' bash "$launcher" "$evidence/$format-launch.log"
+            sudo apparmor_parser --remove "$profile"
+            trap - EXIT
           done
           mkdir -p "$RUNNER_TEMP/linux-package"
           cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$RUNNER_TEMP/linux-package/"
@@ -156,7 +163,8 @@ jobs:
           jq -n --arg tag "$RELEASE_TAG" --arg commit "$(git -C "$GITHUB_WORKSPACE/app-source" rev-parse HEAD)" \
             --arg origin "$PACKAGE_ORIGIN" \
             '{tag:$tag,sourceCommit:$commit,packageOrigin:$origin,architecture:"amd64",os:"Ubuntu 24.04",
-              appimageLaunchPassed:true,debLaunchPassed:true,visibleWindowsVerified:true,isolatedHome:true}' > build-receipt.json
+              appimageLaunchPassed:true,debLaunchPassed:true,visibleWindowsVerified:true,isolatedHome:true,
+              testAppUserNamespaceAllowance:true}' > build-receipt.json
       - name: Retain exact packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

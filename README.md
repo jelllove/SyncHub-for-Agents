@@ -76,7 +76,10 @@ artifacts for 30 days. This does not establish Gatekeeper acceptance, live sync,
 keychain/login-item behavior, or runtime support on macOS 12.
 
 The v0.3.4 Linux packages passed version/architecture checks and isolated
-extracted-package startup on Ubuntu 24.04 x64 under Xvfb.
+extracted-package startup on Ubuntu 24.04 x64 under Xvfb. The stricter native
+window check uses a private D-Bus session and a test-app-only AppArmor user
+namespace allowance for WebKit's sandbox; it does not establish first launch
+under every distribution's default security policy.
 [The Linux validation run](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37210714225)
 retains packages and startup logs. This is not a full UI test, system-wide
 Debian installation test, or a compatibility guarantee for every distribution.
