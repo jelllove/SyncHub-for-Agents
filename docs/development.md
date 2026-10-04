@@ -88,8 +88,10 @@ an existing release tag on Ubuntu 24.04 x64 using the existing Wails tasks. It
 rejects dependency-manifest drift, checks package versions, extracts both the
 AppImage and Debian package, and launches each extracted app under Xvfb with
 isolated HOME/XDG directories and no SSH agent or global Git configuration.
-It checks the actual application process, not only the Xvfb wrapper, and leaves
-onboarding unconfigured. This is a startup smoke test, not native UI automation
+It checks the actual application process and its visible native window by PID,
+not only the Xvfb wrapper, and leaves onboarding unconfigured.
+Startup does not have to create a `.synchub` directory before user interaction.
+This is a startup smoke test, not native UI automation
 or a system-wide apt-install/dependency-resolution test.
 If that release already has all three Linux assets, it downloads and verifies
 their checksums, then tests those exact published package bytes instead of the
