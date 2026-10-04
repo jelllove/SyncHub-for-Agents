@@ -41,7 +41,7 @@ for arch in arm64 amd64; do
       -o "$output/SyncHub-$arch" .
 done
 lipo -create "$output/SyncHub-arm64" "$output/SyncHub-amd64" -output "$app/Contents/MacOS/SyncHub"
-lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/SyncHub"
+lipo "$app/Contents/MacOS/SyncHub" -verify_arch arm64 x86_64
 codesign --force --deep --sign - "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 codesign --display --verbose=4 "$app" 2> "$output/signature.txt"

@@ -34,7 +34,7 @@ codesign --display --verbose=4 "$app" 2> "$evidence/signature.txt"
 grep -q 'Signature=adhoc' "$evidence/signature.txt"
 [[ "$("$app/Contents/MacOS/SyncHub" --version)" == "$version" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" == "$version" ]]
-lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/SyncHub"
+lipo "$app/Contents/MacOS/SyncHub" -verify_arch arm64 x86_64
 hdiutil detach "$evidence/mount"
 mounted=false
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
