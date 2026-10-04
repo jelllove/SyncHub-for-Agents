@@ -8,6 +8,9 @@
     </BuildActionEntries>
   </BuildAction>
   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="NO">
+    <MacroExpansion>
+      <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000005" BuildableName="NativeSmoke.xctest" BlueprintName="NativeSmoke" ReferencedContainer="container:NativeSmoke.xcodeproj"/>
+    </MacroExpansion>
     <Testables>
       <TestableReference skipped="NO">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000005" BuildableName="NativeSmoke.xctest" BlueprintName="NativeSmoke" ReferencedContainer="container:NativeSmoke.xcodeproj"/>

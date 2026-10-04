@@ -11,7 +11,8 @@ final class NativeSmokeTests: XCTestCase {
         evidence = URL(fileURLWithPath: try XCTUnwrap(environment["SMOKE_EVIDENCE_DIR"]))
         profile = evidence.appendingPathComponent("profile")
         let installed = try XCTUnwrap(environment["SMOKE_APP_PATH"])
-        XCTAssertTrue(FileManager.default.fileExists(atPath: installed + "/Contents/MacOS/SyncHub"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: installed + "/Contents/MacOS/SyncHub"),
+                      "Installed app path from test environment: \(installed)")
         app = XCUIApplication(bundleIdentifier: "io.github.qinqingxu.synchub")
         app.launchEnvironment = [
             "HOME": profile.path,
