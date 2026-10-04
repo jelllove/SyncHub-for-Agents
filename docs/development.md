@@ -25,6 +25,57 @@ macOS requires Xcode command-line tools. Ubuntu 24.04 needs
 your OS package manager before setup/check. Packaging dependencies are listed in
 [CI](../.github/workflows/ci.yml).
 
+## macOS installed-app validation
+
+The [macOS installer workflow](../.github/workflows/macos-installer.yml) builds an
+ad-hoc signed universal DMG from an existing immutable release tag. The default
+is `v0.3.4`; dispatch with `publish=false` to inspect artifacts first. Its
+[packager](../scripts/release/macos-adhoc.sh) uses locked npm dependencies and
+readonly Go modules, sets the bundle/executable version, and verifies both
+architectures and the ad-hoc signature. It does not change the existing opt-in
+Developer ID/notarized release path.
+
+Apple Silicon and Intel jobs mount that same DMG read-only, copy the actual app
+to an isolated Applications directory, detach the image, register the installed
+bundle, and run [native XCTest UI tests](../scripts/smoke/macos-ui/NativeSmokeTests.swift).
+The tests launch the installed production app with a fresh fixture `HOME` and
+no SSH agent or global Git configuration. They check the welcome window, click
+Get started, enter a synthetic invalid repository, and assert the real backend
+validation error while preserving the input. They never verify SSH, complete
+onboarding, trigger real synchronization, or approve installs.
+
+Artifacts `macos-native-arm64` and `macos-native-x86_64` retain three named PNGs
+under `screenshots/`, the `native.xcresult` bundle, installation/signature
+receipts, and `xcodebuild.log`, including failed runs. `macos-adhoc-package`
+retains the DMG, its checksum manifest, and immutable source/digest receipt.
+Playwright is not used as a proxy: it cannot directly control the production
+Wails WKWebView. Native XCTest drives the actual macOS app.
+
+The publication job requires both native jobs to pass and rechecks the exact
+DMG digest, successful test summaries without skips, and all three screenshots
+for each architecture. It adds explicitly labeled ad-hoc assets to the selected
+published release only on an explicit `publish=true` dispatch. It refuses to
+replace existing assets, does not rewrite tags, and preserves Windows assets.
+Failed builds, installation, UI assertions, missing screenshots or invalid
+receipts block publication. The release notes link the run and disclose the
+unnotarized status.
+
+These jobs prove isolated copy installation and specific native onboarding
+interactions, not download quarantine/Gatekeeper acceptance, full live sync,
+keychain/login-item integration, or macOS 12 runtime support. Native display/UI
+automation failures are reported, never replaced with browser screenshots.
+For manual testing, use a disposable Mac account and synthetic data. Do not use
+the developer's real home, SSH keys, credentials or sync repository.
+
+Cross-host evidence guard regression tests run in ordinary
+`npm --prefix frontend run test:lint` and `node scripts/dev.mjs verify`.
+The native commands below require macOS and full Xcode:
+
+```bash
+bash scripts/release/macos-adhoc.sh "$PWD" "$RUNNER_TEMP/macos-package" v0.3.4
+bash scripts/smoke/macos-native.sh "$RUNNER_TEMP/macos-package" "$RUNNER_TEMP/native-evidence" v0.3.4
+```
+
 ## Local feedback and cleanup
 
 The shared check uses gofmt, go vet, ESLint, and TypeScript. It checks
@@ -315,5 +366,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs ../scripts/release/macos.test.mjs` |
 <!-- dev-reference:end -->

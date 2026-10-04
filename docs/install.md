@@ -39,9 +39,20 @@ delete your sessions accidentally.
 2. Drag SyncHub to Applications.
 3. Open it from Applications.
 
-macOS packages, when available, are signed and notarized. To uninstall, quit the app from its
+The standard `SyncHub.dmg` release path requires Developer ID signing and
+notarization. To uninstall, quit the app from its
 menu-bar icon and move it from Applications to Trash. Settings remain in
 `~/.synchub`.
+
+An explicitly named `SyncHub-macOS-universal-adhoc.dmg` is instead an **ad-hoc
+signed test build, not Developer ID signed or notarized**. It includes Apple
+Silicon and Intel binaries. Verify its download with `SHA256SUMS-macOS.txt`;
+the separate Windows checksum manifest does not cover this asset. Gatekeeper
+may block its first launch. Only approve it in **System Settings > Privacy &
+Security** if you trust the source; do not disable system-wide security.
+The minimum build target is macOS 12; automated native UI checks run on macOS 15.
+See the [macOS installer pipeline](development.md#macos-installed-app-validation)
+for screenshots, tested behavior, and limitations.
 
 ## Linux
 
