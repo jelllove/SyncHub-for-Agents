@@ -63,3 +63,33 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  repo:setup:
+    summary: Restores locked dependencies and embedded frontend assets
+    cmds:
+      - node scripts/dev.mjs setup
+
+  repo:check:
+    summary: Runs repository formatting, vet, lint, type, docs, and evidence checks
+    cmds:
+      - node scripts/dev.mjs check
+
+  repo:verify:
+    summary: Runs source-bound repository validation and writes report artifacts
+    cmds:
+      - node scripts/dev.mjs verify
+
+  repo:docs:
+    summary: Checks Markdown links, generated references, and evidence drift
+    cmds:
+      - node scripts/dev.mjs docs
+
+  repo:repair:verify:
+    summary: Verifies the diagnostic repair and rollback cycle in containment
+    cmds:
+      - node scripts/dev.mjs repair:verify
+
+  repo:rollback:verify:
+    summary: Verifies review-only maintenance repair and rollback patches
+    cmds:
+      - node scripts/dev.mjs rollback:verify

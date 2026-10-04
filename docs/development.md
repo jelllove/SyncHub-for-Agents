@@ -59,7 +59,8 @@ repair pass over Git-listed Go files. It includes non-ignored untracked files,
 rejects symlinks, never deletes files, and never stages, commits, or pushes.
 Each subprocess has a ten-minute timeout. Review the resulting diff.
 The weekly/manual [maintenance workflow](../.github/workflows/maintenance.yml)
-audits the same checks without applying repairs or opening issues or PRs.
+audits the same Windows and Linux checks without applying repairs or opening
+issues or PRs. It skips installer packaging, not the Linux race or frontend tests.
 There is deliberately no unattended source modification.
 
 This is separate from application trash cleanup. The existing daemon wires
@@ -76,7 +77,12 @@ Its schedule, pause behavior, retention policy, and safety filters are unchanged
 `check`, then the full current-host Go suite (including workflow and architecture
 guards), lint-configuration regressions, and all frontend/UI/tooling tests.
 It does not install dependencies; run setup first.
-The existing Linux CI job also runs the Go suite with `-race`.
+The Linux CI job runs the Go suite with `-race`, `go vet`, frontend lint and
+typechecking, lint-configuration regressions, and all frontend/UI/tooling tests as
+separate native command steps. It runs for every PR and weekly/manual maintenance
+audit, without maintenance-mode or path filters. Windows verification still owns
+the source-bound receipts; Linux checks add cross-platform coverage rather than
+replacing that runner.
 Use `check` for quick feedback and `docs` for documentation-only changes.
 
 Each verification creates a new `.artifacts/validation/run-*` directory containing
@@ -116,6 +122,29 @@ Native-process integration tests use a 20-second test budget for Git/Go startup
 on busy hosts. Their explicit child-command timeout assertions remain unchanged;
 ordinary UI tests retain the default timeout.
 
+The committed evidence contracts live in the
+[validation receipt schema](specs/validation-receipt.v1.schema.json),
+[repair proof schema](specs/repair-proof.v1.schema.json), and
+[agentic observability guide](operations/agentic-observability.md).
+`node scripts/dev.mjs docs` checks that those files still reference the
+workflows, labels, artifact names, and command entry points that publish the
+evidence.
+The optional [MCP server](../tools/mcp/synchub-mcp-server.mjs) wrapper exposes
+the read-only [validation server implementation](../tools/mcp/validation-server.mjs)
+for listing validation commands and running the same documentation drift check;
+it does not edit files or run application synchronization.
+The committed
+[SyncHub validation skill](../.agents/skills/synchub-validation/SKILL.md) gives
+agents the same setup, verification, safety, and handoff sequence without
+publishing local codeblend evaluator binaries or session-specific skill locks.
+Developers who use the `pre-commit` framework can enable
+[local hooks](../.pre-commit-config.yaml) for `node scripts/dev.mjs check` and
+`node scripts/dev.mjs docs`; the repository still keeps the existing opt-in
+`.githooks` path for Git-only workflows.
+CodeQL JavaScript/TypeScript analysis runs from
+[codeql.yml](../.github/workflows/codeql.yml) and reports through GitHub code
+scanning.
+
 The PR workflow and weekly/manual maintenance audit share this runner, append
 results to the GitHub job summary, and upload logs/JSON even on failure. Artifacts
 expire after 14 days in GitHub; local reports are retained until explicitly removed.
@@ -133,11 +162,12 @@ marked command/version reference below. It does not change dependencies, edit
 application logic, or attempt to repair arbitrary test failures.
 
 The command creates `.artifacts/maintenance/run-*` with `proposal.json` and, when
-applicable, `repair.patch`. A proposal is limited to 50 changed files and 1 MiB of
-patch data. It verifies application and reversal in an isolated snapshot and checks
-canonical output before publishing the patch. Source files and the real Git index
-are never modified; per-file before/after SHA-256 digests identify the proposed
-change, including when the working tree is already dirty.
+applicable, `repair.patch` plus `rollback.patch`. A proposal is limited to 50
+changed files and 1 MiB per patch. It verifies repair application, rollback
+application, rollback restoration, and canonical output in an isolated snapshot
+before publishing the patches. Source files and the real Git index are never
+modified; per-file before/after SHA-256 digests identify the proposed change,
+including when the working tree is already dirty.
 
 `proposed` means only that this limited repair is applicable and canonical, not
 that the full test suite has passed. `no-changes` means no supported repair was
@@ -151,20 +181,21 @@ produce an explicit error rather than being silently replaced. Convert a file's
 encoding deliberately before retrying; the tools do not guess another encoding.
 
 After downloading and inspecting a report with status `proposed`, a maintainer
-may explicitly apply its patch and verify the result:
+may explicitly apply its repair patch and verify the result:
 
 ```powershell
-git apply --check path-to-repair.patch
-git apply path-to-repair.patch
+git apply --check repair.patch
+git apply repair.patch
 node scripts/dev.mjs verify
 ```
 
 If that exact patch needs to be reverted, first check for conflicting intervening
-edits; never reset the whole worktree:
+edits; prefer the generated rollback handoff and never reset the whole worktree:
 
 ```powershell
-git apply --reverse --check path-to-repair.patch
-git apply --reverse path-to-repair.patch
+git apply --check rollback.patch
+git apply rollback.patch
+node scripts/dev.mjs verify
 ```
 
 Keep the failing run, proposal, regression test, and passing run linked in the PR.
@@ -266,8 +297,9 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `node scripts/dev.mjs setup` | Restore locked dependencies and build embedded frontend assets. |
 | `node scripts/dev.mjs check` | Check Go formatting/vet, frontend ESLint/TypeScript, and documentation without rewriting files. |
 | `node scripts/dev.mjs verify` | Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs. |
-| `node scripts/dev.mjs propose` | Prepare a bounded, review-only Go formatting/reference patch; never apply or commit it. |
+| `node scripts/dev.mjs propose` | Prepare bounded, review-only Go formatting/reference repair and rollback patches; never apply or commit them. |
 | `node scripts/dev.mjs repair:verify` | Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container. |
+| `node scripts/dev.mjs rollback:verify` | Verify review-only maintenance repair and rollback patches in an isolated fixture. |
 | `node scripts/dev.mjs format` | Apply gofmt to repository-owned Go files only; never stage or commit. |
 | `node scripts/dev.mjs cleanup` | Run one bounded formatting repair pass; never delete files or touch sync data. |
 | `node scripts/dev.mjs docs` | Check local Markdown file links and the generated development reference. |
@@ -283,5 +315,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs` |
 <!-- dev-reference:end -->

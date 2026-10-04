@@ -2,13 +2,15 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync, lstatSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { checkEvidenceDrift } from "./doc-drift.mjs";
 
 export const commands = {
   setup: "Restore locked dependencies and build embedded frontend assets.",
   check: "Check Go formatting/vet, frontend ESLint/TypeScript, and documentation without rewriting files.",
   verify: "Build frontend assets, run shared checks and all Go/frontend tests, and save results and logs.",
-  propose: "Prepare a bounded, review-only Go formatting/reference patch; never apply or commit it.",
+  propose: "Prepare bounded, review-only Go formatting/reference repair and rollback patches; never apply or commit them.",
   "repair:verify": "Verify a diagnostic failure/repair/rollback cycle in a restricted Linux container.",
+  "rollback:verify": "Verify review-only maintenance repair and rollback patches in an isolated fixture.",
   format: "Apply gofmt to repository-owned Go files only; never stage or commit.",
   cleanup: "Run one bounded formatting repair pass; never delete files or touch sync data.",
   docs: "Check local Markdown file links and the generated development reference.",
@@ -247,3 +249,5 @@ export function checkReference(root, write = false) {
     writeFileSync(filename, expected);
   }
 }
+
+export { checkEvidenceDrift };

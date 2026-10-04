@@ -23,7 +23,7 @@ async function lint(source, filePath = 'src/lint-fixture.ts') {
 
 test('keeps default Vitest discovery except for standalone lint tests', () => {
   assert.equal(viteConfig.test.include, undefined)
-  assert.deepEqual(viteConfig.test.exclude, [...configDefaults.exclude, 'lint.test.mjs'])
+  assert.deepEqual(viteConfig.test.exclude, [...configDefaults.exclude, 'lint.test.mjs', 'doc-drift.test.mjs', 'mcp-server.test.mjs'])
   const discovers = filePath =>
     configDefaults.include.some(pattern => path.posix.matchesGlob(filePath, pattern))
     && !viteConfig.test.exclude.some(pattern => path.posix.matchesGlob(filePath, pattern))
@@ -37,6 +37,8 @@ test('keeps default Vitest discovery except for standalone lint tests', () => {
     assert.equal(discovers(filePath), true, filePath)
   }
   assert.equal(discovers('lint.test.mjs'), false)
+  assert.equal(discovers('doc-drift.test.mjs'), false)
+  assert.equal(discovers('mcp-server.test.mjs'), false)
   assert.equal(discovers('node_modules/synthetic/dependency.test.mjs'), false)
 })
 
