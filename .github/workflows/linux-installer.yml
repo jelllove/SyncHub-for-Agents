@@ -62,6 +62,34 @@ jobs:
           npm ci --prefix frontend
           wails3 package GOOS=linux ARCH=amd64 VERSION="${RELEASE_TAG#v}"
           sha256sum --check "$RUNNER_TEMP/source-manifests.txt"
+      - name: Revalidate exact published bytes when packages already exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets.json"
+          count="$(jq '[.assets[] | select(.name == "SyncHub-x86_64.AppImage" or .name == "SyncHub.deb" or .name == "SHA256SUMS-Linux.txt")] | length' "$RUNNER_TEMP/release-assets.json")"
+          if [[ "$count" == 0 ]]; then
+            echo "PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
+          elif [[ "$count" == 3 ]]; then
+            directory="$RUNNER_TEMP/published-linux"
+            gh release download "$RELEASE_TAG" --dir "$directory" \
+              --pattern SyncHub-x86_64.AppImage --pattern SyncHub.deb --pattern SHA256SUMS-Linux.txt
+            (
+              cd "$directory"
+              test "$(wc -l < SHA256SUMS-Linux.txt)" = 2
+              test "$(grep -Ec '^[a-f0-9]{64}  (SyncHub-x86_64.AppImage|SyncHub.deb)$' SHA256SUMS-Linux.txt)" = 2
+              test "$(grep -c '  SyncHub-x86_64.AppImage$' SHA256SUMS-Linux.txt)" = 1
+              test "$(grep -c '  SyncHub.deb$' SHA256SUMS-Linux.txt)" = 1
+              sha256sum --check SHA256SUMS-Linux.txt
+            )
+            cp "$directory/SyncHub-x86_64.AppImage" "$directory/SyncHub.deb" app-source/bin/
+            chmod +x app-source/bin/SyncHub-x86_64.AppImage
+            echo "PACKAGE_ORIGIN=published" >> "$GITHUB_ENV"
+          else
+            echo "Incomplete Linux release asset set; refusing ambiguous verification" >&2
+            exit 1
+          fi
       - name: Extract and launch both packages in isolated profiles
         working-directory: app-source
         run: |
@@ -103,7 +131,8 @@ jobs:
           cd "$RUNNER_TEMP/linux-package"
           sha256sum SyncHub-x86_64.AppImage *.deb > SHA256SUMS-Linux.txt
           jq -n --arg tag "$RELEASE_TAG" --arg commit "$(git -C "$GITHUB_WORKSPACE/app-source" rev-parse HEAD)" \
-            '{tag:$tag,sourceCommit:$commit,architecture:"amd64",os:"Ubuntu 24.04",
+            --arg origin "$PACKAGE_ORIGIN" \
+            '{tag:$tag,sourceCommit:$commit,packageOrigin:$origin,architecture:"amd64",os:"Ubuntu 24.04",
               appimageLaunchPassed:true,debLaunchPassed:true,isolatedHome:true}' > build-receipt.json
       - name: Retain exact packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

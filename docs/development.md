@@ -91,6 +91,9 @@ isolated HOME/XDG directories and no SSH agent or global Git configuration.
 It checks the actual application process, not only the Xvfb wrapper, and leaves
 onboarding unconfigured. This is a startup smoke test, not native UI automation
 or a system-wide apt-install/dependency-resolution test.
+If that release already has all three Linux assets, it downloads and verifies
+their checksums, then tests those exact published package bytes instead of the
+new build outputs. A partially published Linux asset set fails explicitly.
 
 `linux-verified-package` contains both packages, `SHA256SUMS-Linux.txt`, and a
 source/test receipt; `linux-launch-evidence` retains logs including failures.
