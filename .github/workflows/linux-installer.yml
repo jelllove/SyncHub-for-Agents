@@ -66,10 +66,11 @@ jobs:
         working-directory: app-source
         run: |
           evidence="$RUNNER_TEMP/linux-evidence"
+          set -x
           mkdir -p "$evidence/appimage" "$evidence/deb"
           mapfile -t debs < <(find bin -maxdepth 1 -name '*.deb' -type f)
           test "${#debs[@]}" = 1
-          test "$(dpkg-deb --field "${debs[0]}" Version)" = "${RELEASE_TAG#v}"
+          test "$(dpkg-deb --field "${debs[0]}" Version)" = "${RELEASE_TAG#v}-1"
           test "$(dpkg-deb --field "${debs[0]}" Architecture)" = amd64
           dpkg-deb --info "${debs[0]}" > "$evidence/deb-info.txt"
           dpkg-deb --extract "${debs[0]}" "$evidence/deb"
