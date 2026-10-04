@@ -184,3 +184,44 @@ func TestCancelStopsActiveOAuthPolling(t *testing.T) {
 		t.Fatal("OAuth polling did not stop after cancellation")
 	}
 }
+
+func TestReturnToRepositoryRetainsURLAndClearsTransientState(t *testing.T) {
+	oauth := &fakeOAuth{}
+	service := New(Dependencies{OAuth: oauth})
+	if err := service.SetRepository("git@github.com:acme/wrong.git"); err != nil {
+		t.Fatal(err)
+	}
+
+	service.mu.Lock()
+	service.state.Step = Verification
+	service.state.UserCode = "ABCD"
+	service.state.VerificationURI = "https://github.com/login/device"
+	service.state.Message = "repository access failed"
+	service.mu.Unlock()
+
+	state := service.ReturnToRepository()
+
+	if state.Step != Repository ||
+		state.RepositoryURL != "git@github.com:acme/wrong.git" ||
+		state.UserCode != "" ||
+		state.VerificationURI != "" ||
+		state.Message != "" {
+		t.Fatalf("state = %#v", state)
+	}
+	if !oauth.cancelled {
+		t.Fatal("authentication flow was not cancelled")
+	}
+}
+
+func TestResetReturnsToWelcomeWithoutRepositoryOrAuthorization(t *testing.T) {
+	oauth := &fakeOAuth{}
+	service := New(Dependencies{OAuth: oauth, Agents: []Agent{{Name: "demo", Enabled: true}}})
+	if err := service.SetRepository("git@github.com:acme/sync.git"); err != nil {
+		t.Fatal(err)
+	}
+	state := service.Reset([]Agent{{Name: "demo", Enabled: true}})
+	if state.Step != Welcome || state.RepositoryURL != "" || state.AuthMode != "" ||
+		state.Message != "" || state.UserCode != "" || len(state.Agents) != 1 || !oauth.cancelled {
+		t.Fatalf("reset state = %#v, cancelled = %v", state, oauth.cancelled)
+	}
+}
