@@ -30,7 +30,7 @@ test "$(rpm -qp --queryformat '%{NAME}' "$rpm_package")" = synchub
 rpm -qpl "$rpm_package" > "$work_dir/rpm-contents.txt"
 grep -q '^/usr/bin/SyncHub$' "$work_dir/rpm-contents.txt"
 mkdir "$work_dir/rpm"
-rpm2cpio "$rpm_package" | (cd "$work_dir/rpm" && cpio --extract --make-directories --no-absolute-filenames --quiet)
+bsdtar --extract --file "$rpm_package" --directory "$work_dir/rpm" --no-same-owner
 test -x "$work_dir/rpm/usr/bin/SyncHub"
 rpm_version="$("$work_dir/rpm/usr/bin/SyncHub" --version)"
 deb_version="$("$work_dir/deb/usr/bin/SyncHub" --version)"

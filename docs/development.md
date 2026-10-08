@@ -132,7 +132,10 @@ Both generators pass the same version and architecture into nFPM; Debian uses
 metadata follows nFPM's prerelease ordering (`0.3.5~rc.1-1`), while the executable
 continues to report the original application version (`0.3.5-rc.1`).
 Cross-host regression tests run in ordinary frontend lint tests. Native RPM
-metadata/extraction checks need `rpm` and `cpio`; the Fedora installation check
+metadata/extraction checks need `rpm` and `bsdtar` (from `libarchive-tools`).
+RPM extraction uses libarchive directly: Ubuntu 24.04's `rpm2cpio` can return
+a failure status even after emitting a complete nFPM payload. Extraction errors
+remain fatal; no converter failure is ignored. The Fedora installation check
 needs Docker running Linux containers and uses
 [linux-rpm-install.sh](../scripts/smoke/linux-rpm-install.sh).
 

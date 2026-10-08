@@ -56,7 +56,7 @@ jobs:
       - name: Install native packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11 apparmor rpm cpio
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11 apparmor rpm libarchive-tools
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package the original tag and verify source manifests
@@ -118,7 +118,7 @@ jobs:
           rpm -qp --requires "$rpm_package" > "$evidence/rpm-requires.txt"
           grep -qx gtk4 "$evidence/rpm-requires.txt"
           grep -qx webkitgtk6.0 "$evidence/rpm-requires.txt"
-          rpm2cpio "$rpm_package" | (cd "$evidence/rpm" && cpio --extract --make-directories --no-absolute-filenames --quiet)
+          bsdtar --extract --file "$rpm_package" --directory "$evidence/rpm" --no-same-owner
           image="$PWD/bin/SyncHub-x86_64.AppImage"
           (cd "$evidence/appimage" && "$image" --appimage-extract > "$evidence/appimage-extract.log")
           for format in appimage deb rpm; do
