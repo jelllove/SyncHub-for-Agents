@@ -15,16 +15,18 @@ import (
 
 func helperTestDirectory(t *testing.T) string {
 	t.Helper()
-	directory, err := os.MkdirTemp(".", "helper-test-")
+	return t.TempDir()
+}
+
+func TestHelperFixturesStayOutsideSourceTree(t *testing.T) {
+	source, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(directory) })
-	directory, err = filepath.Abs(directory)
-	if err != nil {
-		t.Fatal(err)
+	directory := helperTestDirectory(t)
+	if directory == source || strings.HasPrefix(directory, source+string(filepath.Separator)) {
+		t.Fatalf("helper fixture created inside source tree: %s", directory)
 	}
-	return directory
 }
 
 func helperTestOptions(t *testing.T) helperOptions {

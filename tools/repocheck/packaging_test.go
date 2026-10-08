@@ -72,12 +72,11 @@ func TestPlatformMacOSArchivesAreStapledBeforePublication(t *testing.T) {
 	if appStaple < 0 || finalZip < appStaple || dmg < appStaple {
 		t.Fatal("both macOS archives must contain the notarized, stapled app")
 	}
-	if !strings.Contains(text, `lipo -verify_arch arm64 x86_64 bin/SyncHub.app/Contents/MacOS/SyncHub`) {
+	if !strings.Contains(text, `lipo bin/SyncHub.app/Contents/MacOS/SyncHub -verify_arch arm64 x86_64`) {
 		t.Fatal("Universal releases must prove both CPU architectures are present")
 	}
-	if !strings.Contains(text, "vars.RELEASE_LINUX_RPM == 'true'") ||
-		!strings.Contains(text, "wails3 task linux:create:rpm ARCH=amd64") {
-		t.Fatal("RPM packaging must be explicitly opt-in and x64")
+	if !strings.Contains(text, "bash scripts/smoke/linux-rpm-install.sh bin/SyncHub.rpm") {
+		t.Fatal("RPM publication must retain the upstream Fedora installation check")
 	}
 }
 

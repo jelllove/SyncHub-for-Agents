@@ -111,6 +111,7 @@ tasks:
       - task: create:appimage
       - task: create:deb
       - task: create:tar
+      - task: create:rpm
 
   create:tar:
     summary: Archives the Linux x64 binary, desktop entry, icon, license and install guide

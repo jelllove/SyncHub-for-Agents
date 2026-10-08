@@ -19,7 +19,7 @@ trap cleanup EXIT
 test -x "$binary"
 plutil -lint "$app_path/Contents/Info.plist"
 codesign --verify --deep --strict "$app_path"
-lipo -verify_arch "$(uname -m)" "$binary"
+lipo "$binary" -verify_arch "$(uname -m)"
 hdiutil verify "$root_dir/bin/SyncHub.dmg"
 arch="$(uname -m)"
 if [[ "$arch" == "x86_64" ]]; then arch=amd64; fi

@@ -27,11 +27,11 @@ release are available for download.
 | Platform | CPU | Primary package | Alternative packages |
 | --- | --- | --- | --- |
 | Windows | x64 (amd64) | `SyncHub-for-Agents-Setup-x64.exe` | `SyncHub-for-Agents-Windows-x64.zip` |
-| macOS | ARM64 + Intel x64 | `SyncHub.dmg` (Universal) | `SyncHub-macos-universal.zip` |
-| Linux / Ubuntu | x64 (amd64) | `synchub_*.deb` | `SyncHub-x86_64.AppImage`, `SyncHub-linux-x64.tar.gz` |
-| Linux / RPM distributions | x64 (amd64) | `.rpm`, only when explicitly enabled | Experimental; not a validated distribution target |
+| macOS | ARM64 + Intel x64 | Universal `.dmg` | Universal `.zip`; ad-hoc assets carry `-adhoc` in their names |
+| Linux / Ubuntu | x64 (amd64) | `SyncHub.deb` | `SyncHub-x86_64.AppImage`, `SyncHub-linux-x64.tar.gz` |
+| Linux / RPM distributions | x64 (amd64) | `SyncHub.rpm`, optional alternative | Fedora 43 container installation check; not Fedora desktop verification |
 
-**Linux distribution validation target: Ubuntu 24.04 x64 only.** The
+**Linux desktop validation target: Ubuntu 24.04 x64 only.** The
 [CI packaging job](../.github/workflows/ci.yml) checks the DEB structure, extracts
 and starts the AppImage in an isolated home under Xvfb, and checks the tar archive
 contents and executable version. It does not install the DEB into a clean OS or
@@ -41,7 +41,7 @@ These workflow changes have not themselves been run on a Linux or macOS host
 in the Windows development session.
 
 Debian 13 has the expected GTK4/WebKitGTK 6.0 package family but is not a verified
-target. Ubuntu 22.04, other Debian/Ubuntu versions, Fedora, RHEL, AlmaLinux and
+target. Ubuntu 22.04, other Debian/Ubuntu versions, Fedora desktop, RHEL, AlmaLinux and
 Rocky Linux are not claimed as verified. In particular, RPM generation on Ubuntu
 does not establish compatibility with any RPM distribution. AppImage and tar.gz
 do not guarantee compatibility with older glibc or missing system libraries.
@@ -88,7 +88,8 @@ Do not run an installed and extracted copy simultaneously against the same data.
 2. Drag SyncHub to Applications.
 3. Open it from Applications.
 
-macOS packages, when available, are signed and notarized. To uninstall, quit the app from its
+The standard `SyncHub.dmg` release path requires Developer ID signing and
+notarization. To uninstall, quit the app from its
 menu-bar icon and move it from Applications to Trash. Settings remain in
 `~/.synchub`.
 
@@ -97,18 +98,40 @@ and Intel x64. The deployment target is macOS 12 or later; CI packaging/smoke te
 are configured on macOS 15 ARM64 and Intel hosts, not on every supported OS version.
 
 For the ZIP alternative, extract `SyncHub-macos-universal.zip` and move
-`SyncHub.app` to Applications before launching. Published packages require the
+`SyncHub.app` to Applications before launching. The standard signed packages require the
 configured Developer ID signing and Apple notarization credentials. The workflow
 notarizes and staples the app before creating either final archive. Local/PR
 packages are only ad-hoc signed, not notarized release builds; do not bypass
 Gatekeeper for an untrusted download.
 
+An explicitly named `SyncHub-macOS-universal-adhoc.dmg` or
+`SyncHub-macOS-universal-adhoc.zip` is instead an **ad-hoc
+signed test build, not Developer ID signed or notarized**. It includes Apple
+Silicon and Intel binaries. Verify its download with `SHA256SUMS-macOS.txt`;
+the separate Windows checksum manifest does not cover this asset. Gatekeeper
+may block its first launch. Only approve it in **System Settings > Privacy &
+Security** if you trust the source; do not disable system-wide security.
+The minimum build target is macOS 12; automated native UI checks run on macOS 15.
+For the ad-hoc ZIP, extract and move the app to Applications. Native validation
+checks that its complete contents match the app installed from the tested DMG.
+See the [macOS installer pipeline](development.md#macos-installed-app-validation)
+for screenshots, tested behavior, and limitations.
+
 ## Linux
+
+Linux x64 packaging supports `SyncHub-x86_64.AppImage`, `SyncHub.deb`, and
+`SyncHub.rpm`. Download only assets actually listed in the chosen release;
+older releases may not include RPM.
+Separately added Linux assets have their own `SHA256SUMS-Linux.txt`; verify those
+downloads against that manifest rather than an older Windows-only checksum file.
+The [Linux package workflow](development.md#linux-release-package-validation)
+checks extracted-package startup on Ubuntu 24.04 under Xvfb, not every Linux
+distribution or desktop environment.
 
 ### Debian or Ubuntu
 
 ```bash
-sudo apt install ./synchub_*.deb
+sudo apt install ./SyncHub.deb
 ```
 
 Start SyncHub from the application menu.
@@ -119,6 +142,25 @@ Ubuntu 24.04 x64 is the configured validation target. DEB dependencies include
 ```bash
 sudo apt install git
 ```
+
+
+### Fedora and compatible RPM distributions
+
+```bash
+sudo dnf install ./SyncHub.rpm
+```
+
+The RPM declares `gtk4` and `webkitgtk6.0` dependencies. Use a distribution
+that provides GTK4 and WebKitGTK 6.0; do not assume older RHEL/CentOS releases
+can install it. The validation workflow includes a Fedora 43 container
+installation/dependency check, plus extracted-RPM startup on Ubuntu.
+Check the chosen release's evidence before treating those checks as passed
+for that release. Fedora desktop UI, login items, and live sync are not covered
+by the container's package-installation check.
+
+Start SyncHub from the application menu. Uninstall a DEB with
+`sudo apt remove synchub` or an RPM with `sudo dnf remove synchub`;
+user data in `~/.synchub` is retained.
 
 ### AppImage
 
@@ -154,10 +196,11 @@ Extracting the archive alone does not register a menu item.
 
 ### Optional RPM
 
-Maintainers can opt in to RPM publishing; see
+RPM is an alternative package format; see
 [native packaging and release controls](development.md#native-desktop-packages).
 RPM metadata requires `gtk4` and `webkitgtk6.0`, but the binary is built on Ubuntu
-24.04. No Fedora/RHEL-family installation or launch validation is configured.
+24.04. The Fedora 43 container checks installation and dependencies, not a
+Fedora graphical desktop. RHEL-family installation and launch are not verified.
 Use it only after validating those dependencies and binary compatibility on the
 specific distribution; report the distribution/version and architecture with
 the validation result.
