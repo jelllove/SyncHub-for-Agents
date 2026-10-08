@@ -5,9 +5,15 @@ on:
     branches: [agents/macos-installer-smoke]
     paths:
       - ".github/workflows/linux-installer.yml"
+      - "scripts/release/linux*"
+      - "scripts/smoke/linux*"
+      - "build/linux/**"
   pull_request:
     paths:
       - ".github/workflows/linux-installer.yml"
+      - "scripts/release/linux*"
+      - "scripts/smoke/linux*"
+      - "build/linux/**"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -50,7 +56,7 @@ jobs:
       - name: Install native packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11 apparmor
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb xdotool x11-utils dbus-x11 apparmor rpm cpio
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Package the original tag and verify source manifests
@@ -61,6 +67,7 @@ jobs:
           sha256sum go.mod go.sum frontend/package.json frontend/package-lock.json > "$RUNNER_TEMP/source-manifests.txt"
           npm ci --prefix frontend
           wails3 package GOOS=linux ARCH=amd64 VERSION="${RELEASE_TAG#v}"
+          VERSION="${RELEASE_TAG#v}" GOARCH=amd64 wails3 task linux:generate:rpm ARCH=amd64 VERSION="${RELEASE_TAG#v}"
           sha256sum --check "$RUNNER_TEMP/source-manifests.txt"
       - name: Revalidate exact published bytes when packages already exist
         env:
@@ -68,48 +75,58 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets.json"
-          count="$(jq '[.assets[] | select(.name == "SyncHub-x86_64.AppImage" or .name == "SyncHub.deb" or .name == "SHA256SUMS-Linux.txt")] | length' "$RUNNER_TEMP/release-assets.json")"
-          if [[ "$count" == 0 ]]; then
+          mode="$(node tooling/scripts/release/linux-evidence.mjs published-mode "$RUNNER_TEMP/release-assets.json")"
+          if [[ "$mode" == build ]]; then
             echo "PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
-          elif [[ "$count" == 3 ]]; then
+            echo "RPM_PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
+          else
             directory="$RUNNER_TEMP/published-linux"
             gh release download "$RELEASE_TAG" --dir "$directory" \
               --pattern SyncHub-x86_64.AppImage --pattern SyncHub.deb --pattern SHA256SUMS-Linux.txt
-            (
-              cd "$directory"
-              test "$(wc -l < SHA256SUMS-Linux.txt)" = 2
-              test "$(grep -Ec '^[a-f0-9]{64}  (SyncHub-x86_64.AppImage|SyncHub.deb)$' SHA256SUMS-Linux.txt)" = 2
-              test "$(grep -c '  SyncHub-x86_64.AppImage$' SHA256SUMS-Linux.txt)" = 1
-              test "$(grep -c '  SyncHub.deb$' SHA256SUMS-Linux.txt)" = 1
-              sha256sum --check SHA256SUMS-Linux.txt
-            )
+            if [[ "$mode" == complete ]]; then
+              gh release download "$RELEASE_TAG" --dir "$directory" --pattern SyncHub.rpm
+              echo "RPM_PACKAGE_ORIGIN=published" >> "$GITHUB_ENV"
+            else
+              echo "RPM_PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
+            fi
+            node tooling/scripts/release/linux-evidence.mjs verify "$directory" "$mode"
+            if [[ "$mode" == complete ]]; then
+              cp "$directory/SyncHub.rpm" app-source/bin/
+            fi
             cp "$directory/SyncHub-x86_64.AppImage" "$directory/SyncHub.deb" app-source/bin/
             chmod +x app-source/bin/SyncHub-x86_64.AppImage
             echo "PACKAGE_ORIGIN=published" >> "$GITHUB_ENV"
-          else
-            echo "Incomplete Linux release asset set; refusing ambiguous verification" >&2
-            exit 1
           fi
-      - name: Extract and launch both packages in isolated profiles
+      - name: Extract and launch all packages in isolated profiles
         working-directory: app-source
         run: |
+          set -euo pipefail
           evidence="$RUNNER_TEMP/linux-evidence"
           set -x
-          mkdir -p "$evidence/appimage" "$evidence/deb"
+          mkdir -p "$evidence/appimage" "$evidence/deb" "$evidence/rpm"
           mapfile -t debs < <(find bin -maxdepth 1 -name '*.deb' -type f)
           test "${#debs[@]}" = 1
           test "$(dpkg-deb --field "${debs[0]}" Version)" = "${RELEASE_TAG#v}-1"
           test "$(dpkg-deb --field "${debs[0]}" Architecture)" = amd64
           dpkg-deb --info "${debs[0]}" > "$evidence/deb-info.txt"
           dpkg-deb --extract "${debs[0]}" "$evidence/deb"
+          rpm_package="$PWD/bin/SyncHub.rpm"
+          test "$(rpm -qp --queryformat '%{NAME}' "$rpm_package")" = synchub
+          test "$(rpm -qp --queryformat '%{VERSION}-%{RELEASE}' "$rpm_package")" = "$(node "$GITHUB_WORKSPACE/tooling/scripts/release/linux-evidence.mjs" version "$RELEASE_TAG" rpm)"
+          test "$(rpm -qp --queryformat '%{ARCH}' "$rpm_package")" = x86_64
+          rpm -qpi "$rpm_package" > "$evidence/rpm-info.txt"
+          rpm -qp --requires "$rpm_package" > "$evidence/rpm-requires.txt"
+          grep -qx gtk4 "$evidence/rpm-requires.txt"
+          grep -qx webkitgtk6.0 "$evidence/rpm-requires.txt"
+          rpm2cpio "$rpm_package" | (cd "$evidence/rpm" && cpio --extract --make-directories --no-absolute-filenames --quiet)
           image="$PWD/bin/SyncHub-x86_64.AppImage"
           (cd "$evidence/appimage" && "$image" --appimage-extract > "$evidence/appimage-extract.log")
-          for format in appimage deb; do
+          for format in appimage deb rpm; do
             if [[ "$format" == appimage ]]; then
               binary="$evidence/appimage/squashfs-root/usr/bin/SyncHub"
               launcher="$evidence/appimage/squashfs-root/AppRun"
             else
-              binary="$evidence/deb/usr/bin/SyncHub"
+              binary="$evidence/$format/usr/bin/SyncHub"
               launcher="$binary"
             fi
             test "$("$binary" --version)" = "${RELEASE_TAG#v}"
@@ -157,13 +174,15 @@ jobs:
             trap - EXIT
           done
           mkdir -p "$RUNNER_TEMP/linux-package"
-          cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$RUNNER_TEMP/linux-package/"
+          cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$rpm_package" "$RUNNER_TEMP/linux-package/"
           cd "$RUNNER_TEMP/linux-package"
-          sha256sum SyncHub-x86_64.AppImage *.deb > SHA256SUMS-Linux.txt
+          sha256sum SyncHub-x86_64.AppImage SyncHub.deb SyncHub.rpm > SHA256SUMS-Linux.txt
+          node "$GITHUB_WORKSPACE/tooling/scripts/release/linux-evidence.mjs" verify "$RUNNER_TEMP/linux-package" complete
           jq -n --arg tag "$RELEASE_TAG" --arg commit "$(git -C "$GITHUB_WORKSPACE/app-source" rev-parse HEAD)" \
             --arg origin "$PACKAGE_ORIGIN" \
-            '{tag:$tag,sourceCommit:$commit,packageOrigin:$origin,architecture:"amd64",os:"Ubuntu 24.04",
-              appimageLaunchPassed:true,debLaunchPassed:true,visibleWindowsVerified:true,isolatedHome:true,
+            --arg rpmOrigin "$RPM_PACKAGE_ORIGIN" \
+            '{tag:$tag,sourceCommit:$commit,packageOrigin:$origin,rpmPackageOrigin:$rpmOrigin,architecture:"amd64",os:"Ubuntu 24.04",
+              appimageLaunchPassed:true,debLaunchPassed:true,rpmLaunchPassed:true,visibleWindowsVerified:true,isolatedHome:true,
               testAppUserNamespaceAllowance:true}' > build-receipt.json
       - name: Retain exact packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -180,3 +199,30 @@ jobs:
             ${{ runner.temp }}/linux-evidence/*.txt
             ${{ runner.temp }}/linux-evidence/*.log
           if-no-files-found: warn
+
+  rpm-install:
+    name: Install RPM on Fedora
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: linux-verified-package
+          path: package
+      - name: Resolve dependencies, install and verify on Fedora
+        run: |
+          set -euo pipefail
+          bash scripts/smoke/linux-rpm-install.sh package/SyncHub.rpm "${RELEASE_TAG#v}" \
+            2>&1 | tee "$RUNNER_TEMP/fedora-rpm-install.log"
+      - name: Retain Fedora installation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fedora-rpm-install
+          path: ${{ runner.temp }}/fedora-rpm-install.log
+          if-no-files-found: error

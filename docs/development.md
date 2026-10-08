@@ -85,8 +85,8 @@ bash scripts/smoke/macos-native.sh "$RUNNER_TEMP/macos-package" "$RUNNER_TEMP/na
 
 The [Linux installer workflow](../.github/workflows/linux-installer.yml) packages
 an existing release tag on Ubuntu 24.04 x64 using the existing Wails tasks. It
-rejects dependency-manifest drift, checks package versions, extracts both the
-AppImage and Debian package, and launches each extracted app under Xvfb in a
+rejects dependency-manifest drift, checks package versions and architectures,
+extracts AppImage, DEB and RPM, and launches each extracted app under Xvfb in a
 private D-Bus session with
 isolated HOME/XDG directories and no SSH agent or global Git configuration.
 It checks the actual application process and its visible native window by PID,
@@ -99,16 +99,42 @@ WebKit sandboxing remains enabled; no system-wide AppArmor/sysctl setting is
 disabled. This does not prove first launch under an unmodified Ubuntu policy.
 This is a startup smoke test, not native UI automation
 or a system-wide apt-install/dependency-resolution test.
-If that release already has all three Linux assets, it downloads and verifies
-their checksums, then tests those exact published package bytes instead of the
-new build outputs. A partially published Linux asset set fails explicitly.
+If the release already has AppImage, DEB, RPM and their Linux checksum manifest,
+it downloads and verifies them, then tests those exact published bytes instead
+of new build outputs. Legacy releases with only AppImage, DEB and their manifest
+remain supported: those two published packages are retained and verified while
+RPM is built from the same source tag. Package origins are recorded separately
+in the receipt. Duplicate assets, incomplete sets, missing RPM in a complete
+manifest, unsafe checksum paths and digest mismatches fail explicitly.
 
-`linux-verified-package` contains both packages, `SHA256SUMS-Linux.txt`, and a
+`linux-verified-package` contains all three packages, `SHA256SUMS-Linux.txt`, and a
 source/test receipt; `linux-launch-evidence` retains logs including failures.
 The workflow does not publish automatically. Before attaching these exact
 artifacts to an existing release, require the hosted run to pass, resolve the
 destination's live tag to the receipt commit, verify checksums, refuse to replace
 existing assets, and retain existing platform assets and release notes.
+The Fedora 43 container job installs the RPM through `dnf`, resolves its declared
+dependencies, checks installed version/architecture and executable version, and
+verifies installed package files. It does not exercise Fedora's desktop UI.
+Require this job as well as the native startup job to pass before publication;
+the standard Linux release job also gates RPM artifact upload on this check.
+
+Default Linux packaging retains AppImage and DEB and adds RPM:
+
+```bash
+wails3 package GOOS=linux ARCH=amd64 VERSION=0.3.4
+```
+
+For an individual format, use `wails3 task linux:create:deb` or
+`wails3 task linux:create:rpm` with `ARCH=amd64 VERSION=0.3.4`.
+Both generators pass the same version and architecture into nFPM; Debian uses
+`amd64`, while RPM uses `x86_64`. Both have packaging revision `1`. Package
+metadata follows nFPM's prerelease ordering (`0.3.5~rc.1-1`), while the executable
+continues to report the original application version (`0.3.5-rc.1`).
+Cross-host regression tests run in ordinary frontend lint tests. Native RPM
+metadata/extraction checks need `rpm` and `cpio`; the Fedora installation check
+needs Docker running Linux containers and uses
+[linux-rpm-install.sh](../scripts/smoke/linux-rpm-install.sh).
 
 ## Local feedback and cleanup
 
@@ -400,5 +426,5 @@ Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 | `npm --prefix frontend run lint` | `eslint . --max-warnings 0` |
 | `npm --prefix frontend run typecheck` | `tsc --noEmit` |
 | `npm --prefix frontend run test` | `vitest run` |
-| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs ../scripts/release/macos.test.mjs` |
+| `npm --prefix frontend run test:lint` | `node --test lint.test.mjs doc-drift.test.mjs mcp-server.test.mjs ../scripts/release/macos.test.mjs ../scripts/release/linux.test.mjs` |
 <!-- dev-reference:end -->

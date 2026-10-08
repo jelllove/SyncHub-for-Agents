@@ -55,12 +55,14 @@ Use the [official releases](https://github.com/jelllove/SyncHub-for-Agents/relea
 or the [qinqingxu mirror](https://github.com/qinqingxu/SyncHub-for-Agents/releases/latest).
 Check each release's asset list and notes; a packaging target does not mean an
 installer was published or tested on every OS version.
+Linux packaging produces DEB and RPM alongside AppImage. Older releases,
+including the original v0.3.4 Linux asset set, may not include an RPM.
 
 | Platform | Package | Notes |
 | --- | --- | --- |
 | Windows x64 | `SyncHub-for-Agents-Setup-x64.exe` | Per-user installer; may be unsigned. Check SmartScreen/signing notes. |
 | macOS Apple Silicon / Intel | `SyncHub-macOS-universal-adhoc.dmg` | Universal ad-hoc build, **not Apple notarized**. Gatekeeper may block first launch. |
-| Linux x64 | `SyncHub-x86_64.AppImage`, `SyncHub.deb` | AppImage or Debian package; extracted-package startup tested on Ubuntu 24.04 x64. |
+| Linux x64 | `SyncHub-x86_64.AppImage`, `SyncHub.deb`, `SyncHub.rpm` | AppImage, Debian/Ubuntu DEB, or Fedora-family RPM; check the release's actual asset list. |
 
 Verify Windows downloads with `SHA256SUMS.txt`, the ad-hoc macOS DMG with
 `SHA256SUMS-macOS.txt`, and separately added Linux packages with
@@ -97,7 +99,8 @@ Debian installation test, or a compatibility guarantee for every distribution.
 
 Detailed install and onboarding guide: [docs/install.md](docs/install.md).
 On macOS, open the DMG and drag the app to Applications. On Linux, install the
-Debian package or make the AppImage executable and keep it at a permanent path.
+DEB/RPM package with the distribution's package manager, or make the AppImage
+executable and keep it at a permanent path.
 Approve an unnotarized macOS app only if you trust its source; do not disable
 system-wide security.
 

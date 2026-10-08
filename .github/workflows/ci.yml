@@ -153,7 +153,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb
+          sudo apt-get install --yes gcc libgtk-4-dev libwebkitgtk-6.0-dev libfuse2 xvfb rpm cpio
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
       - name: Install Wails
         shell: bash
@@ -193,4 +193,5 @@ jobs:
             bin/*.dmg
             bin/*.AppImage
             bin/*.deb
+            bin/*.rpm
           if-no-files-found: error
