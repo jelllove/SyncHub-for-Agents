@@ -37,8 +37,15 @@ and starts the AppImage in an isolated home under Xvfb, and checks the tar archi
 contents and executable version. It does not install the DEB into a clean OS or
 prove interactive desktop behavior. A distribution is verified for a particular
 revision only when that native job passes; inspect the corresponding CI run.
-These workflow changes have not themselves been run on a Linux or macOS host
-in the Windows development session.
+For `v0.3.5`, [Ubuntu/Fedora package validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37797776658)
+passed for release commit `f84e964`. Ubuntu checks verified visible native startup
+of the extracted AppImage, DEB and RPM, plus tar.gz content equality with the DEB.
+Fedora 43 checks verified RPM dependencies, installation and executable version in
+a container, not a graphical Fedora desktop.
+[macOS native validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37796990437)
+passed on macOS 15 ARM64 and Intel, including DMG installation, native onboarding
+UI tests, and complete ZIP app-content equality. These results do not extend to
+other distributions, Gatekeeper acceptance or live synchronization.
 
 Debian 13 has the expected GTK4/WebKitGTK 6.0 package family but is not a verified
 target. Ubuntu 22.04, other Debian/Ubuntu versions, Fedora desktop, RHEL, AlmaLinux and
@@ -108,7 +115,8 @@ An explicitly named `SyncHub-macOS-universal-adhoc.dmg` or
 `SyncHub-macOS-universal-adhoc.zip` is instead an **ad-hoc
 signed test build, not Developer ID signed or notarized**. It includes Apple
 Silicon and Intel binaries. Verify its download with `SHA256SUMS-macOS.txt`;
-the separate Windows checksum manifest does not cover this asset. Gatekeeper
+older Windows-only checksum manifests do not cover this asset. The `v0.3.5`
+combined `SHA256SUMS.txt` covers every package, alongside the platform manifests. Gatekeeper
 may block its first launch. Only approve it in **System Settings > Privacy &
 Security** if you trust the source; do not disable system-wide security.
 The minimum build target is macOS 12; automated native UI checks run on macOS 15.

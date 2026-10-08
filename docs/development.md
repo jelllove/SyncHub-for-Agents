@@ -86,6 +86,16 @@ macOS CPU hosts and the Ubuntu package smoke scripts. Inspect actual run results
 before describing an OS/distribution as verified; local fixtures are not native
 installer or interactive desktop tests.
 
+For release `v0.3.5` at commit `f84e964`, the
+[Windows release build](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37796905229),
+[macOS ARM64/Intel installed-app validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37796990437),
+and [Ubuntu/Fedora Linux package validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37797776658)
+passed. Windows assets are unsigned; macOS assets use the explicitly labeled
+ad-hoc path, not Developer ID signing or notarization. The combined checksum
+manifest covers all eight package files; platform manifests remain available.
+The [installation guide](install.md#package-matrix-and-validation-scope) records
+the exact tested scope and exclusions.
+
 ## macOS installed-app validation
 
 The [macOS installer workflow](../.github/workflows/macos-installer.yml) builds an
