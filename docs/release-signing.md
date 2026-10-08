@@ -6,6 +6,13 @@ include `SHA256SUMS.txt` for download integrity, but Windows SmartScreen can
 show unknown-publisher warnings until a valid publisher signature and reputation
 exist.
 
+The portable `SyncHub-for-Agents-Windows-x64.zip` contains the same executable
+after signing; the ZIP container itself is not Authenticode-signed.
+`SHA256SUMS.txt` covers both the installer and ZIP. See the
+[package matrix](install.md#package-matrix-and-validation-scope) for other
+platforms and the [native packaging guide](development.md#native-desktop-packages)
+for release opt-ins and macOS signing/notarization order.
+
 ## Certificate options
 
 Use one of these signing setups:

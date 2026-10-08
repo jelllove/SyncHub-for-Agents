@@ -4,6 +4,7 @@ set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 appimage="${1:-"$root_dir/bin/SyncHub-x86_64.AppImage"}"
 deb="${2:-$(find "$root_dir/bin" -maxdepth 1 -name '*.deb' -print -quit)}"
+archive="${3:-"$root_dir/bin/SyncHub-linux-x64.tar.gz"}"
 work_dir="$(mktemp -d)"
 pid=""
 
@@ -22,6 +23,17 @@ test -f "$deb"
 dpkg-deb --info "$deb" >/dev/null
 dpkg-deb --contents "$deb" > "$work_dir/deb-contents.txt"
 grep -q 'usr/bin/SyncHub' "$work_dir/deb-contents.txt"
+
+test -s "$archive"
+mkdir "$work_dir/archive"
+tar -xzf "$archive" -C "$work_dir/archive"
+test -x "$work_dir/archive/SyncHub/SyncHub"
+for entry in LICENSE SyncHub.png SyncHub.desktop INSTALL.md; do
+  test -s "$work_dir/archive/SyncHub/$entry"
+done
+cmp "$root_dir/bin/SyncHub" "$work_dir/archive/SyncHub/SyncHub"
+HOME="$work_dir/home" XDG_CONFIG_HOME="$work_dir/config" \
+  "$work_dir/archive/SyncHub/SyncHub" --version
 
 (
   cd "$work_dir"

@@ -16,6 +16,41 @@ ssh -T git@github.com
 
 GitHub should report that authentication succeeded.
 
+## Package matrix and validation scope
+
+Download packages and `SHA256SUMS.txt` from the
+[official release page](https://github.com/jelllove/SyncHub-for-Agents/releases/latest).
+The workflows produce this matrix; an older release may not contain every format.
+macOS and Linux publishing remain opt-in, so only assets actually attached to a
+release are available for download.
+
+| Platform | CPU | Primary package | Alternative packages |
+| --- | --- | --- | --- |
+| Windows | x64 (amd64) | `SyncHub-for-Agents-Setup-x64.exe` | `SyncHub-for-Agents-Windows-x64.zip` |
+| macOS | ARM64 + Intel x64 | `SyncHub.dmg` (Universal) | `SyncHub-macos-universal.zip` |
+| Linux / Ubuntu | x64 (amd64) | `synchub_*.deb` | `SyncHub-x86_64.AppImage`, `SyncHub-linux-x64.tar.gz` |
+| Linux / RPM distributions | x64 (amd64) | `.rpm`, only when explicitly enabled | Experimental; not a validated distribution target |
+
+**Linux distribution validation target: Ubuntu 24.04 x64 only.** The
+[CI packaging job](../.github/workflows/ci.yml) checks the DEB structure, extracts
+and starts the AppImage in an isolated home under Xvfb, and checks the tar archive
+contents and executable version. It does not install the DEB into a clean OS or
+prove interactive desktop behavior. A distribution is verified for a particular
+revision only when that native job passes; inspect the corresponding CI run.
+These workflow changes have not themselves been run on a Linux or macOS host
+in the Windows development session.
+
+Debian 13 has the expected GTK4/WebKitGTK 6.0 package family but is not a verified
+target. Ubuntu 22.04, other Debian/Ubuntu versions, Fedora, RHEL, AlmaLinux and
+Rocky Linux are not claimed as verified. In particular, RPM generation on Ubuntu
+does not establish compatibility with any RPM distribution. AppImage and tar.gz
+do not guarantee compatibility with older glibc or missing system libraries.
+Windows ARM64 and Linux ARM64 packages are outside this release matrix.
+
+Git must be installed separately and available on `PATH` on every platform.
+Compare each downloaded asset with its entry in `SHA256SUMS.txt`; checksums detect
+corruption, not publisher identity.
+
 ## Windows
 
 1. Download `SyncHub-for-Agents-Setup-x64.exe` from the latest release.
@@ -33,6 +68,20 @@ Uninstall it from **Settings > Apps > Installed apps**. Your synchronized data
 and settings in `%USERPROFILE%\.synchub` are retained so an uninstall cannot
 delete your sessions accidentally.
 
+### Portable ZIP
+
+Extract `SyncHub-for-Agents-Windows-x64.zip` to a permanent directory and run
+`SyncHub.exe`. The ZIP includes the executable and license, not an installer.
+Microsoft Edge WebView2 Runtime must already be installed; unlike the installer,
+the ZIP does not bootstrap it.
+
+"Portable" means no installation is required, not isolated data storage:
+settings and synchronization data still use `%USERPROFILE%\.synchub`.
+Keep the extracted directory stable before enabling **Start at login**.
+Automatic Windows updates still use the NSIS installer; disable automatic updates
+in settings and replace the ZIP manually if you want to remain installation-free.
+Do not run an installed and extracted copy simultaneously against the same data.
+
 ## macOS
 
 1. Download and open `SyncHub.dmg`.
@@ -42,6 +91,17 @@ delete your sessions accidentally.
 macOS packages, when available, are signed and notarized. To uninstall, quit the app from its
 menu-bar icon and move it from Applications to Trash. Settings remain in
 `~/.synchub`.
+
+Release DMG and ZIP packages contain a Universal app for both Apple Silicon ARM64
+and Intel x64. The deployment target is macOS 12 or later; CI packaging/smoke tests
+are configured on macOS 15 ARM64 and Intel hosts, not on every supported OS version.
+
+For the ZIP alternative, extract `SyncHub-macos-universal.zip` and move
+`SyncHub.app` to Applications before launching. Published packages require the
+configured Developer ID signing and Apple notarization credentials. The workflow
+notarizes and staples the app before creating either final archive. Local/PR
+packages are only ad-hoc signed, not notarized release builds; do not bypass
+Gatekeeper for an untrusted download.
 
 ## Linux
 
@@ -53,6 +113,13 @@ sudo apt install ./synchub_*.deb
 
 Start SyncHub from the application menu.
 
+Ubuntu 24.04 x64 is the configured validation target. DEB dependencies include
+`libgtk-4-1` and `libwebkitgtk-6.0-4`. Install Git separately:
+
+```bash
+sudo apt install git
+```
+
 ### AppImage
 
 ```bash
@@ -62,6 +129,38 @@ chmod +x SyncHub-x86_64.AppImage
 
 Keep the AppImage at a permanent path before enabling **Start at login**.
 SyncHub records that stable path, not the temporary AppImage mount.
+
+On Ubuntu 24.04, install `libfuse2t64` if FUSE 2 is missing. AppImage extraction
+can avoid the FUSE mount requirement, but does not remove other runtime-library
+requirements.
+
+### tar.gz
+
+The archive contains `SyncHub/SyncHub`, a desktop entry, icon, license and
+installation guide. It is not a self-contained AppImage; install the native
+runtime dependencies first. On Ubuntu 24.04:
+
+```bash
+sudo apt install git libgtk-4-1 libwebkitgtk-6.0-4
+mkdir -p "$HOME/.local/opt"
+tar -xzf SyncHub-linux-x64.tar.gz -C "$HOME/.local/opt"
+"$HOME/.local/opt/SyncHub/SyncHub"
+```
+
+Keep that directory stable for **Start at login**. The included desktop entry
+uses `Exec=SyncHub`; copying it to an application-menu directory also requires
+putting the executable on `PATH` or updating `Exec` and `Icon` to absolute paths.
+Extracting the archive alone does not register a menu item.
+
+### Optional RPM
+
+Maintainers can opt in to RPM publishing; see
+[native packaging and release controls](development.md#native-desktop-packages).
+RPM metadata requires `gtk4` and `webkitgtk6.0`, but the binary is built on Ubuntu
+24.04. No Fedora/RHEL-family installation or launch validation is configured.
+Use it only after validating those dependencies and binary compatibility on the
+specific distribution; report the distribution/version and architecture with
+the validation result.
 
 ## First launch
 

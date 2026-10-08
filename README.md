@@ -51,6 +51,21 @@ See [docs/portable-resources.md](docs/portable-resources.md) for detailed rules.
 
 Detailed install and onboarding guide: [docs/install.md](docs/install.md).
 
+## Desktop packages
+
+The packaging workflows provide the following outputs. Actual release availability
+depends on the maintainer enabling the platform jobs; see the
+[package matrix and validation scope](docs/install.md#package-matrix-and-validation-scope).
+
+| Platform | Architecture | Main package | Alternative |
+| --- | --- | --- | --- |
+| Windows | x64 | `.exe` per-user installer | Portable `.zip` |
+| macOS | Apple Silicon ARM64 + Intel x64 | Universal `.dmg` | Universal `.zip` containing the app bundle |
+| Linux | x64 | `.deb` for the Ubuntu 24.04 validation target | `.AppImage`, `.tar.gz`; `.rpm` opt-in, not distro-validated |
+
+Native CI packaging covers Windows, both macOS architectures, and Ubuntu 24.04.
+That configured coverage is not evidence that every release passed on every OS.
+
 ## Software updates
 
 Starting with v0.3.0, release builds check

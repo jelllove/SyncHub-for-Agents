@@ -25,6 +25,68 @@ macOS requires Xcode command-line tools. Ubuntu 24.04 needs
 your OS package manager before setup/check. Packaging dependencies are listed in
 [CI](../.github/workflows/ci.yml).
 
+## Native desktop packages
+
+The [installation matrix](install.md#package-matrix-and-validation-scope)
+defines formats, CPU coverage, dependencies and the limits of distribution
+verification. Use native hosts for distribution packaging. After the pinned
+toolchain and `node scripts/dev.mjs setup`, these commands produce the packages:
+
+```text
+# Windows x64: NSIS installer + ZIP + checksums (PowerShell 7 and NSIS required)
+wails3 package GOOS=windows ARCH=amd64 INSTALL_SCOPE=user VERSION=0.3.0
+pwsh -NoProfile -File scripts/release/test-windows.ps1
+
+# macOS: native build, ad-hoc signed DMG + ZIP for one CPU
+wails3 task darwin:package:dmg ARCH=arm64 VERSION=0.3.0
+wails3 task darwin:package:dmg ARCH=amd64 VERSION=0.3.0
+
+# macOS: Universal bundle, then DMG + ZIP containing both CPUs
+wails3 task darwin:package:universal VERSION=0.3.0
+wails3 task darwin:create:dmg
+wails3 task darwin:create:zip ARCH=universal
+
+# Ubuntu 24.04 x64: DEB + AppImage + tar.gz
+wails3 package GOOS=linux ARCH=amd64 VERSION=0.3.0
+# Optional RPM, using the same CPU and version metadata
+wails3 task linux:create:rpm ARCH=amd64 VERSION=0.3.0
+```
+
+Linux needs the native libraries above, FUSE 2 for AppImage packaging and the
+pinned nFPM tool:
+`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0`.
+On Ubuntu 24.04 the FUSE package is `libfuse2t64` (`libfuse2` is a transitional
+package name used in CI). No Linux ARM64 AppImage is offered.
+
+Windows creates the ZIP from the same executable used by NSIS after optional
+Authenticode signing, and hashes both final assets. The Linux archive script
+stages only the binary, license, icon, desktop entry and install guide in a
+temporary directory; it never installs or runs application synchronization.
+DEB/RPM metadata receives the requested `GOARCH` and `VERSION`.
+
+The [release workflow](../.github/workflows/release.yml) keeps these opt-ins:
+
+| Repository variable | Behavior |
+| --- | --- |
+| `RELEASE_MACOS=true` | Publish Universal DMG and ZIP; requires Developer ID and notarization secrets already used by the workflow. |
+| `RELEASE_LINUX=true` | Publish Ubuntu-built x64 DEB, AppImage and tar.gz. |
+| `RELEASE_LINUX_RPM=true` | Additionally publish RPM when the Linux job is enabled; experimental, no RPM-distro smoke test. |
+
+For macOS releases, signing precedes notarization of the app archive, then the
+stapled app is placed into the final ZIP and DMG. The DMG is also signed,
+notarized and stapled. `lipo` verifies ARM64 and Intel slices before publication.
+The final publish job verifies the Windows checksum receipt and generates a
+single `SHA256SUMS.txt` covering all attached package assets.
+
+`go test ./tools/repocheck -run TestPlatform -count=1` covers workflow wiring,
+Windows ZIP bytes/checksums through synthetic PowerShell fixtures, and Linux
+tar content/executable permissions through synthetic Bash fixtures. On Windows,
+the tar fixture uses Git Bash when installed; otherwise it is explicitly skipped.
+These tests run in the normal full Go suite. Native CI additionally checks both
+macOS CPU hosts and the Ubuntu package smoke scripts. Inspect actual run results
+before describing an OS/distribution as verified; local fixtures are not native
+installer or interactive desktop tests.
+
 ## Local feedback and cleanup
 
 The shared check uses gofmt, go vet, ESLint, and TypeScript. It checks

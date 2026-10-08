@@ -131,9 +131,12 @@ jobs:
           - name: Windows
             os: windows-2025
             arch: amd64
-          - name: macOS
+          - name: macOS-ARM64
             os: macos-15
             arch: arm64
+          - name: macOS-Intel
+            os: macos-15-intel
+            arch: amd64
           - name: Linux
             os: ubuntu-24.04
             arch: amd64
@@ -168,7 +171,13 @@ jobs:
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: wails3 package GOOS=windows ARCH=${{ matrix.arch }} INSTALL_SCOPE=user
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          wails3 package GOOS=windows ARCH=${{ matrix.arch }} INSTALL_SCOPE=user
+          foreach ($asset in @('SyncHub-for-Agents-Setup-x64.exe', 'SyncHub-for-Agents-Windows-x64.zip')) {
+            if ((Get-Item "bin\$asset").Length -eq 0) { throw "Empty package: $asset" }
+          }
       - name: Smoke test Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -190,7 +199,9 @@ jobs:
           name: SyncHub-${{ matrix.name }}
           path: |
             bin/*.exe
+            bin/*.zip
             bin/*.dmg
             bin/*.AppImage
             bin/*.deb
+            bin/*.tar.gz
           if-no-files-found: error
