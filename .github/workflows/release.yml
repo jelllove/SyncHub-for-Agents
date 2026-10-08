@@ -161,12 +161,15 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           wails3 package GOOS=linux ARCH=amd64 VERSION="$version" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+      - name: Verify RPM installation and dependencies on Fedora
+        run: bash scripts/smoke/linux-rpm-install.sh bin/SyncHub.rpm "${GITHUB_REF_NAME#v}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-linux
           path: |
             bin/*.AppImage
             bin/*.deb
+            bin/*.rpm
           if-no-files-found: error
 
   publish:

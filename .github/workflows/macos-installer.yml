@@ -1,0 +1,148 @@
+name: macOS installer validation
+
+on:
+  push:
+    branches: [agents/macos-installer-smoke]
+  pull_request:
+    paths:
+      - ".github/workflows/macos-installer.yml"
+      - "scripts/release/macos*"
+      - "scripts/smoke/macos*"
+      - "scripts/smoke/macos-ui/**"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing published source release tag to package
+        required: true
+        default: v0.3.4
+      publish:
+        description: Upload the DMG only after both installed-app UI tests pass
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-installer-${{ github.ref }}-${{ inputs.release_tag || 'v0.3.4' }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag || 'v0.3.4' }}
+
+jobs:
+  build:
+    name: Build universal ad-hoc DMG
+    runs-on: macos-15
+    timeout-minutes: 25
+    outputs:
+      source_commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: tooling
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: tooling/.node-version
+      - name: Validate immutable release reference
+        run: node tooling/scripts/release/macos-evidence.mjs version "$RELEASE_TAG"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          path: app-source
+          fetch-depth: 0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: app-source/go.mod
+          cache-dependency-path: app-source/go.sum
+      - name: Record source commit and test release guards
+        id: source
+        run: |
+          echo "commit=$(git -C app-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          node --test tooling/scripts/release/macos.test.mjs
+      - name: Package the original source tag
+        run: |
+          bash tooling/scripts/release/macos-adhoc.sh \
+            "$GITHUB_WORKSPACE/app-source" "$RUNNER_TEMP/macos-package" "$RELEASE_TAG"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-adhoc-package
+          path: |
+            ${{ runner.temp }}/macos-package/SyncHub-macOS-universal-adhoc.dmg
+            ${{ runner.temp }}/macos-package/SHA256SUMS-macOS.txt
+            ${{ runner.temp }}/macos-package/build-receipt.json
+            ${{ runner.temp }}/macos-package/signature.txt
+          if-no-files-found: error
+
+  native:
+    name: Installed app UI (${{ matrix.arch }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: macos-adhoc-package
+          path: ${{ runner.temp }}/package
+      - name: Install from DMG, open native app, and test onboarding
+        run: |
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          bash scripts/smoke/macos-native.sh \
+            "$RUNNER_TEMP/package" "$RUNNER_TEMP/native-evidence" "$RELEASE_TAG"
+      - name: Retain screenshots, UI test bundle and failure logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-native-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/native-evidence/screenshots
+            ${{ runner.temp }}/native-evidence/native.xcresult
+            ${{ runner.temp }}/native-evidence/xcodebuild.log
+            ${{ runner.temp }}/native-evidence/test-summary.json
+            ${{ runner.temp }}/native-evidence/installation.json
+            ${{ runner.temp }}/native-evidence/signature.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish verified ad-hoc macOS installer
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: [build, native]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: macos-adhoc-package
+          path: package
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: macos-native-*
+          path: evidence
+      - name: Check both native results and exact build digest before uploading
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXPECTED_COMMIT: ${{ needs.build.outputs.source_commit }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/release/macos-publish.mjs package evidence \
+            "$RELEASE_TAG" "$EXPECTED_COMMIT" "$RUN_URL"
