@@ -110,6 +110,7 @@ tasks:
     cmds:
       - task: create:appimage
       - task: create:deb
+      - task: create:rpm
 
   create:appimage:
     summary: Creates an AppImage
@@ -195,11 +196,15 @@ tasks:
       - wails3 tool package -name "{{.APP_NAME}}" -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
     env:
       VERSION: '{{.VERSION | default "0.1.0"}}'
+      GOARCH: '{{.ARCH | default ARCH}}'
 
   generate:rpm:
     summary: Creates a rpm package
     cmds:
       - wails3 tool package -name "{{.APP_NAME}}" -format rpm -config ./build/linux/nfpm/nfpm.yaml -out {{.ROOT_DIR}}/bin
+    env:
+      VERSION: '{{.VERSION | default "0.1.0"}}'
+      GOARCH: '{{.ARCH | default ARCH}}'
 
   generate:aur:
     summary: Creates a arch linux packager package

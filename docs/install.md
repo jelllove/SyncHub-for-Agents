@@ -39,19 +39,57 @@ delete your sessions accidentally.
 2. Drag SyncHub to Applications.
 3. Open it from Applications.
 
-macOS packages, when available, are signed and notarized. To uninstall, quit the app from its
+The standard `SyncHub.dmg` release path requires Developer ID signing and
+notarization. To uninstall, quit the app from its
 menu-bar icon and move it from Applications to Trash. Settings remain in
 `~/.synchub`.
 
+An explicitly named `SyncHub-macOS-universal-adhoc.dmg` is instead an **ad-hoc
+signed test build, not Developer ID signed or notarized**. It includes Apple
+Silicon and Intel binaries. Verify its download with `SHA256SUMS-macOS.txt`;
+the separate Windows checksum manifest does not cover this asset. Gatekeeper
+may block its first launch. Only approve it in **System Settings > Privacy &
+Security** if you trust the source; do not disable system-wide security.
+The minimum build target is macOS 12; automated native UI checks run on macOS 15.
+See the [macOS installer pipeline](development.md#macos-installed-app-validation)
+for screenshots, tested behavior, and limitations.
+
 ## Linux
+
+Linux x64 packaging supports `SyncHub-x86_64.AppImage`, `SyncHub.deb`, and
+`SyncHub.rpm`. Download only assets actually listed in the chosen release;
+older releases may not include RPM.
+Separately added Linux assets have their own `SHA256SUMS-Linux.txt`; verify those
+downloads against that manifest rather than an older Windows-only checksum file.
+The [Linux package workflow](development.md#linux-release-package-validation)
+checks extracted-package startup on Ubuntu 24.04 under Xvfb, not every Linux
+distribution or desktop environment.
 
 ### Debian or Ubuntu
 
 ```bash
-sudo apt install ./synchub_*.deb
+sudo apt install ./SyncHub.deb
 ```
 
 Start SyncHub from the application menu.
+
+### Fedora and compatible RPM distributions
+
+```bash
+sudo dnf install ./SyncHub.rpm
+```
+
+The RPM declares `gtk4` and `webkitgtk6.0` dependencies. Use a distribution
+that provides GTK4 and WebKitGTK 6.0; do not assume older RHEL/CentOS releases
+can install it. The validation workflow includes a Fedora 43 container
+installation/dependency check, plus extracted-RPM startup on Ubuntu.
+Check the chosen release's evidence before treating those checks as passed
+for that release. Fedora desktop UI, login items, and live sync are not covered
+by the container's package-installation check.
+
+Start SyncHub from the application menu. Uninstall a DEB with
+`sudo apt remove synchub` or an RPM with `sudo dnf remove synchub`;
+user data in `~/.synchub` is retained.
 
 ### AppImage
 
