@@ -27,6 +27,11 @@ your OS package manager before setup/check. Packaging dependencies are listed in
 
 ## Native desktop packages
 
+For standalone, GUI-free command-line builds and the four-target CLI archive
+matrix, see the [CLI development and verification guide](cli.md). The reusable
+[CLI workflow](../.github/workflows/cli.yml) is called by CI and release builds;
+it is skipped during read-only maintenance alongside Desktop packaging.
+
 The [installation matrix](install.md#package-matrix-and-validation-scope)
 defines formats, CPU coverage, dependencies and the limits of distribution
 verification. Use native hosts for distribution packaging. After the pinned

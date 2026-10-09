@@ -14,6 +14,12 @@ permissions:
   contents: read
 
 jobs:
+  cli:
+    if: ${{ !inputs.maintenance }}
+    uses: ./.github/workflows/cli.yml
+    with:
+      version: "0.0.0"
+
   documentation-drift:
     name: Documentation drift
     runs-on: ubuntu-24.04

@@ -5,6 +5,14 @@ configuration and session files through a private GitHub repository.
 
 ## Before installing
 
+### Headless CLI option
+
+Use the separate [CLI guide](cli.md) for command-line installation, JSON output
+and headless daemon operation. Starting with v0.3.6, CLI archives are published
+separately from Desktop packages and do not require GUI runtimes. They share the
+Desktop profile by default; quit Desktop from its tray before CLI operations on
+that profile. Earlier releases do not include the new headless executable.
+
 Create an empty **private** GitHub repository. Do not add a README or other
 files; SyncHub can initialize the repository itself.
 

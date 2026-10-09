@@ -23,11 +23,21 @@ entry points. The React frontend consumes the desktop service boundary through
 generated Wails bindings. These entry points and frontend code are outside the
 import scan.
 
+The [CLI contract](cli.md) describes the standalone headless entry point and
+[OS-backed profile ownership](../internal/instance/lock.go) shared by Desktop and
+CLI. Desktop acquires ownership before backend initialization; CLI holds it for
+each finite operation or the daemon lifetime. Busy profiles are rejected instead
+of running competing synchronization or settings changes. Different profiles
+must not share a clone or overlapping resource targets. The lock file stays in
+place after release; the OS lock, not file existence, determines ownership.
+
 The desktop executable uses Wails' native tray. Shared tray icons remain in
 `internal/tray`; the legacy `synchub tray` backend is isolated in
-`internal/tray/legacy`. Keeping the Fyne tray backend out of the desktop dependency
-graph prevents colliding Objective-C menu symbols on macOS without disabling
-either user-facing tray mode. A dependency-graph test guards this separation.
+`internal/tray/legacy` and requires an explicit `legacytray` CLI build tag.
+Default CLI builds exclude both Wails and Fyne so they work without GUI libraries.
+Keeping the Fyne tray backend out of the desktop dependency graph prevents
+colliding Objective-C menu symbols on macOS. A dependency-graph test guards this
+separation; the headless package does not replace Desktop tray behavior.
 
 ## Two enforced directions
 
@@ -78,6 +88,9 @@ resource prefixes using path-segment boundaries. It also
 protects internal metadata from accidental restoration, and retains blocked
 remote paths for removal. It does not mutate the caller's snapshots or perform I/O.
 
+Local status/CLI plans apply the same explicit first-sync mapping to the prepared
+plan when configuration says it is pending. The planner includes protected
+metadata and blocked/skipped paths before mapping, as execution does.
 The engine applies explicit first-sync choices only when `FirstSyncRun` is true,
 then executes the resulting actions through the existing applier. Pull/push retry
 handling, conflict persistence, installation approval, state updates, and progress

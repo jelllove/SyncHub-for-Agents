@@ -2,7 +2,7 @@
 
 ![SyncHub for Agents hackathon poster](backup/hackathon-media-20260821/final/hackathon-poster.png)
 
-SyncHub for Agents is a desktop tray app that keeps AI agent configuration and session data synchronized across multiple computers.
+SyncHub for Agents keeps AI agent configuration and session data synchronized across multiple computers, through a desktop tray app or a standalone headless CLI.
 
 It uses a private Git repository you control as the synchronization bridge, with strict safety filters so credentials and machine-specific state stay local.
 
@@ -11,6 +11,8 @@ It uses a private Git repository you control as the synchronization bridge, with
 - Synchronize agent resources (sessions, config, instructions, skills, plugin declarations).
 - Run as a desktop/tray app with clear status states: Ready, Updating, Sync complete, Paused, Needs attention.
 - Sync periodically in the background and on-demand.
+- Run without a GUI through `synchub`, with local previews, diagnostics,
+  one-shot synchronization, a headless daemon, and versioned JSON output.
 - Propagate deletions across machines with a configurable recovery window.
 - Resolve conflicts with local/remote/merged choices and batch apply.
 - Review and approve plugin/skill install operations before execution, with explicit retry for failed operations.
@@ -118,6 +120,58 @@ depends on the maintainer enabling the platform jobs; see the
 
 Native CI packaging covers Windows, both macOS architectures, and Ubuntu 24.04.
 That configured coverage is not evidence that every release passed on every OS.
+
+## Headless CLI
+
+Starting with **v0.3.6**, releases include a separate `synchub` command-line
+executable alongside the existing Desktop UI. It shares the synchronization
+engine, credential exclusion, conflict protection and installation-approval
+rules, without requiring Wails, WebView2, GTK, WebKitGTK or Node. Git must be
+installed separately.
+
+Download the archive for your OS from the
+[v0.3.6 release](https://github.com/jelllove/SyncHub-for-Agents/releases/tag/v0.3.6),
+verify it using `SHA256SUMS.txt`, extract `synchub-cli`, and add that directory to
+your user `PATH` or invoke the executable by its full path:
+
+| Platform | CPU | CLI archive |
+| --- | --- | --- |
+| Windows | x64 | `SyncHub-CLI-windows-x64.zip` |
+| macOS | Apple Silicon ARM64 | `SyncHub-CLI-macos-arm64.tar.gz` |
+| macOS | Intel x64 | `SyncHub-CLI-macos-x64.tar.gz` |
+| Linux | x64 | `SyncHub-CLI-linux-x64.tar.gz` |
+
+```text
+synchub version --json
+synchub doctor --json
+synchub status --json
+synchub plan --json
+synchub sync --json
+synchub daemon
+```
+
+For a new profile, initialize it through your existing Git/SSH authentication:
+
+```text
+synchub init --repo git@github.com:example-user/private-agent-sync.git --first-sync merge-cloud-local
+```
+
+**Already using Desktop? Do not run `init` again.** Both entry points use
+`~/.synchub` by default. Quit Desktop from its tray before CLI operations on the
+same profile; closing its window is not enough. Desktop and daemon hold an
+OS-backed ownership lock, and a competing CLI command returns exit **3 (busy)**
+instead of starting a second writer. `--home` selects another explicit profile,
+which must not share a clone or overlapping resources with a running profile.
+
+`plan` is a **local-only preview**: it does not fetch remote changes or apply
+actions. `sync` returns exit **4 (needs attention)** for unresolved conflicts,
+blocked resources or pending installation approval, rather than claiming complete
+success. Complex conflict editing remains in Desktop. CLI packages are
+unsigned/not notarized, independently of any Desktop signing.
+
+See the [CLI guide](docs/cli.md) for JSON/error contracts, first-sync choices,
+installation and source builds, and the [architecture guide](docs/architecture.md)
+for Desktop/CLI safety boundaries. Older releases do not include this CLI.
 
 ## Software updates
 
