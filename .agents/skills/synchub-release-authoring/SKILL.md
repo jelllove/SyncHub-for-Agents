@@ -62,6 +62,11 @@ attached to the GitHub release.
 - Record the destination repository, branch, version/tag and exact commit.
   Verify that the intended changes are committed and included in that commit.
   A dirty worktree is not part of a release built from its tag.
+- Inventory all outstanding requirements from the maintainer before choosing
+  release inputs. Previously requested, implemented Desktop features are not
+  unrelated merely because the latest request mentions CLI. Reconcile each
+  requirement with the committed tag and final packaged assets; report any
+  deliberate deferral explicitly instead of saying the full request is complete.
 - Inspect Git status and preserve unrelated work. Stage only authorized changes;
   do not bundle other pending desktop features into a skill/documentation commit.
 - Before GitHub operations, inspect `git remote get-url origin` (or the existing
@@ -202,3 +207,11 @@ commits under one tag, or call the NPM launcher a substitute for DMG/DEB package
 If any required package or evidence is missing, report the release as
 **blocked/incomplete**, name the missing item and failing command/run, and keep
 working only within the authorized scope. Never waive an OS silently.
+
+## Learnings
+
+An isolated CLI release previously excluded implemented settings tabs and other
+requested Desktop changes, leaving users with the old UI despite a successful
+build. Verify the complete requested-feature inventory, not just the latest
+subtask: source tests plus actual embedded UI resources must match the release.
+Local implementation completion is not published user delivery.

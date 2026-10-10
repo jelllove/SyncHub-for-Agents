@@ -63,8 +63,18 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          go test . ./internal/updater ./internal/desktop ./internal/scheduler ./internal/daemon
-          npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
+          go test . ./internal/updater ./internal/startup ./internal/desktop ./internal/scheduler ./internal/daemon ./internal/tray ./internal/tray/desktop
+          npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx src/TrayTip.test.tsx
+      - name: Verify requested UI is embedded in the packaged executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $embedded = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes('bin\SyncHub.exe'))
+          foreach ($marker in @('Settings categories', 'settings-tabs', 'tray-tip:status')) {
+            if (-not $embedded.Contains($marker)) {
+              throw "Packaged executable is missing requested UI resource: $marker"
+            }
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-windows
