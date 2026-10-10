@@ -9,6 +9,20 @@ export const requirements = {
   'AGENTS.md': ['Project documents', 'Implementation requirements', 'Completion requirements'],
 }
 
+function hasSectionContent(content) {
+  let offset = 0
+  let visible = false
+  while (offset < content.length) {
+    const start = content.indexOf('<!--', offset)
+    if (start < 0) return visible || Boolean(content.slice(offset).trim())
+    visible ||= Boolean(content.slice(offset, start).trim())
+    const end = content.indexOf('-->', start + 4)
+    if (end < 0) throw new Error('Unterminated documentation comment')
+    offset = end + 3
+  }
+  return visible
+}
+
 export async function checkDocs(root) {
   const documents = new Map()
   for (const [file, headings] of Object.entries(requirements)) {
@@ -25,8 +39,8 @@ export async function checkDocs(root) {
       const index = sections.findIndex((match) => match[1] === heading)
       if (index < 0) throw new Error(`Required section is missing: ${file} / ${heading}`)
       const content = text.slice(sections[index].index + sections[index][0].length,
-        sections[index + 1]?.index ?? text.length).replace(/<!--[\s\S]*?-->/g, '').trim()
-      if (!content) throw new Error(`Required section is empty: ${file} / ${heading}`)
+        sections[index + 1]?.index ?? text.length)
+      if (!hasSectionContent(content)) throw new Error(`Required section is empty: ${file} / ${heading}`)
     }
     documents.set(file, text)
   }

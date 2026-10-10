@@ -546,7 +546,7 @@ Until that is done, a failing workflow alone does not guarantee merges are block
 
 Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 
-- Go minimum: `1.26.6` (from `go.mod`).
+- Go minimum: `1.26.9` (from `go.mod`).
 - Node.js: `24.17.0` (from `.node-version`).
 - Wails CLI: `v3.0.0-beta.8` (from `go.mod`).
 

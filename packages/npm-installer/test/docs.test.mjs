@@ -35,6 +35,16 @@ test('documentation gates reject missing, empty, unfinished and unlinked fixture
     const content = originals.get(spec).replace(/## Goals[\s\S]*?(?=## Scope)/, '## Goals\n\n')
     await writeFile(path.join(fixture, spec), content)
     await assert.rejects(checkDocs(fixture), /section/i)
+    await writeFile(path.join(fixture, spec), originals.get(spec).replace(
+      /## Goals[\s\S]*?(?=## Scope)/,
+      '## Goals\n\n<!-- visible content is missing -->\n<!-- second comment -->\n\n',
+    ))
+    await assert.rejects(checkDocs(fixture), /section/i)
+    await writeFile(path.join(fixture, spec), originals.get(spec).replace(
+      /## Goals[\s\S]*?(?=## Scope)/,
+      '## Goals\n\n<!-- unterminated comment\n\n',
+    ))
+    await assert.rejects(checkDocs(fixture), /comment/i)
     await writeFile(path.join(fixture, spec), originals.get(spec).replace(/## Goals[\s\S]*?(?=## Scope)/, ''))
     await assert.rejects(checkDocs(fixture), /section/i)
     await writeFile(path.join(fixture, spec), originals.get(spec))
