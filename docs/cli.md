@@ -24,7 +24,7 @@ separately. Existing Desktop OAuth authentication also requires the operating
 system credential store; new CLI initialization uses existing Git/SSH credentials
 instead of introducing a login wizard.
 
-Future releases containing this change publish these separate archives:
+Starting with v0.3.6, releases publish these separate archives:
 
 | Platform | Archive |
 | --- | --- |
@@ -95,7 +95,7 @@ a live query of Desktop or an independently verified last successful upload.
 Successful finite commands emit one JSON object:
 
 ```json
-{"schemaVersion":1,"ok":true,"data":{"version":"0.0.0"}}
+{"schemaVersion":1,"ok":true,"data":{"version":"0.3.6"}}
 ```
 
 Errors emit `ok:false` and an `error` with `code` and `message`. Attention-required

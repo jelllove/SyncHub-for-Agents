@@ -8,10 +8,10 @@ configuration and session files through a private GitHub repository.
 ### Headless CLI option
 
 Use the separate [CLI guide](cli.md) for command-line installation, JSON output
-and headless daemon operation. CLI archives do not require desktop GUI runtimes
-and are distinct from the Desktop packages and initial NPM launcher. They share
-the Desktop profile by default; quit Desktop from its tray before CLI operations
-on that profile. Existing releases predating the CLI change do not include it.
+and headless daemon operation. Starting with v0.3.6, CLI archives are published
+separately from Desktop packages and do not require GUI runtimes. They share the
+Desktop profile by default; quit Desktop from its tray before CLI operations on
+that profile. Earlier releases do not include the new headless executable.
 
 ### NPM installation option
 
