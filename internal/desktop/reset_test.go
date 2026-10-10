@@ -64,7 +64,7 @@ func TestResetRemovesSetupAndPreservesUnrelatedData(t *testing.T) {
 	} {
 		resetFile(t, filepath.Join(service.home, filepath.FromSlash(path)))
 	}
-	for _, path := range []string{"providers/notes.txt", "logs/keep.log", "updates/settings.json"} {
+	for _, path := range []string{"providers/notes.txt", "logs/keep.log", "updates/settings.json", "startup-settings.json"} {
 		resetFile(t, filepath.Join(service.home, filepath.FromSlash(path)))
 	}
 	source := filepath.Join(filepath.Dir(service.home), "agent", "settings.json")
@@ -95,6 +95,7 @@ func TestResetRemovesSetupAndPreservesUnrelatedData(t *testing.T) {
 		source, filepath.Join(service.home, "providers", "notes.txt"),
 		filepath.Join(service.home, "logs", "keep.log"),
 		filepath.Join(service.home, "updates", "settings.json"),
+		filepath.Join(service.home, "startup-settings.json"),
 	} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("preserved path %s: %v", path, err)

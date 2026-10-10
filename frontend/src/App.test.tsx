@@ -534,6 +534,7 @@ describe('App settings preview', () => {
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Open settings' }))
     await screen.findByText(/Last refreshed/)
+    await user.click(screen.getByRole('tab', { name: 'Advanced' }))
     await user.click(screen.getByRole('button', { name: 'Reset and start over' }))
     await screen.findByText('C:\\synthetic\\repo')
     await user.type(screen.getByRole('textbox', { name: 'Type RESET to confirm' }), 'RESET')

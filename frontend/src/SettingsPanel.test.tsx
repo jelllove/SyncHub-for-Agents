@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Snapshot } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
@@ -119,12 +119,13 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByRole('dialog', { name: 'Sync settings' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
     expect(screen.getByText('No preview generated yet')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Refresh preview' }))
     expect(refreshPreview).toHaveBeenCalledTimes(1)
   })
 
-  it('shows the persisted preview timestamp and file count', () => {
+  it('shows the persisted preview timestamp and file count', async () => {
     render(
       <SettingsPanel
         snapshot={normalizeSnapshot(snapshot('2026-08-18T09:00:00Z', 7))}
@@ -137,6 +138,7 @@ describe('SettingsPanel', () => {
       />,
     )
 
+    await userEvent.click(screen.getByRole('tab', { name: 'Resources' }))
     expect(screen.getByText(/Last refreshed/)).toBeInTheDocument()
     expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByText('safe files')).toBeInTheDocument()
@@ -175,8 +177,10 @@ describe('SettingsPanel', () => {
     )
     await screen.findByText('v1.0.0')
     const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Repository' }))
     const repository = screen.getByRole('textbox', { name: /Private Git repository/ })
     await user.clear(repository)
+    await user.click(screen.getByRole('tab', { name: 'Desktop' }))
     await user.click(screen.getByRole('checkbox', { name: 'Automatic updates' }))
     await user.click(screen.getByRole('button', { name: 'Check now' }))
 
@@ -190,6 +194,7 @@ describe('SettingsPanel', () => {
       expect(button).toHaveAttribute('type', 'button')
     }
 
+    await user.click(screen.getByRole('tab', { name: 'Repository' }))
     await user.type(repository, 'git@github.com:owner/changed.git')
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     expect(save).toHaveBeenCalledWith(
@@ -227,8 +232,98 @@ describe('SettingsPanel', () => {
       />,
     )
 
+    await userEvent.click(screen.getByRole('tab', { name: 'Desktop' }))
     const restart = await screen.findByRole('button', { name: 'Restart to update' })
     if (disabled) expect(restart).toBeDisabled()
     else expect(restart).toBeEnabled()
+  })
+
+  function renderSettings(save = vi.fn().mockResolvedValue(true)) {
+    render(
+      <SettingsPanel
+        snapshot={normalizeSnapshot(snapshot('2026-08-18T09:00:00Z', 7))}
+        busy={false}
+        previewLoading={false}
+        close={vi.fn()}
+        refreshPreview={vi.fn().mockResolvedValue(undefined)}
+        runSyncNow={vi.fn().mockResolvedValue(undefined)}
+        save={save}
+      />,
+    )
+    return save
+  }
+
+  it('groups controls into five accessible categories without resetting drafts', async () => {
+    startAtLogin.mockResolvedValue(true)
+    const save = renderSettings()
+    const user = userEvent.setup()
+    expect(screen.getByRole('tablist', { name: 'Settings categories' })).toBeVisible()
+    expect(screen.getAllByRole('tab')).toHaveLength(5)
+    expect(screen.getByRole('tab', { name: 'Sync' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('textbox', { name: /Private Git repository/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Repository' }))
+    const repository = screen.getByRole('textbox', { name: /Private Git repository/ })
+    await user.clear(repository)
+    await user.type(repository, 'git@github.com:owner/new.git')
+    await user.click(screen.getByRole('tab', { name: 'Resources' }))
+    await user.click(screen.getByRole('checkbox', { name: /claude.*safety exclusions/i }))
+    await user.click(screen.getByRole('tab', { name: 'Desktop' }))
+    const startup = screen.getByRole('checkbox', { name: /Start with Windows/ })
+    await waitFor(() => expect(startup).toBeChecked())
+    await user.click(startup)
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ repositoryUrl: 'git@github.com:owner/new.git', agents: { claude: false } }),
+      false,
+      true,
+    )
+    expect(updates.status).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports arrow, Home and End navigation with roving keyboard focus', async () => {
+    renderSettings()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Resources' })).toHaveFocus()
+    expect(screen.getByRole('tabpanel', { name: 'Resources' })).toBeVisible()
+    await user.keyboard('{End}')
+    expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Reset and start over' })).toBeVisible()
+    await user.keyboard('{Home}')
+    expect(screen.getByRole('tab', { name: 'Repository' })).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('tab', { name: 'Repository' })).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('reveals and focuses invalid settings from another tab rather than silently blocking save', async () => {
+    const save = renderSettings()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Repository' }))
+    await user.clear(screen.getByRole('textbox', { name: /Private Git repository/ }))
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
+    expect(save).not.toHaveBeenCalled()
+    expect(screen.getByRole('tab', { name: 'Repository' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /Private Git repository/ })).toHaveFocus())
+  })
+
+  it('surfaces startup errors and allows retry without losing other settings', async () => {
+    startAtLogin.mockRejectedValueOnce(new Error('Registry access denied'))
+    renderSettings()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Desktop' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Registry access denied')
+    expect(screen.getByRole('checkbox', { name: /Start with Windows/ })).toBeDisabled()
+    startAtLogin.mockResolvedValue(true)
+    await user.click(screen.getByRole('button', { name: 'Retry startup status' }))
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /Start with Windows/ })).toBeChecked())
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    await user.click(screen.getByRole('tab', { name: 'Desktop' }))
+    expect(screen.getByRole('checkbox', { name: /Start with Windows/ })).toBeChecked()
   })
 })

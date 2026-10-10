@@ -35,13 +35,20 @@ grep -q 'Signature=adhoc' "$evidence/signature.txt"
 [[ "$("$app/Contents/MacOS/SyncHub" --version)" == "$version" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" == "$version" ]]
 lipo "$app/Contents/MacOS/SyncHub" -verify_arch arm64 x86_64
+zip="$package/SyncHub-macOS-universal-adhoc.zip"
+ditto -x -k "$zip" "$evidence/zip"
+zip_app="$evidence/zip/SyncHub.app"
+codesign --verify --deep --strict --verbose=2 "$zip_app"
+diff -qr "$app" "$zip_app"
 hdiutil detach "$evidence/mount"
 mounted=false
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
 architecture="$(uname -m)"
 digest="$(shasum -a 256 "$dmg" | awk '{print $1}')"
-jq -n --arg version "$version" --arg architecture "$architecture" --arg digest "$digest" \
+zip_digest="$(shasum -a 256 "$zip" | awk '{print $1}')"
+jq -n --arg version "$version" --arg architecture "$architecture" --arg digest "$digest" --arg zipDigest "$zip_digest" \
   '{version:$version,architecture:$architecture,originalDMGDigest:$digest,installedFromDMG:true,
+    originalZIPDigest:$zipDigest,archiveContentsMatch:true,
     adHocSignatureVerified:true,executableVersionVerified:true,isolatedHome:true}' > "$evidence/installation.json"
 set +e
 xcodebuild test -project "$project/NativeSmoke.xcodeproj" -scheme NativeSmoke \

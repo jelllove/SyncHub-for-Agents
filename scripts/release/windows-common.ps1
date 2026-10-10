@@ -79,3 +79,31 @@ function Get-WindowsSigningMode {
     }
     return 'signed'
 }
+
+function Write-WindowsPortableBundle {
+    param(
+        [Parameter(Mandatory)][string]$Executable,
+        [Parameter(Mandatory)][string]$License,
+        [Parameter(Mandatory)][string]$Output
+    )
+
+    foreach ($file in @($Executable, $License)) {
+        $item = Get-Item -LiteralPath $file
+        if ($item.PSIsContainer -or $item.Length -eq 0) { throw "Missing or empty portable bundle input: $file." }
+    }
+    Compress-Archive -LiteralPath $Executable, $License -DestinationPath $Output -Force
+}
+
+function Write-ReleaseChecksums {
+    param(
+        [Parameter(Mandatory)][string[]]$Files,
+        [Parameter(Mandatory)][string]$Output
+    )
+
+    $lines = foreach ($file in $Files) {
+        $item = Get-Item -LiteralPath $file
+        if ($item.PSIsContainer -or $item.Length -eq 0) { throw "Missing or empty release asset: $file." }
+        (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $item.Name
+    }
+    $lines | Set-Content -LiteralPath $Output -Encoding ascii
+}

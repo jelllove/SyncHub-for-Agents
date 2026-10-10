@@ -12,6 +12,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  cli:
+    uses: ./.github/workflows/cli.yml
+    with:
+      version: ${{ github.ref_name }}
+
   windows:
     runs-on: windows-2025
     environment: release
@@ -58,13 +63,24 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          go test . ./internal/updater ./internal/desktop ./internal/scheduler ./internal/daemon
-          npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
+          go test . ./internal/updater ./internal/startup ./internal/desktop ./internal/scheduler ./internal/daemon ./internal/tray ./internal/tray/desktop
+          npm --prefix frontend test -- --run src/UpdatePanel.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx src/TrayTip.test.tsx
+      - name: Verify requested UI is embedded in the packaged executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $embedded = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes('bin\SyncHub.exe'))
+          foreach ($marker in @('Settings categories', 'settings-tabs', 'tray-tip:status')) {
+            if (-not $embedded.Contains($marker)) {
+              throw "Packaged executable is missing requested UI resource: $marker"
+            }
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-windows
           path: |
             bin/SyncHub-for-Agents-Setup-x64.exe
+            bin/SyncHub-for-Agents-Windows-x64.zip
             bin/SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -121,16 +137,27 @@ jobs:
             --entitlements build/darwin/entitlements.plist \
             --sign "$SIGNING_IDENTITY" bin/SyncHub.app
           codesign --verify --deep --strict --verbose=2 bin/SyncHub.app
+          lipo bin/SyncHub.app/Contents/MacOS/SyncHub -verify_arch arm64 x86_64
+          ditto -c -k --sequesterRsrc --keepParent bin/SyncHub.app "$RUNNER_TEMP/notarization.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarization.zip" --wait \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+          xcrun stapler staple bin/SyncHub.app
+          xcrun stapler validate bin/SyncHub.app
+          wails3 task darwin:create:zip ARCH=universal
           wails3 task darwin:create:dmg
           codesign --force --timestamp --sign "$SIGNING_IDENTITY" bin/SyncHub.dmg
           xcrun notarytool submit bin/SyncHub.dmg --wait \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
           xcrun stapler staple bin/SyncHub.dmg
           xcrun stapler validate bin/SyncHub.dmg
+          test -s bin/SyncHub.dmg
+          test -s bin/SyncHub-macos-universal.zip
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-macos
-          path: bin/SyncHub.dmg
+          path: |
+            bin/SyncHub.dmg
+            bin/SyncHub-macos-universal.zip
           if-no-files-found: error
 
   linux:
@@ -161,6 +188,9 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           wails3 package GOOS=linux ARCH=amd64 VERSION="$version" GITHUB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+          test -s bin/SyncHub-x86_64.AppImage
+          test -s bin/SyncHub-linux-x64.tar.gz
+          find bin -maxdepth 1 -name '*.deb' -size +0c | grep -q .
       - name: Verify RPM installation and dependencies on Fedora
         run: bash scripts/smoke/linux-rpm-install.sh bin/SyncHub.rpm "${GITHUB_REF_NAME#v}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -169,14 +199,16 @@ jobs:
           path: |
             bin/*.AppImage
             bin/*.deb
+            bin/*.tar.gz
             bin/*.rpm
           if-no-files-found: error
 
   publish:
-    needs: [windows, macos, linux]
+    needs: [windows, macos, linux, cli]
     if: >-
       always() && !cancelled() &&
       needs.windows.result == 'success' &&
+      needs.cli.result == 'success' &&
       (needs.macos.result == 'success' || needs.macos.result == 'skipped') &&
       (needs.linux.result == 'success' || needs.linux.result == 'skipped')
     runs-on: ubuntu-24.04
@@ -197,8 +229,13 @@ jobs:
         working-directory: dist
         run: |
           test -s SyncHub-for-Agents-Setup-x64.exe
+          test -s SyncHub-CLI-windows-x64.zip
+          test -s SyncHub-CLI-macos-arm64.tar.gz
+          test -s SyncHub-CLI-macos-x64.tar.gz
+          test -s SyncHub-CLI-linux-x64.tar.gz
           sha256sum --check SHA256SUMS.txt
-          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' |
+          for manifest in SHA256SUMS-cli-*.txt; do sha256sum --check "$manifest"; done
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS*.txt' -printf '%f\0' |
             sort -z | xargs -0 sha256sum > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - name: Publish GitHub release

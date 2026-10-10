@@ -35,6 +35,10 @@ func NewGitClient(home, repositoryURL, dir string) (*gitclient.Client, error) {
 	}
 	client.AuthMode = gitclient.AuthOAuth
 	client.Executable = executable
+	client.CredentialHome, err = filepath.Abs(home)
+	if err != nil {
+		return nil, err
+	}
 	return client, nil
 }
 

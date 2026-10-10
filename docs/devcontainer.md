@@ -53,7 +53,7 @@ multi-platform **index** identities, resolved on 2026-09-17:
 
 | Input | Pinned image |
 | --- | --- |
-| Go 1.26.6 | `docker.io/library/golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36` |
+| Go 1.26.9 | `docker.io/library/golang:1.26.9-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c` |
 | Node 24.17.0, including npm/npx | `docker.io/library/node:24.17.0-bookworm-slim@sha256:862263c612aa437e3037674b85419622a9d93bff80aa1eee5398dfe686375532` |
 | Ubuntu 24.04 developer base | `mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae` |
 

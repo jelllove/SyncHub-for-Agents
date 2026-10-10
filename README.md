@@ -2,7 +2,7 @@
 
 ![SyncHub for Agents hackathon poster](backup/hackathon-media-20260821/final/hackathon-poster.png)
 
-SyncHub for Agents is a desktop tray app that keeps AI agent configuration and session data synchronized across multiple computers.
+SyncHub for Agents keeps AI agent configuration and session data synchronized across multiple computers, through a desktop tray app or a standalone headless CLI.
 
 It uses a private Git repository you control as the synchronization bridge, with strict safety filters so credentials and machine-specific state stay local.
 
@@ -10,12 +10,16 @@ It uses a private Git repository you control as the synchronization bridge, with
 
 - Synchronize agent resources (sessions, config, instructions, skills, plugin declarations).
 - Run as a desktop/tray app with clear status states: Ready, Updating, Sync complete, Paused, Needs attention.
+- Show non-activating Windows tray activity tips with phase icons/text for pulling,
+  scanning, comparing, applying and pushing, plus completion/error feedback.
 - Sync periodically in the background and on-demand.
+- Run without a GUI through `synchub`, with local previews, diagnostics,
+  one-shot synchronization, a headless daemon, and versioned JSON output.
 - Propagate deletions across machines with a configurable recovery window.
 - Resolve conflicts with local/remote/merged choices and batch apply.
 - Review and approve plugin/skill install operations before execution, with explicit retry for failed operations.
 - Select which agents and resource categories are included, plus custom resource directories.
-- Start automatically at login.
+- Start automatically at login, enabled by default in Windows releases with an opt-out.
 - Check GitHub Releases automatically and securely download Windows x64 updates
   for installation when you quit the app.
 
@@ -104,7 +108,108 @@ executable and keep it at a permanent path.
 Approve an unnotarized macOS app only if you trust its source; do not disable
 system-wide security.
 
+## Desktop packages
+
+The packaging workflows provide the following outputs. Actual release availability
+depends on the maintainer enabling the platform jobs; see the
+[package matrix and validation scope](docs/install.md#package-matrix-and-validation-scope).
+
+| Platform | Architecture | Main package | Alternative |
+| --- | --- | --- | --- |
+| Windows | x64 | `.exe` per-user installer | Portable `.zip` |
+| macOS | Apple Silicon ARM64 + Intel x64 | Universal `.dmg` | Universal `.zip` containing the app bundle |
+| Linux | x64 | `.deb` for the Ubuntu 24.04 validation target | `.AppImage`, `.tar.gz`; `.rpm` alternative with Fedora 43 container installation checks |
+
+Native CI packaging covers Windows, both macOS architectures, and Ubuntu 24.04.
+That configured coverage is not evidence that every release passed on every OS.
+
+## Headless CLI
+
+Starting with **v0.3.6**, releases include a separate `synchub` command-line
+executable alongside the existing Desktop UI. It shares the synchronization
+engine, credential exclusion, conflict protection and installation-approval
+rules, without requiring Wails, WebView2, GTK, WebKitGTK or Node. Git must be
+installed separately.
+
+Download the archive for your OS from the
+[v0.3.6 release](https://github.com/jelllove/SyncHub-for-Agents/releases/tag/v0.3.6),
+verify it using `SHA256SUMS.txt`, extract `synchub-cli`, and add that directory to
+your user `PATH` or invoke the executable by its full path:
+
+| Platform | CPU | CLI archive |
+| --- | --- | --- |
+| Windows | x64 | `SyncHub-CLI-windows-x64.zip` |
+| macOS | Apple Silicon ARM64 | `SyncHub-CLI-macos-arm64.tar.gz` |
+| macOS | Intel x64 | `SyncHub-CLI-macos-x64.tar.gz` |
+| Linux | x64 | `SyncHub-CLI-linux-x64.tar.gz` |
+
+```text
+synchub version --json
+synchub doctor --json
+synchub status --json
+synchub plan --json
+synchub sync --json
+synchub daemon
+```
+
+For a new profile, initialize it through your existing Git/SSH authentication:
+
+```text
+synchub init --repo git@github.com:example-user/private-agent-sync.git --first-sync merge-cloud-local
+```
+
+**Already using Desktop? Do not run `init` again.** Both entry points use
+`~/.synchub` by default. Quit Desktop from its tray before CLI operations on the
+same profile; closing its window is not enough. Desktop and daemon hold an
+OS-backed ownership lock, and a competing CLI command returns exit **3 (busy)**
+instead of starting a second writer. `--home` selects another explicit profile,
+which must not share a clone or overlapping resources with a running profile.
+
+`plan` is a **local-only preview**: it does not fetch remote changes or apply
+actions. `sync` returns exit **4 (needs attention)** for unresolved conflicts,
+blocked resources or pending installation approval, rather than claiming complete
+success. Complex conflict editing remains in Desktop. CLI packages are
+unsigned/not notarized, independently of any Desktop signing.
+
+See the [CLI guide](docs/cli.md) for JSON/error contracts, first-sync choices,
+installation and source builds, and the [architecture guide](docs/architecture.md)
+for Desktop/CLI safety boundaries. Older releases do not include this CLI.
+
+## Desktop improvements in v0.3.7
+
+This version integrates the previously requested Desktop changes alongside CLI:
+
+- **Settings categories:** Repository, Sync, Resources, Desktop and Advanced tabs,
+  with keyboard navigation and preserved drafts when switching categories.
+- **Windows start at login:** enabled once on the first release launch, with
+  persisted opt-outs and no automatic registration for developer builds.
+- **Update checks:** bounded retries for transient GitHub request failures,
+  including TLS handshake timeouts; certificate and download verification remain.
+- **Tray activity feedback:** a persistent tray icon and non-activating Windows
+  tips for pulling, scanning, applying and pushing, plus completion/error status.
+  macOS/Linux update icons and tooltips but do not show the Windows popup.
+
+These changes are in v0.3.7, not the earlier v0.3.6 CLI release. Installing the
+same older release again will not enable the new settings tabs. See the
+[installation guide](docs/install.md) for startup/update behavior.
+
 ## Software updates
+
+An optional [NPM installer/launcher](packages/npm-installer/README.md) is available
+as a separately validated package. It pins existing desktop release archives,
+does not compile Go/Wails on the user's machine, and retains native OS prerequisites.
+Public availability must be confirmed after NPM publishing succeeds.
+
+Wrapper 0.1.1 pins Desktop v0.3.7. Until public NPM authentication is available,
+download `synchub-for-agents-0.1.1.tgz` from the release and install that local
+tarball:
+
+```text
+npm install -g ./synchub-for-agents-0.1.1.tgz --registry=https://registry.npmjs.org/
+```
+
+This installs Desktop, not the headless `synchub` CLI; it does not launch the app
+during installation.
 
 Starting with v0.3.0, release builds check
 [GitHub Releases](https://github.com/jelllove/SyncHub-for-Agents/releases/latest)

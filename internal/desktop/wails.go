@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -156,13 +157,19 @@ func (s *WailsService) RetryConflictBatch(id string) error {
 }
 
 func (s *WailsService) SetStartAtLogin(enabled bool) error {
-	if enabled {
-		return s.startup.Enable()
+	if s.startup == nil {
+		return errors.New("startup manager is not initialized")
 	}
-	return s.startup.Disable()
+	return s.startup.SetEnabled(enabled)
 }
 
 func (s *WailsService) StartAtLogin() (bool, error) {
+	if s.startup == nil {
+		return false, errors.New("startup manager is not initialized")
+	}
+	if err := s.startup.InitializeDefault(); err != nil {
+		return false, err
+	}
 	return s.startup.IsEnabled()
 }
 

@@ -55,11 +55,14 @@ dmg="SyncHub-macOS-universal-adhoc.dmg"
 hdiutil create -volname "SyncHub $version (ad-hoc)" -srcfolder "$output/dmg-root" \
   -format UDZO "$output/$dmg"
 hdiutil verify "$output/$dmg"
+zip="SyncHub-macOS-universal-adhoc.zip"
+ditto -c -k --sequesterRsrc --keepParent "$app" "$output/$zip"
 [[ "$before" == "$(shasum -a 256 go.mod go.sum frontend/package.json frontend/package-lock.json)" ]]
 cd "$output"
-shasum -a 256 "$dmg" > SHA256SUMS-macOS.txt
+shasum -a 256 "$dmg" "$zip" > SHA256SUMS-macOS.txt
 digest="$(shasum -a 256 "$dmg" | awk '{print $1}')"
-jq -n --arg tag "$tag" --arg commit "$source_commit" --arg digest "$digest" \
-  '{tag:$tag, sourceCommit:$commit, dmgSHA256:$digest, signature:"ad-hoc", notarized:false, architectures:["arm64","x86_64"]}' \
+zip_digest="$(shasum -a 256 "$zip" | awk '{print $1}')"
+jq -n --arg tag "$tag" --arg commit "$source_commit" --arg digest "$digest" --arg zipDigest "$zip_digest" \
+  '{tag:$tag, sourceCommit:$commit, dmgSHA256:$digest, zipSHA256:$zipDigest, signature:"ad-hoc", notarized:false, architectures:["arm64","x86_64"]}' \
   > build-receipt.json
 echo "Built $output/$dmg. AD-HOC signed, NOT notarized; Gatekeeper may block first launch."

@@ -16,7 +16,7 @@ on:
         required: true
         default: v0.3.4
       publish:
-        description: Upload the DMG only after both installed-app UI tests pass
+        description: Upload DMG and ZIP only after both installed-app UI tests pass
         type: boolean
         default: false
 
@@ -69,6 +69,7 @@ jobs:
           name: macos-adhoc-package
           path: |
             ${{ runner.temp }}/macos-package/SyncHub-macOS-universal-adhoc.dmg
+            ${{ runner.temp }}/macos-package/SyncHub-macOS-universal-adhoc.zip
             ${{ runner.temp }}/macos-package/SHA256SUMS-macOS.txt
             ${{ runner.temp }}/macos-package/build-receipt.json
             ${{ runner.temp }}/macos-package/signature.txt

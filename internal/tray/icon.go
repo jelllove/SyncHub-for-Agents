@@ -69,7 +69,12 @@ func pngsToICO(images [][]byte, sizes []int) []byte {
 	return ico
 }
 
-// Icon returns tray icon bytes in the format the OS expects.
+// PNGIcon supplies the image-resource bytes required by Wails' native icon loader.
+func PNGIcon(state scheduler.State) []byte {
+	return bytes.Clone(assetPNG(state, 32))
+}
+
+// Icon returns tray icon bytes in the format the legacy systray backend expects.
 func Icon(state scheduler.State, goos string) []byte {
 	if goos != "windows" {
 		return bytes.Clone(assetPNG(state, 32))

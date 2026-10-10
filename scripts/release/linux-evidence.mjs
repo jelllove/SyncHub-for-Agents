@@ -6,6 +6,7 @@ import { validateTag } from './macos-evidence.mjs'
 
 const legacyNames = ['SyncHub-x86_64.AppImage', 'SyncHub.deb']
 const packageNames = [...legacyNames, 'SyncHub.rpm']
+const archiveNames = [...packageNames, 'SyncHub-linux-x64.tar.gz']
 const manifestName = 'SHA256SUMS-Linux.txt'
 
 export function packageVersion(tag, format) {
@@ -18,18 +19,19 @@ export function packageVersion(tag, format) {
 }
 
 export function publishedPackageMode(assets) {
-  const relevant = assets.filter((asset) => [...packageNames, manifestName].includes(asset.name))
+  const relevant = assets.filter((asset) => [...archiveNames, manifestName].includes(asset.name))
   const names = relevant.map((asset) => asset.name)
   if (names.length === 0) return 'build'
   if (new Set(names).size !== names.length) throw new Error('Duplicate Linux release asset set')
   if (names.length === 3 && [...legacyNames, manifestName].every((name) => names.includes(name))) return 'legacy'
   if (names.length === 4 && [...packageNames, manifestName].every((name) => names.includes(name))) return 'complete'
+  if (names.length === 5 && [...archiveNames, manifestName].every((name) => names.includes(name))) return 'archives'
   throw new Error('Incomplete Linux release asset set')
 }
 
 export function verifyPackageManifest(directory, mode) {
-  if (!['legacy', 'complete'].includes(mode)) throw new Error('Invalid Linux package verification mode')
-  const expected = mode === 'legacy' ? legacyNames : packageNames
+  if (!['legacy', 'complete', 'archives'].includes(mode)) throw new Error('Invalid Linux package verification mode')
+  const expected = mode === 'legacy' ? legacyNames : mode === 'archives' ? archiveNames : packageNames
   const lines = readFileSync(join(directory, manifestName), 'utf8').trim().split(/\r?\n/)
   const found = new Set()
   for (const line of lines) {

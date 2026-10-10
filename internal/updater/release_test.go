@@ -3,15 +3,21 @@ package updater
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type transportFunc func(*http.Request) (*http.Response, error)
@@ -199,5 +205,163 @@ func TestReadLimitsAndBinaryChecksumFormat(t *testing.T) {
 	line := strings.Replace(sumLine("installer"), "  ", " *", 1)
 	if _, err := installerChecksum([]byte(line)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type handshakeTimeout struct{}
+
+func (handshakeTimeout) Error() string   { return "net/http: TLS handshake timeout" }
+func (handshakeTimeout) Timeout() bool   { return true }
+func (handshakeTimeout) Temporary() bool { return true }
+
+func TestUpdateRequestRecoversFromTLSHandshakeTimeout(t *testing.T) {
+	attempts := 0
+	client := &releaseClient{http: &http.Client{Transport: transportFunc(func(req *http.Request) (*http.Response, error) {
+		attempts++
+		if req.Header.Get("Authorization") != "" {
+			t.Fatal("retries must not send private repository credentials")
+		}
+		if attempts < 3 {
+			return nil, handshakeTimeout{}
+		}
+		return response(`{"tag_name":"v0.3.5","assets":[]}`), nil
+	})}}
+	release, err := client.latest(context.Background())
+	if err != nil || release.Tag != "v0.3.5" || attempts != 3 {
+		t.Fatalf("release = %#v, attempts = %d, error = %v", release, attempts, err)
+	}
+}
+
+func TestUpdateRequestRetriesAreBoundedAndCancellationIsPreserved(t *testing.T) {
+	attempts := 0
+	client := &releaseClient{http: &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		attempts++
+		return nil, handshakeTimeout{}
+	})}}
+	if _, err := client.latest(context.Background()); err == nil ||
+		!strings.Contains(err.Error(), "3 attempts") ||
+		!strings.Contains(err.Error(), "proxy") || attempts != 3 {
+		t.Fatalf("attempts = %d, error = %v", attempts, err)
+	}
+	attempts = 0
+	ctx, cancel := context.WithCancel(context.Background())
+	client.http.Transport = transportFunc(func(*http.Request) (*http.Response, error) {
+		attempts++
+		cancel()
+		return nil, handshakeTimeout{}
+	})
+	if _, err := client.latest(ctx); !errors.Is(err, context.Canceled) || attempts != 1 {
+		t.Fatalf("cancellation: attempts = %d, error = %v", attempts, err)
+	}
+}
+
+type trackedResponseBody struct {
+	io.Reader
+	closed bool
+}
+
+func (body *trackedResponseBody) Close() error {
+	body.closed = true
+	return nil
+}
+
+func TestUpdateRequestRetriesTransientHTTPErrorsOnly(t *testing.T) {
+	for _, code := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusForbidden, http.StatusNotFound} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			attempts := 0
+			body := &trackedResponseBody{Reader: strings.NewReader("temporary outage")}
+			client := &releaseClient{http: &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+				attempts++
+				if attempts == 1 {
+					return &http.Response{StatusCode: code, Body: body}, nil
+				}
+				return response(`{"tag_name":"v0.3.5","assets":[]}`), nil
+			})}}
+			_, err := client.latest(context.Background())
+			transient := code >= 500
+			if (err == nil) != transient || !body.closed || (transient && attempts != 2) || (!transient && attempts != 1) {
+				t.Fatalf("attempts = %d, body closed = %v, error = %v", attempts, body.closed, err)
+			}
+		})
+	}
+}
+
+func TestUpdaterHasExplicitBoundedTLSAndMetadataTimeouts(t *testing.T) {
+	client := newReleaseClient()
+	transport, ok := client.http.Transport.(*http.Transport)
+	if !ok || transport.TLSHandshakeTimeout != 20*time.Second ||
+		transport.ResponseHeaderTimeout != 30*time.Second || transport.Proxy == nil ||
+		(transport.TLSClientConfig != nil && transport.TLSClientConfig.InsecureSkipVerify) {
+		t.Fatalf("unsafe or missing transport limits: %#v", client.http.Transport)
+	}
+	client.http.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
+		deadline, ok := req.Context().Deadline()
+		remaining := time.Until(deadline)
+		if !ok || remaining < 89*time.Second || remaining > 90*time.Second {
+			t.Errorf("metadata request budget = %v, present = %v", remaining, ok)
+		}
+		return response(`{"tag_name":"v0.3.5","assets":[]}`), nil
+	})
+	if _, err := client.latest(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateRequestRecoversFromARealStalledTLSHandshake(t *testing.T) {
+	var handshakes atomic.Int32
+	releaseFirstHandshake := make(chan struct{})
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"tag_name":"v0.3.5","assets":[]}`)
+	}))
+	server.TLS = &tls.Config{
+		GetConfigForClient: func(*tls.ClientHelloInfo) (*tls.Config, error) {
+			if handshakes.Add(1) == 1 {
+				<-releaseFirstHandshake
+			}
+			return nil, nil
+		},
+	}
+	server.StartTLS()
+	defer server.Close()
+	defer close(releaseFirstHandshake)
+	transport := server.Client().Transport.(*http.Transport).Clone()
+	transport.TLSHandshakeTimeout = 100 * time.Millisecond
+	client := &releaseClient{http: &http.Client{Transport: transport}}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	resp, err := client.get(ctx, server.URL)
+	if err != nil {
+		t.Fatalf("real TLS timeout did not recover: %v", err)
+	}
+	defer resp.Body.Close()
+	if handshakes.Load() < 2 {
+		t.Fatal("the stalled TLS handshake was not retried")
+	}
+}
+
+func TestUpdateRequestDoesNotRetryCertificateFailures(t *testing.T) {
+	attempts := 0
+	client := &releaseClient{http: &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		attempts++
+		return nil, x509.UnknownAuthorityError{}
+	})}}
+	if _, err := client.latest(context.Background()); err == nil || attempts != 1 {
+		t.Fatalf("certificate failure: attempts = %d, error = %v", attempts, err)
+	}
+}
+
+func TestUpdateRequestCancelsDuringRetryDelay(t *testing.T) {
+	attempts := 0
+	client := &releaseClient{
+		retryDelay: time.Hour,
+		http: &http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+			attempts++
+			return nil, handshakeTimeout{}
+		})},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := client.latest(ctx); !errors.Is(err, context.DeadlineExceeded) || attempts != 1 {
+		t.Fatalf("retry delay cancellation: attempts = %d, error = %v", attempts, err)
 	}
 }

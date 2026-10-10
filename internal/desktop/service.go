@@ -62,6 +62,7 @@ type Service struct {
 	stateObservers         map[uint64]*stateObserver
 	nextProgressObserverID uint64
 	progressObservers      map[uint64]func(Progress)
+	cycleObservers         map[uint64]func(daemon.CycleResult)
 	previewCollector       func(context.Context, config.Config, []provider.Provider) (ResourcePreview, error)
 	previewCoordinator     *previewCoordinator
 	previewMu              sync.Mutex
@@ -79,6 +80,7 @@ func New(home, goos string) (*Service, error) {
 		start:             make(chan *daemon.Daemon, 1),
 		stateObservers:    make(map[uint64]*stateObserver),
 		progressObservers: make(map[uint64]func(Progress)),
+		cycleObservers:    make(map[uint64]func(daemon.CycleResult)),
 	}
 	service.previewCollector = service.collectPreview
 	service.previewCoordinator = newPreviewCoordinator(service.refreshPreview)
@@ -193,7 +195,6 @@ func (s *Service) SubscribeProgress(callback func(Progress)) func() {
 
 func (s *Service) recordCycle(result daemon.CycleResult) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	store := newSummaryStore(s.home)
 	if result.Error == "" {
 		if err := store.save("successful-cycle.json", result); err != nil {
@@ -213,6 +214,16 @@ func (s *Service) recordCycle(result daemon.CycleResult) {
 	s.last = result
 	if result.Error == "" {
 		s.progress = cycleProgress(result)
+	}
+	observed := result
+	observed.NeedsAttention = cycleNeedsAttention(result, s.noticeReview)
+	observers := make([]func(daemon.CycleResult), 0, len(s.cycleObservers))
+	for _, observer := range s.cycleObservers {
+		observers = append(observers, observer)
+	}
+	s.mu.Unlock()
+	for _, observer := range observers {
+		observer(observed)
 	}
 }
 
