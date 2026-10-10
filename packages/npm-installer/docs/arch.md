@@ -6,6 +6,8 @@ The NPM package is an installation and process-launch adapter for existing
 desktop release binaries. It does not implement synchronization or the Wails UI.
 The public NPM registry supplies JavaScript; official GitHub release URLs supply
 the pinned native archive. TLS and the shipped archive hashes are trust boundaries.
+Wrapper 0.1.1 pins the independently verified v0.3.7 assets; changing wrapper
+metadata does not rebuild or move the immutable Desktop release tag.
 
 ## Module responsibilities
 

@@ -1,7 +1,8 @@
 # SyncHub for Agents NPM installer
 
 A lightweight installer and launcher for the prebuilt SyncHub desktop app.
-Wrapper 0.1.0 installs desktop **v0.3.5**, not uncommitted development changes.
+Wrapper 0.1.1 installs desktop **v0.3.7**, including settings tabs, startup
+preferences, updater retries and tray activity feedback.
 Public registry availability must be confirmed after publishing.
 
 ## Install and run
@@ -30,7 +31,7 @@ synchub-for-agents --install
 
 Windows supports x64 and needs Microsoft Edge WebView2 Runtime. macOS supports
 Intel x64 and Apple Silicon using a Universal app, minimum build target macOS 12.
-The v0.3.5 macOS binary is ad-hoc signed, not Developer ID signed or notarized;
+The v0.3.7 macOS binary is ad-hoc signed, not Developer ID signed or notarized;
 do not disable Gatekeeper or other system security to run an untrusted download.
 Linux supports x64 and needs Git, GTK4 and WebKitGTK 6.0. Ubuntu 24.04 x64 is the
 verified startup target; other distributions are not guaranteed.
@@ -44,7 +45,7 @@ enabled with `NODE_USE_ENV_PROXY=1` when a proxy is required.
 ## Updates and uninstall
 
 To remain NPM-managed, disable **Automatic updates** in the desktop settings:
-the v0.3.5 Windows desktop updater uses an NSIS installer, not NPM.
+the Windows desktop updater uses an NSIS installer, not NPM.
 Update through NPM after a newer wrapper/native release has been published.
 Quit the app and disable its start-at-login setting before uninstalling:
 
@@ -72,3 +73,13 @@ Do not use the internal corporate registry or place tokens in this directory.
 
 See the [specification](docs/spec.md), [architecture](docs/arch.md), and
 [project guidance](AGENTS.md) for scope, constraints and acceptance criteria.
+
+Public NPM publishing remains authentication-dependent. The GitHub release also
+provides `synchub-for-agents-0.1.1.tgz` for local-tarball installation:
+
+```text
+npm install -g ./synchub-for-agents-0.1.1.tgz --registry=https://registry.npmjs.org/
+synchub-for-agents --version
+```
+
+This wrapper launches Desktop, not the separate `synchub` headless CLI.

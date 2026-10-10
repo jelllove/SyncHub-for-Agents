@@ -17,7 +17,7 @@ that profile. Earlier releases do not include the new headless executable.
 
 The [NPM installer package](../packages/npm-installer/README.md) provides a
 download-verifying launcher rather than compiling the desktop app through Node.
-Its initial wrapper 0.1.0 pins desktop v0.3.5 and supports Windows x64, macOS
+Wrapper 0.1.1 pins desktop v0.3.7 and supports Windows x64, macOS
 Universal x64/ARM64, and Linux x64. It downloads only official release archives,
 validates size/SHA-256 and rejects unsafe extraction. Installing does not open
 the app or modify startup settings. NPM publication requires an authenticated
@@ -34,13 +34,13 @@ synchub-for-agents
 For a verified local tarball:
 
 ```text
-npm install -g ./synchub-for-agents-0.1.0.tgz
+npm install -g ./synchub-for-agents-0.1.1.tgz --registry=https://registry.npmjs.org/
 ```
 
 The existing platform prerequisites below still apply. NPM does not supply
 WebView2 or Linux GTK4/WebKitGTK, notarize macOS binaries, or create OS shortcuts.
 The launcher stays in the foreground until you quit the desktop app. Disable
-desktop automatic updates if you want to remain NPM-managed, because v0.3.5
+desktop automatic updates if you want to remain NPM-managed, because current
 Windows updates use NSIS instead of NPM. Quit and disable start-at-login before
 uninstalling the NPM package; user data is never deleted by this wrapper.
 
