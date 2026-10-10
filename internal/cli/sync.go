@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
+
+var ErrFirstSyncChoiceRequired = errors.New("first sync strategy is required before synchronizing")
 
 // RunSync loads settings from home and performs one sync pass for goos.
 func RunSync(home, goos string) (syncengine.Result, error) {
@@ -52,7 +55,7 @@ func runSyncWithUserHome(
 		return syncengine.Result{}, fmt.Errorf("resolve repository directory: %w", err)
 	}
 	if !cfg.FirstSync.Completed && strings.TrimSpace(cfg.FirstSync.Strategy) == config.FirstSyncStrategyChoose {
-		return syncengine.Result{}, fmt.Errorf("first sync strategy is required before synchronizing")
+		return syncengine.Result{}, ErrFirstSyncChoiceRequired
 	}
 
 	client, err := NewGitClient(home, cfg.RepoURL, repoDir)

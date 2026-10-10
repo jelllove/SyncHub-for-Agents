@@ -1,181 +1,60 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"runtime"
-	"time"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
-	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
-	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
-	"github.com/qinqingxu/synchub-for-agents/internal/repository"
-	legacytray "github.com/qinqingxu/synchub-for-agents/internal/tray/legacy"
-	"github.com/spf13/cobra"
 )
 
 func main() {
+	if len(os.Args) == 3 && os.Args[1] == "--git-credential" {
+		if err := cli.RunCredential(os.Args[2], os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, "credential helper:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	root := newRootCommand()
-	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := root.ExecuteContext(ctx); err != nil {
+		failure := asCommandError(err)
+		if !failure.reported {
+			if flagErr := root.PersistentFlags().Set("json", strconv.FormatBool(requestedJSON(os.Args[1:]))); flagErr != nil {
+				fmt.Fprintln(os.Stderr, "output mode:", flagErr)
+				os.Exit(1)
+			}
+			reportCommandError(root, failure)
+		}
+		os.Exit(failure.Code)
 	}
 }
 
-func newRootCommand() *cobra.Command {
-	root := &cobra.Command{
-		Use:   "synchub",
-		Short: "Sync AI agent config and session files across machines via a private GitHub repo",
+func requestedJSON(args []string) bool {
+	enabled := false
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--" {
+			break
+		}
+		switch arg {
+		case "--home", "--repo", "--first-sync", "--agents":
+			index++
+		case "--json":
+			enabled = true
+		default:
+			if value, ok := strings.CutPrefix(arg, "--json="); ok {
+				if parsed, err := strconv.ParseBool(value); err == nil {
+					enabled = parsed
+				}
+			}
+		}
 	}
-	root.AddCommand(initCmd(), syncCmd(), statusCmd(), daemonCmd(), trayCmd(), installCmd(), uninstallCmd(), credentialCmd())
-	return root
-}
-
-func credentialCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:    "git-credential [get|store|erase]",
-		Hidden: true,
-		Args:   cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cli.RunCredential(args[0], os.Stdin, os.Stdout)
-		},
-	}
-}
-
-func initCmd() *cobra.Command {
-	var repo string
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize SyncHub: bind a private repo, clone it, detect agents",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			home, err := cli.Home()
-			if err != nil {
-				return err
-			}
-			setup := &repository.Setup{Client: &gitclient.Client{}}
-			if err := cli.RunInit(home, repo, setup); err != nil {
-				return err
-			}
-			fmt.Printf("Initialized SyncHub at %s (repo: %s)\n", home, repo)
-			return nil
-		},
-	}
-	cmd.Flags().StringVar(&repo, "repo", "", "private git repo URL (required)")
-	_ = cmd.MarkFlagRequired("repo")
-	return cmd
-}
-
-func syncCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "sync",
-		Short: "Run one sync pass now",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			home, err := cli.Home()
-			if err != nil {
-				return err
-			}
-			res, err := cli.RunSync(home, runtime.GOOS)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Sync complete: %d actions, %d blocked, pushed=%v\n",
-				len(res.Actions), len(res.Blocked), res.Pushed)
-			return nil
-		},
-	}
-}
-
-func statusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show current sync status",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			home, err := cli.Home()
-			if err != nil {
-				return err
-			}
-			st, err := cli.RunStatus(home, runtime.GOOS)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Repo:            %s\n", st.RepoURL)
-			fmt.Printf("Enabled agents:  %v\n", st.EnabledAgents)
-			if st.LastSync.IsZero() {
-				fmt.Println("Last sync:       never")
-			} else {
-				fmt.Printf("Last sync:       %s\n", st.LastSync.Format(time.RFC3339))
-			}
-			fmt.Printf("Pending actions: %d\n", st.PendingActions)
-			return nil
-		},
-	}
-}
-
-func daemonCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "daemon",
-		Short: "Run the sync daemon (periodic sync + trash cleanup) until stopped",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			home, err := cli.Home()
-			if err != nil {
-				return err
-			}
-			return daemon.RunWithSignals(home, runtime.GOOS)
-		},
-	}
-}
-
-func trayCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "tray",
-		Short: "Run SyncHub with a system-tray icon (daemon + UI)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			home, err := cli.Home()
-			if err != nil {
-				return err
-			}
-			return legacytray.Run(home, runtime.GOOS)
-		},
-	}
-}
-
-func installCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "install",
-		Short: "Enable SyncHub to start automatically at login",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			exe, err := os.Executable()
-			if err != nil {
-				return err
-			}
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-			path, err := cli.RunInstall(runtime.GOOS, userHome, exe)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Autostart enabled: %s\n", path)
-			return nil
-		},
-	}
-}
-
-func uninstallCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "uninstall",
-		Short: "Disable SyncHub autostart",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				return err
-			}
-			if err := cli.RunUninstall(runtime.GOOS, userHome); err != nil {
-				return err
-			}
-			fmt.Println("Autostart disabled")
-			return nil
-		},
-	}
+	return enabled
 }

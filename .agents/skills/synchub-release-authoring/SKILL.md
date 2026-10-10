@@ -35,6 +35,15 @@ making eight. Preserve RPM coverage unless the maintainer explicitly changes tha
 scope; never silently drop it because its validation failed. Windows ARM64 and
 Linux ARM64 are not required by the current matrix.
 
+Releases containing the [standalone CLI](../../../docs/cli.md) also require
+`SyncHub-CLI-windows-x64.zip`, `SyncHub-CLI-macos-arm64.tar.gz`,
+`SyncHub-CLI-macos-x64.tar.gz` and `SyncHub-CLI-linux-x64.tar.gz`.
+The reusable [CLI workflow](../../../.github/workflows/cli.yml) runs native
+command/ownership tests on all four targets and produces separate build receipts.
+Require the CLI matrix, matching version/source metadata and archive checksums;
+CLI archives cannot substitute for any Desktop package. CLI signing status must
+be stated separately from Desktop signing.
+
 For macOS, use either the Developer ID/notarized pair (`SyncHub.dmg` and
 `SyncHub-macos-universal.zip`) or the explicitly approved ad-hoc pair
 (`SyncHub-macOS-universal-adhoc.dmg` and `SyncHub-macOS-universal-adhoc.zip`).

@@ -18,8 +18,17 @@ func PrepareResourceActions(
 	specs map[string]resource.Spec,
 	skipped, blocked []resource.Issue,
 ) ([]Action, []string) {
+	return PreviewResourceActions(base, local, remoteSnapshot, validRemote, specs, skipped, blocked, "")
+}
+
+func PreviewResourceActions(
+	base, local, remoteSnapshot, validRemote state.Snapshot,
+	specs map[string]resource.Spec,
+	skipped, blocked []resource.Issue,
+	firstSyncMode string,
+) ([]Action, []string) {
 	plan := prepareResourcePlan(base, local, remoteSnapshot, validRemote, specs, skipped, blocked)
-	return plan.actions, plan.blockedPaths
+	return ApplyFirstSyncStrategy(plan.actions, plan.local, plan.remote, firstSyncMode), plan.blockedPaths
 }
 
 func prepareResourcePlan(
@@ -56,7 +65,16 @@ func (e *Engine) applyFirstSyncStrategy(
 	local state.Snapshot,
 	remote state.Snapshot,
 ) []Action {
-	switch e.FirstSyncMode {
+	return ApplyFirstSyncStrategy(actions, local, remote, e.FirstSyncMode)
+}
+
+// ApplyFirstSyncStrategy shares the initial direction policy with local previews.
+func ApplyFirstSyncStrategy(
+	actions []Action,
+	local, remote state.Snapshot,
+	mode string,
+) []Action {
+	switch mode {
 	case "use-cloud":
 		mapped := make([]Action, 0, len(actions))
 		for _, action := range actions {

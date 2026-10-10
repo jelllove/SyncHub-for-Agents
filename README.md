@@ -10,12 +10,14 @@ It uses a private Git repository you control as the synchronization bridge, with
 
 - Synchronize agent resources (sessions, config, instructions, skills, plugin declarations).
 - Run as a desktop/tray app with clear status states: Ready, Updating, Sync complete, Paused, Needs attention.
+- Show non-activating Windows tray activity tips with phase icons/text for pulling,
+  scanning, comparing, applying and pushing, plus completion/error feedback.
 - Sync periodically in the background and on-demand.
 - Propagate deletions across machines with a configurable recovery window.
 - Resolve conflicts with local/remote/merged choices and batch apply.
 - Review and approve plugin/skill install operations before execution, with explicit retry for failed operations.
 - Select which agents and resource categories are included, plus custom resource directories.
-- Start automatically at login.
+- Start automatically at login, enabled by default in Windows releases with an opt-out.
 - Check GitHub Releases automatically and securely download Windows x64 updates
   for installation when you quit the app.
 
@@ -119,7 +121,28 @@ depends on the maintainer enabling the platform jobs; see the
 Native CI packaging covers Windows, both macOS architectures, and Ubuntu 24.04.
 That configured coverage is not evidence that every release passed on every OS.
 
+## Headless CLI
+
+Desktop UI remains available. The separate [CLI](docs/cli.md) supports `init`,
+`status`, `doctor`, local-only `plan`, one-shot `sync` and headless `daemon`.
+Finite commands support versioned JSON and distinct error/attention exit codes.
+It uses the same backend and safety policies without Wails or GUI dependencies.
+
+Desktop/daemon owns its profile while running. Quit from the tray before using
+CLI operations on that same profile; contention returns an explicit busy error
+instead of starting competing writers. Complex conflict editing stays in Desktop.
+
+Build with `go build ./cmd/synchub`; follow the [CLI guide](docs/cli.md) for isolated
+profiles, first-sync choices and installation. Future releases containing this
+change add Windows x64, macOS ARM64/Intel and Linux x64 CLI archives. The existing
+v0.3.5 release and initial NPM desktop launcher do not contain this new CLI.
+
 ## Software updates
+
+An optional [NPM installer/launcher](packages/npm-installer/README.md) is available
+as a separately validated package. It pins existing desktop release archives,
+does not compile Go/Wails on the user's machine, and retains native OS prerequisites.
+Public availability must be confirmed after NPM publishing succeeds.
 
 Starting with v0.3.0, release builds check
 [GitHub Releases](https://github.com/jelllove/SyncHub-for-Agents/releases/latest)

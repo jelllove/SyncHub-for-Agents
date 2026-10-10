@@ -97,6 +97,26 @@ main { max-width: 1180px; margin: 0 auto; padding: 40px 42px 54px; }
 .drawer { width: min(510px, 100%); height: 100%; padding: 38px; overflow: auto; background: #fbfcfa; box-shadow: -20px 0 70px rgba(17,35,25,.17); animation: slide-in .2s ease-out; }
 @keyframes slide-in { from { transform: translateX(30px); opacity: 0; } }
 .drawer-title { display: flex; justify-content: space-between; align-items: start; margin-bottom: 34px; }
+.settings-drawer { display: flex; flex-direction: column; overflow: hidden; }
+.settings-drawer .drawer-title, .settings-drawer .settings-tabs { flex-shrink: 0; }
+.settings-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; margin-right: -4px; }
+.settings-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.settings-tabs button { padding: 9px 10px; border: 0; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0; color: var(--muted); background: transparent; font-size: 12px; font-weight: 600; }
+.settings-tabs button:hover { color: var(--ink); background: #edf1ed; }
+.settings-tabs button[aria-selected=true] { color: var(--green-dark); border-bottom-color: var(--green); background: #e7f3eb; }
+.settings-tab-error { margin-left: 6px; color: #8d2925; }
+.settings-panel { display: grid; min-width: 0; gap: 22px; }
+.settings-panel[hidden] { display: none; }
+.settings-panel fieldset { min-width: 0; }
+.settings-panel .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-panel .inline-error { overflow-wrap: anywhere; }
+.settings-actions { flex-shrink: 0; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.settings-panel .update-panel, .settings-panel .reset-panel { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .drawer { animation: none; } }
+@media (max-width: 480px) {
+  .settings-panel .field-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-panel .preview-refresh { flex-wrap: wrap; }
+}
 .first-sync-dialog { width: min(620px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 32px; overflow-y: auto; color: var(--ink); border: 1px solid var(--line); border-radius: 22px; background: #fbfcfa; box-shadow: 0 24px 80px rgba(17,35,25,.25); }
 .first-sync-dialog::backdrop { background: rgba(19,30,24,.46); backdrop-filter: blur(4px); }
 .first-sync-dialog h2 { margin: 8px 0 12px; font-size: 27px; letter-spacing: -.03em; }

@@ -1,0 +1,67 @@
+name: Headless CLI packages
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version metadata for validation artifacts (does not publish)
+        required: true
+        default: "0.0.0"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: CLI (${{ matrix.goos }}/${{ matrix.arch }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            goos: windows
+            arch: amd64
+          - os: macos-15
+            goos: darwin
+            arch: arm64
+          - os: macos-15-intel
+            goos: darwin
+            arch: amd64
+          - os: ubuntu-24.04
+            goos: linux
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test headless commands and native cross-process locks
+        run: go test ./cmd/synchub ./internal/instance ./internal/cli ./tools/clipack
+      - name: Build and smoke native CLI archive without GUI libraries
+        env:
+          CLI_VERSION: ${{ inputs.version }}
+        run: go run ./tools/clipack --os ${{ matrix.goos }} --arch ${{ matrix.arch }} --version $env:CLI_VERSION --out (Join-Path $env:RUNNER_TEMP "cli-dist")
+        shell: pwsh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-cli-${{ matrix.goos }}-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/cli-dist/*.zip
+            ${{ runner.temp }}/cli-dist/*.tar.gz
+            ${{ runner.temp }}/cli-dist/SHA256SUMS-cli-*.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cli-build-evidence-${{ matrix.goos }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/cli-dist/CLI-BUILD-*.json
+          if-no-files-found: error

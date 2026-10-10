@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
+	"github.com/qinqingxu/synchub-for-agents/internal/startup"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func TestWailsServiceDelegatesToDesktopCore(t *testing.T) {
@@ -55,5 +57,52 @@ func TestWailsServiceReturnsOnboardingToRepositoryStep(t *testing.T) {
 	if state.Step != onboarding.Repository ||
 		state.RepositoryURL != "git@github.com:acme/wrong.git" {
 		t.Fatalf("state = %#v", state)
+	}
+}
+
+type desktopStartupBackend struct {
+	enabled bool
+}
+
+func (backend *desktopStartupBackend) EnableWithOptions(application.AutostartOptions) error {
+	backend.enabled = true
+	return nil
+}
+
+func (backend *desktopStartupBackend) Disable() error {
+	backend.enabled = false
+	return nil
+}
+
+func (backend *desktopStartupBackend) IsEnabled() (bool, error) {
+	return backend.enabled, nil
+}
+
+func TestWailsStartupDefaultAndExplicitOptOut(t *testing.T) {
+	backend := &desktopStartupBackend{}
+	manager := &startup.Manager{
+		Backend: backend, Identifier: "io.github.qinqingxu.synchub",
+		Arguments: []string{"--hidden"}, GOOS: "windows",
+		PreferencesPath: filepath.Join(t.TempDir(), "startup-settings.json"),
+	}
+	service := NewWailsService(nil, nil, nil, manager)
+	if enabled, err := service.StartAtLogin(); err != nil || !enabled {
+		t.Fatalf("initial Windows startup = %v, error = %v", enabled, err)
+	}
+	if err := service.SetStartAtLogin(false); err != nil {
+		t.Fatal(err)
+	}
+	if enabled, err := service.StartAtLogin(); err != nil || enabled {
+		t.Fatalf("Windows startup opt-out = %v, error = %v", enabled, err)
+	}
+}
+
+func TestWailsStartupReportsMissingManager(t *testing.T) {
+	service := NewWailsService(nil, nil, nil, nil)
+	if _, err := service.StartAtLogin(); err == nil {
+		t.Fatal("missing startup manager must be reported")
+	}
+	if err := service.SetStartAtLogin(true); err == nil {
+		t.Fatal("missing startup manager must not appear to enable startup")
 	}
 }

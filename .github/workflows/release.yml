@@ -12,6 +12,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  cli:
+    uses: ./.github/workflows/cli.yml
+    with:
+      version: ${{ github.ref_name }}
+
   windows:
     runs-on: windows-2025
     environment: release
@@ -189,10 +194,11 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [windows, macos, linux]
+    needs: [windows, macos, linux, cli]
     if: >-
       always() && !cancelled() &&
       needs.windows.result == 'success' &&
+      needs.cli.result == 'success' &&
       (needs.macos.result == 'success' || needs.macos.result == 'skipped') &&
       (needs.linux.result == 'success' || needs.linux.result == 'skipped')
     runs-on: ubuntu-24.04
@@ -213,8 +219,13 @@ jobs:
         working-directory: dist
         run: |
           test -s SyncHub-for-Agents-Setup-x64.exe
+          test -s SyncHub-CLI-windows-x64.zip
+          test -s SyncHub-CLI-macos-arm64.tar.gz
+          test -s SyncHub-CLI-macos-x64.tar.gz
+          test -s SyncHub-CLI-linux-x64.tar.gz
           sha256sum --check SHA256SUMS.txt
-          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' |
+          for manifest in SHA256SUMS-cli-*.txt; do sha256sum --check "$manifest"; done
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS*.txt' -printf '%f\0' |
             sort -z | xargs -0 sha256sum > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
       - name: Publish GitHub release

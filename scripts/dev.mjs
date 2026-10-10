@@ -29,6 +29,7 @@ try {
     run("go", ["version"], root);
     run("go", ["mod", "download"], root);
     run("npm", ["ci", "--prefix", "frontend"], root);
+    run("npm", ["ci", "--prefix", "packages/npm-installer", "--ignore-scripts"], root);
     run("npm", ["--prefix", "frontend", "run", "build"], root);
   } else if (command === "verify") {
     const { report, directory } = runValidation(root, validationChecks(root), {

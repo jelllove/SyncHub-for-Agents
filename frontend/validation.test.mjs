@@ -355,7 +355,7 @@ describe("validation receipts", { timeout: 20_000 }, () => {
     const report = JSON.parse(readFileSync(path.join(base, readdirSync(base)[0], "validation.json"), "utf8"));
     expect(report.status).toBe("failed");
     expect(report.checks.map(check => check.id)).toEqual([
-      "frontend-build", "repository-checks", "go-tests", "lint-tests", "frontend-tests",
+      "frontend-build", "repository-checks", "go-tests", "lint-tests", "frontend-tests", "npm-installer-tests",
     ]);
     expect(readFileSync(outputFile, "utf8")).toContain(`report_directory=${path.join(base, readdirSync(base)[0])}`);
   }, 30_000);
@@ -365,6 +365,9 @@ describe("validation receipts", { timeout: 20_000 }, () => {
     const { env } = commandFixture(root);
     mkdirSync(path.join(root, "frontend"));
     mkdirSync(path.join(root, "docs"));
+    mkdirSync(path.join(root, "packages", "npm-installer"), { recursive: true });
+    writeFileSync(path.join(root, "packages", "npm-installer", "package.json"),
+      JSON.stringify({ scripts: { test: 'node -e "process.exit(0)"' } }));
     writeFileSync(path.join(root, "input.txt"), "before");
     writeFileSync(path.join(root, ".node-version"), "24.17.0\n");
     writeFileSync(path.join(root, "go.mod"), "module example.test/receipt\n\ngo 1.26.6\nrequire (\n github.com/wailsapp/wails/v3 v3.0.0-beta.8\n)\n");

@@ -1,0 +1,19 @@
+html.tray-tip-window, body.tray-tip-window, .tray-tip-window #root { min-width: 0; min-height: 100%; height: 100%; margin: 0; overflow: hidden; background: #fbfcfa; }
+.tray-tip-card { height: 100%; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; color: #19231f; background: #fbfcfa; border: 1px solid #dfe5df; border-radius: 12px; font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif; }
+.tray-tip-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tray-tip-brand { color: #6c7972; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+.tray-tip-heading button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px; color: #6c7972; background: transparent; font-size: 20px; cursor: pointer; }
+.tray-tip-heading button:hover { color: #19231f; background: #edf1ed; }
+.tray-tip-content { display: flex; align-items: flex-start; flex: 1; min-height: 0; gap: 12px; }
+.tray-tip-content > div { min-width: 0; }
+.tray-tip-icon { display: grid; place-items: center; flex: 0 0 38px; height: 38px; border-radius: 10px; color: #2b6fe8; background: #e7effd; }
+.tray-tip-icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tray-tip-card[data-kind=pushing] .tray-tip-icon, .tray-tip-card[data-kind=done] .tray-tip-icon, .tray-tip-card[data-kind=ready] .tray-tip-icon { color: #1a8057; background: #e3f3e9; }
+.tray-tip-card[data-kind=warning] .tray-tip-icon { color: #94691b; background: #fff2d6; }
+.tray-tip-card[data-kind=error] .tray-tip-icon { color: #c43d4b; background: #f9e8ea; }
+.tray-tip-card[data-kind=paused] .tray-tip-icon { color: #6b7583; background: #eceff2; }
+.tray-tip-content h1 { margin: 0 0 5px; font-size: 16px; line-height: 1.2; font-weight: 700; }
+.tray-tip-content p { margin: 0; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.tray-tip-open { align-self: flex-end; padding: 3px 0; border: 0; color: #126442; background: transparent; font-size: 11px; font-weight: 600; cursor: pointer; }
+.tray-tip-open span { margin-left: 5px; }
+.tray-tip-card button:focus-visible { outline: 2px solid #1a8057; outline-offset: 2px; }

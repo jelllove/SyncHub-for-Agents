@@ -1,0 +1,45 @@
+{
+  "name": "synchub-for-agents",
+  "version": "0.1.0",
+  "description": "Verified cross-platform installer and launcher for SyncHub for Agents desktop",
+  "type": "module",
+  "license": "MIT",
+  "author": "SyncHub for Agents contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jelllove/SyncHub-for-Agents.git",
+    "directory": "packages/npm-installer"
+  },
+  "homepage": "https://github.com/jelllove/SyncHub-for-Agents",
+  "bugs": "https://github.com/jelllove/SyncHub-for-Agents/issues",
+  "bin": {
+    "synchub-for-agents": "bin/synchub-for-agents.mjs"
+  },
+  "engines": {
+    "node": ">=24.13.0"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "scripts/install.mjs",
+    "scripts/check-docs.mjs",
+    "release.json",
+    "docs/",
+    "README.md",
+    "AGENTS.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/install.mjs",
+    "test": "node scripts/check-docs.mjs && node --test test/*.test.mjs",
+    "prepack": "npm test"
+  },
+  "dependencies": {
+    "tar": "7.5.22",
+    "yauzl": "3.4.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

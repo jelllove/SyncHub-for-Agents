@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -73,12 +74,23 @@ type release struct {
 }
 
 type releaseClient struct {
-	http *http.Client
+	http       *http.Client
+	retryDelay time.Duration
 }
 
 func newReleaseClient() *releaseClient {
-	return &releaseClient{http: &http.Client{
+	return &releaseClient{retryDelay: 500 * time.Millisecond, http: &http.Client{
 		Timeout: 10 * time.Minute,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   20 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+			ExpectContinueTimeout: time.Second,
+		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return errors.New("too many update download redirects")
@@ -104,25 +116,54 @@ func trustedDownloadURL(u *url.URL) bool {
 }
 
 func (c *releaseClient) get(ctx context.Context, location string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
-	if err != nil {
-		return nil, err
+	const attempts = 3
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("request update: %w", err)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, location, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "SyncHub-for-Agents-updater")
+		req.Header.Set("Accept", "application/vnd.github+json")
+		resp, requestErr := c.http.Do(req)
+		retry := false
+		if requestErr != nil {
+			var networkError net.Error
+			retry = errors.Is(requestErr, io.EOF) || errors.Is(requestErr, io.ErrUnexpectedEOF) ||
+				(errors.As(requestErr, &networkError) && networkError.Timeout())
+			requestErr = fmt.Errorf("request update: %w", requestErr)
+		} else if resp.StatusCode == http.StatusOK {
+			return resp, nil
+		} else {
+			resp.Body.Close()
+			retry = resp.StatusCode == http.StatusInternalServerError ||
+				resp.StatusCode == http.StatusBadGateway || resp.StatusCode == http.StatusServiceUnavailable ||
+				resp.StatusCode == http.StatusGatewayTimeout
+			requestErr = fmt.Errorf("GitHub update request returned HTTP %d", resp.StatusCode)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("request update: %w", err)
+		}
+		if !retry {
+			return nil, requestErr
+		}
+		if attempt == attempts {
+			return nil, fmt.Errorf("update request failed after %d attempts: %w; check your connection or proxy settings and try again", attempts, requestErr)
+		}
+		timer := time.NewTimer(c.retryDelay * time.Duration(attempt))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("request update: %w", ctx.Err())
+		case <-timer.C:
+		}
 	}
-	req.Header.Set("User-Agent", "SyncHub-for-Agents-updater")
-	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request update: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, fmt.Errorf("GitHub update request returned HTTP %d", resp.StatusCode)
-	}
-	return resp, nil
 }
 
 func (c *releaseClient) latest(ctx context.Context) (*release, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	resp, err := c.get(ctx, releaseAPI)
 	if err != nil {

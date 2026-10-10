@@ -1,0 +1,30 @@
+{
+  "version": "0.3.5",
+  "repository": "https://github.com/jelllove/SyncHub-for-Agents",
+  "assets": {
+    "windows": {
+      "name": "SyncHub-for-Agents-Windows-x64.zip",
+      "size": 5954355,
+      "sha256": "df237a4469a741a6ee357b6656770690068e7230f8c0c9bdc99e8e0858a43138",
+      "format": "zip",
+      "root": "",
+      "executable": "SyncHub.exe"
+    },
+    "macos": {
+      "name": "SyncHub-macOS-universal-adhoc.zip",
+      "size": 10925083,
+      "sha256": "a669f8d5044e693da2a82ff3e497e44585ec95009cb3a3ba7136d2cff80961fa",
+      "format": "zip",
+      "root": "SyncHub.app",
+      "executable": "Contents/MacOS/SyncHub"
+    },
+    "linux": {
+      "name": "SyncHub-linux-x64.tar.gz",
+      "size": 5799519,
+      "sha256": "175e6b2a5b25dcb71b2f09a8641484ffe33d7b46825bca50be83b1f8575f716b",
+      "format": "tar",
+      "root": "SyncHub",
+      "executable": "SyncHub"
+    }
+  }
+}

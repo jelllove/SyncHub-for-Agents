@@ -14,6 +14,10 @@ node scripts/dev.mjs verify
 Setup restores Go modules and the npm lockfile and builds frontend assets required
 by Go's embed directive. It does not install global tools, change Git configuration,
 start a daemon, or access a user's synchronization repository.
+It also restores the [NPM installer](../packages/npm-installer/README.md) lockfile
+with lifecycle scripts disabled so repository setup never installs or launches
+the desktop distribution. Full verification includes `npm-installer-tests`,
+which run the package's installation and deterministic documentation checks.
 For a pinned Linux environment, use the [development container](devcontainer.md).
 
 For desktop development, install the Wails CLI at the version in the generated
@@ -26,6 +30,11 @@ your OS package manager before setup/check. Packaging dependencies are listed in
 [CI](../.github/workflows/ci.yml).
 
 ## Native desktop packages
+
+For standalone, GUI-free command-line builds and the separate CLI archive matrix,
+see the [CLI development and verification guide](cli.md). The reusable
+[CLI workflow](../.github/workflows/cli.yml) is called by CI and release builds;
+it is skipped during read-only maintenance alongside desktop packaging.
 
 The [installation matrix](install.md#package-matrix-and-validation-scope)
 defines formats, CPU coverage, dependencies and the limits of distribution
@@ -216,6 +225,53 @@ needs Docker running Linux containers and uses
 
 ## Local feedback and cleanup
 
+### Desktop preference and update regressions
+
+Tray activity tests additionally run with:
+
+```text
+go test ./internal/tray/... ./internal/desktop ./tools/archcheck
+go test ./internal/syncengine -run "TestEnginePublishesProgress|TestNoChangeCycleDoesNotReportPushing"
+npm --prefix frontend test -- --run src/TrayTip.test.tsx src/App.test.tsx
+```
+
+Fake clocks cover stage de-duplication, late renderer readiness, dismissal,
+terminal error priority, review acknowledgements, stale timers and shutdown.
+Windows tests create/destroy native icon handles from the actual Wails icon
+bytes without adding real tray entries. Terminal-cycle observers are tested with
+synthetic homes and errors; unchanged Git cycles use isolated local bare remotes.
+The Windows tip's hidden/tool-window/no-activation flags and fixed 360x168 layout
+are guarded independently of real user configuration.
+Native smoke checks must use a separate fixture application with an isolated
+WebView2 profile and no desktop sync/startup services. Browser checks can validate
+icons, text, controls and fit, but cannot establish Windows popup placement or
+focus behavior. Keep logs, including platform/framework shutdown diagnostics.
+The legacy Fyne tray must remain isolated from the Wails desktop adapter.
+
+For updater transport, Windows startup defaults and settings categories:
+
+```text
+go test ./internal/updater ./internal/startup ./internal/desktop
+npm --prefix frontend test -- --run src/SettingsPanel.test.tsx src/UpdatePanel.test.tsx src/ResetPanel.test.tsx src/App.test.tsx
+```
+
+Updater tests include an isolated HTTPS server that deliberately stalls its first
+TLS handshake, plus retry limits, cancellation, certificate rejection and HTTP
+error classification. They do not contact live GitHub or weaken production TLS.
+Windows startup tests use fake native backends and temporary preference files,
+not the developer's Run key. The one-time default, explicit opt-out, external
+entry removal, persistence rollback and setup-reset preservation are covered.
+Developer builds skip the automatic registration so temporary development binaries
+do not become login entries. macOS/Linux keep their previous opt-in behavior.
+
+Settings controls remain mounted while inactive categories are hidden. This
+preserves unsaved form/editor state and update subscriptions. Update and reset
+actions remain outside the synchronization form. Required fields in hidden tabs
+are revealed and focused before submission rather than being silently rejected.
+The category bar and save actions remain visible while the body scrolls.
+Browser fixture checks validate keyboard interaction, draft retention and narrow
+layouts, but do not prove native registry writes or Windows login behavior.
+
 The shared check uses gofmt, go vet, ESLint, and TypeScript. It checks
 all repository-owned Go files and all packages, not just the staged diff.
 Checks report command output on failure and do not rewrite source files.
@@ -273,6 +329,19 @@ audit, without maintenance-mode or path filters. Windows verification still owns
 the source-bound receipts; Linux checks add cross-platform coverage rather than
 replacing that runner.
 Use `check` for quick feedback and `docs` for documentation-only changes.
+
+The NPM distribution lives under `packages/npm-installer`, separately from the
+private repository/frontend packages. From that directory, use
+`npm ci --ignore-scripts`, `npm test`, and `npm pack`.
+Root `npm test` also runs its tests. Its actual delivery documents are the
+[specification](../packages/npm-installer/docs/spec.md) and
+[architecture](../packages/npm-installer/docs/arch.md); they are checked for
+required sections, links and unfinished markers in the ordinary package test.
+Publish only a reviewed tarball to `https://registry.npmjs.org/` with the user's
+authenticated account, not the machine's internal default feed. Do not copy an
+NPM token into source, fixtures or the published archive. Initial package assets
+remain pinned to the existing v0.3.5 release; creating another GitHub release is
+a separate maintainer action.
 
 Each verification creates a new `.artifacts/validation/run-*` directory containing
 `validation.json` and one log per check. The JSON records the actual commit,

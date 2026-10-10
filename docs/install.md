@@ -5,6 +5,45 @@ configuration and session files through a private GitHub repository.
 
 ## Before installing
 
+### Headless CLI option
+
+Use the separate [CLI guide](cli.md) for command-line installation, JSON output
+and headless daemon operation. CLI archives do not require desktop GUI runtimes
+and are distinct from the Desktop packages and initial NPM launcher. They share
+the Desktop profile by default; quit Desktop from its tray before CLI operations
+on that profile. Existing releases predating the CLI change do not include it.
+
+### NPM installation option
+
+The [NPM installer package](../packages/npm-installer/README.md) provides a
+download-verifying launcher rather than compiling the desktop app through Node.
+Its initial wrapper 0.1.0 pins desktop v0.3.5 and supports Windows x64, macOS
+Universal x64/ARM64, and Linux x64. It downloads only official release archives,
+validates size/SHA-256 and rejects unsafe extraction. Installing does not open
+the app or modify startup settings. NPM publication requires an authenticated
+official-registry account; a local tarball is not evidence of publication.
+
+After publication, install with:
+
+```text
+npm install -g synchub-for-agents --registry=https://registry.npmjs.org/
+synchub-for-agents --version
+synchub-for-agents
+```
+
+For a verified local tarball:
+
+```text
+npm install -g ./synchub-for-agents-0.1.0.tgz
+```
+
+The existing platform prerequisites below still apply. NPM does not supply
+WebView2 or Linux GTK4/WebKitGTK, notarize macOS binaries, or create OS shortcuts.
+The launcher stays in the foreground until you quit the desktop app. Disable
+desktop automatic updates if you want to remain NPM-managed, because v0.3.5
+Windows updates use NSIS instead of NPM. Quit and disable start-at-login before
+uninstalling the NPM package; user data is never deleted by this wrapper.
+
 Create an empty **private** GitHub repository. Do not add a README or other
 files; SyncHub can initialize the repository itself.
 
@@ -245,7 +284,7 @@ the validation result.
 
 ### Reset and start over
 
-Use **Reset and start over** at the bottom of **Sync settings**, or in the
+Use **Reset and start over** under **Sync settings > Advanced**, or in the
 onboarding steps if setup was not completed. Review the local clone path and
 type `RESET`, then choose **Delete local setup**.
 
@@ -288,15 +327,68 @@ details, exclusions, conflict handling, and recovery behavior.
 
 ## Settings and startup
 
-Open the dashboard from the tray icon. Settings let you:
+### Tray activity tips
 
-- enable or disable each detected agent;
-- enable or disable individual resource categories;
-- preview portable and excluded files;
-- add validated custom resource directories;
-- change the synchronization interval;
-- enable or disable **Start at login**;
-- trigger a synchronization immediately.
+While the desktop app is running, its native system-tray icon remains registered,
+including when the main window is closed to the tray. Only **Quit** exits it.
+Windows controls whether the icon is in the visible notification area or the
+overflow menu; pin SyncHub through Windows taskbar settings if you want it always
+visible. SyncHub does not override your taskbar preferences.
+
+Windows displays a small, non-activating activity tip beside the tray during
+synchronization. Its status icon and text change for **Pulling**, **Scanning**,
+**Comparing**, **Applying** and **Pushing**. A push is only reported when the
+engine actually reaches a Git push, not for an unchanged cycle.
+The same tip is updated in place; per-file progress does not create extra tips.
+It does not steal focus or add a taskbar button.
+
+Successful completion stays visible for four seconds. Errors and items needing
+attention stay visible for twelve seconds; the error/attention tray icon and
+hover text remain after the tip disappears. Errors are also reported if a cycle
+fails while future automatic syncing is paused. **Open SyncHub for Agents**
+opens the main window for details. **Dismiss activity tip** hides tips for the
+current run, but a terminal error/attention result is still shown.
+
+Tips use generic operation text, not repository URLs, file paths or raw command
+output. They are application-owned tips, not Windows Notification Center history.
+macOS/Linux receive the same status-specific tray icon and hover text but do not
+automatically show this Windows popup. The legacy `synchub tray` CLI is unchanged.
+
+### Settings categories and login startup
+
+Open the dashboard from the tray icon, then **Sync settings**. Settings are
+organized into keyboard-accessible tabs:
+
+| Tab | Controls |
+| --- | --- |
+| Repository | Private repository URL, local clone directory, and clone/move policy. |
+| Sync | Synchronization frequency, archive retention and **Run sync now**. |
+| Resources | Agents, resource categories, preview/restore totals and custom resources. |
+| Desktop | **Start with Windows** / **Start at login**, automatic updates and update checks. |
+| Advanced | Review and confirm **Reset and start over**. |
+
+Configured installations open on **Sync**; an unconfigured settings panel opens
+on **Repository**. Arrow keys, Home and End move between tabs. Unsaved values
+survive tab changes, and **Save settings** saves all categories together.
+If a required field in another tab is invalid, saving reveals and focuses that
+field. Automatic-update preferences are still saved immediately, independently
+of the synchronization form. Reset still requires an explicit review and `RESET`.
+
+On Windows, the desktop app registers the current executable with `--hidden`
+under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, using the existing
+`io.github.qinqingxu.synchub` identifier. Startup is enabled once on the first
+release-build launch with no recorded startup preference, including older Windows installations
+that have not recorded a choice. It starts in the tray at the next Windows login,
+not immediately. Turn it off under **Desktop > Start with Windows**, then choose
+**Save settings**.
+
+The choice is kept locally in `~/.synchub/startup-settings.json`. Later launches
+do not override a saved opt-out or recreate an entry removed outside SyncHub.
+Resetting synchronization setup preserves this file and the registration.
+Developer builds do not automatically register temporary executables; an explicit
+startup choice is still available. macOS/Linux startup defaults are unchanged. Registry/preference failures remain
+visible in the Desktop tab with **Retry startup status**; they do not prevent
+opening the application or get reported as a successful registration.
 
 The installer migrates the legacy `synchub` startup entry when the desktop app
 first launches. Existing configuration, repository checkout, and session data
@@ -309,6 +401,19 @@ From v0.3.0 onward, release builds check the public
 Only newer, stable releases are accepted: drafts, prereleases, equal versions,
 and downgrades are not installed. Update checks do not use or send the
 credentials for your private synchronization repository.
+
+Transient request timeouts (including TLS handshake timeouts), connection EOFs
+and HTTP 500/502/503/504 responses get at most three attempts with bounded,
+cancellable delays. Release metadata has a 90-second total budget; individual
+TLS handshakes have a 20-second limit and response headers a 30-second limit.
+The normal system certificate trust and HTTP(S) proxy environment settings are
+preserved. Certificate errors and permanent HTTP errors are not retried or
+bypassed; installer size, source and SHA-256 checks remain mandatory.
+
+If requests still fail, **Desktop > Check now** shows the error and guidance to
+check the connection or proxy. Retry after restoring connectivity, or open the
+official release page for manual installation. Retries cannot make a blocked
+GitHub endpoint reachable.
 
 On Windows x64, a matching `SyncHub-for-Agents-Setup-x64.exe` and
 `SHA256SUMS.txt` must both be present on the release. The download is size-limited
