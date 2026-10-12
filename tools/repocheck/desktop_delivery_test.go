@@ -15,6 +15,7 @@ func TestReleaseVerifiesRequestedDesktopFeaturesInActualExecutable(t *testing.T)
 		"./internal/startup", "./internal/tray", "./internal/tray/desktop",
 		"src/TrayTip.test.tsx", "ReadAllBytes", "bin\\SyncHub.exe",
 		"Settings categories", "settings-tabs", "tray-tip:status",
+		"src/TrayTipSettings.test.tsx", "Don't show again", "Show activity tips", "tray-tip:disable",
 	} {
 		if !strings.Contains(commands, required) {
 			t.Errorf("Windows release lacks delivered-feature check %q", required)

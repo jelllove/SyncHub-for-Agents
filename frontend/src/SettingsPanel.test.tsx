@@ -20,6 +20,8 @@ vi.mock('@wailsio/runtime', () => ({
 vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice', () => ({
   PreviewCustomResource: vi.fn(),
   StartAtLogin: () => startAtLogin(),
+  TrayTipsEnabled: vi.fn().mockResolvedValue(true),
+  SetTrayTipsEnabled: vi.fn().mockResolvedValue(undefined),
   UpdateStatus: () => updates.status(),
   CheckForUpdates: () => updates.check(),
   SetAutomaticUpdates: (enabled: boolean) => updates.automatic(enabled),

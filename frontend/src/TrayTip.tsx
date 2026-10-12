@@ -59,10 +59,14 @@ export function TrayTip() {
       setTip(event.data)
       setError('')
     })
+    const unsubscribeError = Events.On('tray-tip:preference-error', (event) => {
+      if (!event.sender && typeof event.data === 'string') setError(event.data)
+    })
     void emit('tray-tip:ready')
     return () => {
       mounted.current = false
       unsubscribe()
+      unsubscribeError()
     }
   }, [])
 
@@ -76,12 +80,17 @@ export function TrayTip() {
         {tip && <span className="tray-tip-icon"><StatusIcon kind={tip.kind} title={tip.title} /></span>}
         <div>
           <h1>{tip?.title ?? 'Waiting for sync status…'}</h1>
-          <p>{error || tip?.message || 'Connecting to the desktop activity feed.'}</p>
+          <p title={error || tip?.message}>{error || tip?.message || 'Connecting to the desktop activity feed.'}</p>
         </div>
       </div>
-      <button className="tray-tip-open" onClick={() => void emit('tray-tip:open')} type="button">
-        Open SyncHub for Agents <span aria-hidden="true">→</span>
-      </button>
+      <div className="tray-tip-actions">
+        <button className="tray-tip-disable" onClick={() => void emit('tray-tip:disable')} type="button" title="Turn tips back on in Settings > Desktop">
+          Don't show again
+        </button>
+        <button className="tray-tip-open" aria-label="Open SyncHub for Agents" onClick={() => void emit('tray-tip:open')} type="button">
+          Open app <span aria-hidden="true">→</span>
+        </button>
+      </div>
     </section>
   )
 }

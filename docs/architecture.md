@@ -47,6 +47,15 @@ positions the Windows popup through its public system-tray API. It uses native
 image-resource PNG data; the legacy backend retains its ICO packaging.
 This keeps Wails out of the Fyne legacy executable's dependency graph too.
 
+[Tray tip preferences](../internal/tray/preferences.go) persist the local popup
+opt-out independently of synchronized resources. Both the sender-scoped popup
+disable event and generated Desktop settings APIs update this same preference;
+failed persistence leaves the current value unchanged. The notifier immediately
+hides disabled tips while preserving tray icon/tooltip updates. Reenable waits
+for future state changes rather than replaying a stale tip. The feedback
+controller owns bounded active and terminal timers; the Windows adapter alone
+uses the public native window handle for a non-activating show.
+
 [Terminal cycle observers](../internal/desktop/cycle_observer.go) publish after
 summary persistence and outside the service lock, including error cycles while
 paused that have no completion-progress event. Native tray callbacks consume

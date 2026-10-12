@@ -38,7 +38,7 @@ func desktopIcon(state scheduler.State) []byte {
 func tipWindowOptions() application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
 		Name: TipWindowName, Title: "SyncHub activity", URL: "/?view=tray-tip",
-		Width: 360, Height: 168, Hidden: true, AlwaysOnTop: true,
+		Width: 300, Height: 132, Hidden: true, AlwaysOnTop: true,
 		Frameless: true, DisableResize: true,
 		BackgroundColour: application.NewRGB(251, 252, 250),
 		Windows: application.WindowsWindow{
@@ -48,9 +48,14 @@ func tipWindowOptions() application.WebviewWindowOptions {
 	}
 }
 
-func NewNotifier(app *application.App, systemTray *application.SystemTray, open func()) *Notifier {
+func NewNotifier(app *application.App, systemTray *application.SystemTray, open func(), preferences *tray.TipPreferences) *Notifier {
 	notifier := &Notifier{app: app, tray: systemTray}
 	notifier.feedback = tray.NewFeedback(notifier.render, func(err error) { log.Printf("tray activity feedback: %v", err) })
+	notifier.feedback.SetEnabled(preferences.Enabled())
+	notifier.unsubscribe = append(notifier.unsubscribe, preferences.Subscribe(func(enabled bool) {
+		notifier.feedback.SetEnabled(enabled)
+		app.Event.Emit(tray.TipPreferencesEvent)
+	}))
 	if popupSupported() {
 		notifier.window = app.Window.NewWithOptions(tipWindowOptions())
 		notifier.window.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
@@ -69,6 +74,14 @@ func NewNotifier(app *application.App, systemTray *application.SystemTray, open 
 			app.Event.On("tray-tip:dismiss", func(event *application.CustomEvent) {
 				if event.Sender == TipWindowName {
 					notifier.feedback.Dismiss()
+				}
+			}),
+			app.Event.On("tray-tip:disable", func(event *application.CustomEvent) {
+				if event.Sender == TipWindowName && !notifier.closed.Load() {
+					if err := preferences.SetEnabled(false); err != nil {
+						log.Printf("disable tray activity tips: %v", err)
+						app.Event.Emit("tray-tip:preference-error", "Activity tips could not be turned off. Try again or use Settings > Desktop.")
+					}
 				}
 			}),
 			app.Event.On("tray-tip:open", func(event *application.CustomEvent) {
@@ -136,7 +149,7 @@ func (n *Notifier) render(update tray.FeedbackUpdate) error {
 		return fmt.Errorf("position activity tip beside the tray: %w", err)
 	}
 	if !n.closed.Load() {
-		n.window.Show()
+		return showTipWindow(n.window)
 	}
 	return nil
 }

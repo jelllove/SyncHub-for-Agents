@@ -49,6 +49,8 @@ vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wa
   SetStartAtLogin: vi.fn(),
   Snapshot: () => api.snapshot(),
   StartAtLogin: () => api.startAtLogin(),
+  TrayTipsEnabled: vi.fn().mockResolvedValue(true),
+  SetTrayTipsEnabled: vi.fn().mockResolvedValue(undefined),
   TriggerSync: () => api.triggerSync(),
   UpdateStatus: () => api.updateStatus(),
   CheckForUpdates: vi.fn(),

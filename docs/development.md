@@ -232,7 +232,7 @@ Tray activity tests additionally run with:
 ```text
 go test ./internal/tray/... ./internal/desktop ./tools/archcheck
 go test ./internal/syncengine -run "TestEnginePublishesProgress|TestNoChangeCycleDoesNotReportPushing"
-npm --prefix frontend test -- --run src/TrayTip.test.tsx src/App.test.tsx
+npm --prefix frontend test -- --run src/TrayTip.test.tsx src/TrayTipSettings.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
 ```
 
 Fake clocks cover stage de-duplication, late renderer readiness, dismissal,
@@ -240,8 +240,20 @@ terminal error priority, review acknowledgements, stale timers and shutdown.
 Windows tests create/destroy native icon handles from the actual Wails icon
 bytes without adding real tray entries. Terminal-cycle observers are tested with
 synthetic homes and errors; unchanged Git cycles use isolated local bare remotes.
-The Windows tip's hidden/tool-window/no-activation flags and fixed 360x168 layout
+The Windows tip's hidden/tool-window/no-activation flags and fixed 300x132 layout
 are guarded independently of real user configuration.
+Fake clocks assert exact five-second active/completion and ten-second
+error/attention budgets, same-phase timeout de-duplication, opt-out and reenable
+behavior. Isolated preference fixtures cover restart persistence and explicit
+save failures. Regenerate Wails bindings after changing the preference APIs;
+never edit generated files by hand.
+
+The Windows adapter uses the public `NativeWindow()` handle and UI-thread
+dispatch to show the tip with `SW_SHOWNOACTIVATE`. The pinned Wails `Show()` uses
+`SW_SHOW`, which activated the popup in a native smoke test despite the
+`WS_EX_NOACTIVATE` style. Keep the non-activating show path isolated in the
+Windows adapter, and retain native regression evidence against a known-focused
+fixture window rather than inferring focus behavior only from option flags.
 Native smoke checks must use a separate fixture application with an isolated
 WebView2 profile and no desktop sync/startup services. Browser checks can validate
 icons, text, controls and fit, but cannot establish Windows popup placement or

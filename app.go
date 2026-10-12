@@ -33,6 +33,7 @@ type guiApplication struct {
 	isQuitting atomic.Bool
 	updates    *updater.Manager
 	activity   *traydesktop.Notifier
+	trayTips   *tray.TipPreferences
 }
 
 type activationQueue struct {
@@ -99,6 +100,11 @@ func (gui *guiApplication) configure(
 	home string,
 ) error {
 	gui.service = core
+	tipPreferences, err := tray.NewTipPreferences(filepath.Join(home, "tray-settings.json"))
+	if err != nil {
+		return err
+	}
+	gui.trayTips = tipPreferences
 	gui.startup = &startup.Manager{
 		Backend:         gui.app.Autostart,
 		Identifier:      "io.github.qinqingxu.synchub",
@@ -123,7 +129,7 @@ func (gui *guiApplication) configure(
 	}
 	gui.updates = updates
 	gui.app.RegisterService(application.NewService(desktop.WithUpdates(
-		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
+		desktop.WithTrayTips(desktop.NewWailsService(gui.app, core, onboardingService, gui.startup), gui.trayTips),
 		updates,
 		func() {
 			gui.isQuitting.Store(true)
@@ -178,7 +184,7 @@ func (g *guiApplication) configureTray() {
 	g.tray = g.app.SystemTray.New()
 	g.tray.SetIcon(tray.PNGIcon(scheduler.StateIdle))
 	g.tray.SetTooltip("SyncHub for Agents")
-	g.activity = traydesktop.NewNotifier(g.app, g.tray, g.show)
+	g.activity = traydesktop.NewNotifier(g.app, g.tray, g.show, g.trayTips)
 
 	menu := g.app.NewMenu()
 	menu.Add("Open SyncHub for Agents").OnClick(func(*application.Context) {

@@ -193,6 +193,23 @@ These changes are in v0.3.7, not the earlier v0.3.6 CLI release. Installing the
 same older release again will not enable the new settings tabs. See the
 [installation guide](docs/install.md) for startup/update behavior.
 
+## Compact Windows activity tips in v0.3.8
+
+- Smaller 300x132 logical-pixel tray popups keep icons, status text and controls.
+- **Don't show again** hides the tip and persistently disables future popups.
+  Reenable them in **Settings > Desktop > Show activity tips**; changes save
+  immediately, independently of synchronization settings.
+- Ordinary tips, including active pulling/pushing, hide after **5 seconds**.
+  Error/attention tips hide after **10 seconds**. A new phase starts its timer;
+  repeated same-phase updates do not keep it open or resurrect it after timeout.
+- Disabling popups does not stop synchronization or remove the tray icon/error
+  status. Reenabling permits future tips without replaying old status.
+- Showing the popup does not activate it or steal focus from the current window.
+
+These controls are in v0.3.8, not v0.3.7. The Windows popup preference is local
+and is not synchronized as an agent resource. macOS/Linux retain tray icons and
+tooltips without these automatic Windows popups.
+
 ## Software updates
 
 An optional [NPM installer/launcher](packages/npm-installer/README.md) is available

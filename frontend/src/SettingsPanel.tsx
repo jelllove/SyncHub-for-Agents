@@ -11,6 +11,7 @@ import { ResourceSettings, type CategorySettings } from './resources/ResourceSet
 import { RestorePreview } from './resources/RestorePreview'
 import { UpdatePanel } from './UpdatePanel'
 import { ResetPanel } from './ResetPanel'
+import { TrayTipSettings } from './TrayTipSettings'
 
 const settingsTabs = [
   { id: 'repository', label: 'Repository' },
@@ -392,6 +393,7 @@ export function SettingsPanel({
               </>
             )}
           </fieldset>
+          {snapshot.platform === 'windows' && <TrayTipSettings />}
           <UpdatePanel syncBusy={busy || snapshot.state === 'updating'} />
         </section>
         <section

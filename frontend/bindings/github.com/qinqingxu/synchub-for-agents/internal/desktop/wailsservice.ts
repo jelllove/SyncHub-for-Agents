@@ -113,6 +113,10 @@ export function SetStartAtLogin(enabled: boolean): $CancellablePromise<void> {
     return $Call.ByID(3530873694, enabled);
 }
 
+export function SetTrayTipsEnabled(enabled: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1031068639, enabled);
+}
+
 export function Snapshot(): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(3816368756);
 }
@@ -123,6 +127,10 @@ export function StartAtLogin(): $CancellablePromise<boolean> {
 
 export function StartGitHubLogin(): $CancellablePromise<onboarding$0.State> {
     return $Call.ByID(2111959360);
+}
+
+export function TrayTipsEnabled(): $CancellablePromise<boolean> {
+    return $Call.ByID(3726699151);
 }
 
 export function TriggerSync(): $CancellablePromise<void> {

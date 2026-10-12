@@ -36,6 +36,7 @@ type Feedback struct {
 	ready         bool
 	dismissed     bool
 	visible       bool
+	enabled       bool
 	closed        bool
 	timer         tipTimer
 	after         func(time.Duration, func()) tipTimer
@@ -47,8 +48,9 @@ type Feedback struct {
 
 func NewFeedback(render func(FeedbackUpdate) error, report func(error)) *Feedback {
 	return &Feedback{
-		tip:    Tip{Kind: "ready", Title: "Ready", Message: "SyncHub for Agents is running in the tray."},
-		render: render, report: report,
+		tip:     Tip{Kind: "ready", Title: "Ready", Message: "SyncHub for Agents is running in the tray."},
+		enabled: true,
+		render:  render, report: report,
 		after: func(delay time.Duration, callback func()) tipTimer { return time.AfterFunc(delay, callback) },
 	}
 }
@@ -196,6 +198,20 @@ func (f *Feedback) Dismiss() {
 	f.deliver(update)
 }
 
+func (f *Feedback) SetEnabled(enabled bool) {
+	f.mu.Lock()
+	if f.closed || f.enabled == enabled {
+		f.mu.Unlock()
+		return
+	}
+	f.enabled, f.visible = enabled, false
+	f.tip.Revision++
+	f.stopTimerLocked()
+	update := f.updateLocked()
+	f.mu.Unlock()
+	f.deliver(update)
+}
+
 func (f *Feedback) Close() {
 	f.mu.Lock()
 	f.closed = true
@@ -204,22 +220,22 @@ func (f *Feedback) Close() {
 }
 
 func (f *Feedback) setLocked(tip Tip, visible bool) {
-	if f.tip.Kind == tip.Kind && f.tip.Message == tip.Message && f.visible == visible {
+	if f.tip.Kind == tip.Kind && f.tip.Message == tip.Message {
 		return
 	}
 	tip.Revision = f.tip.Revision + 1
-	f.tip, f.visible = tip, visible
+	f.tip, f.visible = tip, visible && f.enabled
 	f.stopTimerLocked()
 	f.scheduleHideLocked()
 }
 
 func (f *Feedback) scheduleHideLocked() {
-	if !f.ready || !f.visible || f.active {
+	if !f.ready || !f.visible || !f.enabled {
 		return
 	}
-	delay := 4 * time.Second
+	delay := 5 * time.Second
 	if f.tip.Kind == "error" || f.tip.Kind == "warning" {
-		delay = 12 * time.Second
+		delay = 10 * time.Second
 	}
 	revision := f.tip.Revision
 	f.timer = f.after(delay, func() {
@@ -257,7 +273,7 @@ func (f *Feedback) updateLocked() FeedbackUpdate {
 	}
 	return FeedbackUpdate{
 		Tip: f.tip, Tooltip: "SyncHub for Agents: " + f.tip.Title,
-		IconState: state, Show: f.ready && f.visible,
+		IconState: state, Show: f.ready && f.visible && f.enabled,
 	}
 }
 

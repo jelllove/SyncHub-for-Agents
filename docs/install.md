@@ -342,12 +342,24 @@ engine actually reaches a Git push, not for an unchanged cycle.
 The same tip is updated in place; per-file progress does not create extra tips.
 It does not steal focus or add a taskbar button.
 
-Successful completion stays visible for four seconds. Errors and items needing
-attention stay visible for twelve seconds; the error/attention tray icon and
-hover text remain after the tip disappears. Errors are also reported if a cycle
-fails while future automatic syncing is paused. **Open SyncHub for Agents**
-opens the main window for details. **Dismiss activity tip** hides tips for the
-current run, but a terminal error/attention result is still shown.
+The compact popup is 300x132 logical pixels. Ordinary tips, including active
+pulling/pushing phases, hide after five seconds; errors and items needing
+attention hide after ten seconds. Each new phase starts its own visibility
+budget, but repeated per-file updates of the same phase do not reset the timer
+or bring back a timed-out popup. The error/attention tray icon and hover text
+remain after the tip disappears. Errors are also reported if a cycle fails while
+future automatic syncing is paused. **Open app** opens the main window for
+details. **Dismiss activity tip** hides tips for the current run, but a terminal
+error/attention result is still shown unless all popups have been disabled.
+
+Choose **Don't show again** inside a tip to hide it immediately and disable
+future popups, including error popups. This preference is stored locally in
+`~/.synchub/tray-settings.json` and survives restart. It does not stop
+synchronization or remove the tray icon/error status. To reenable it, open
+**Settings > Desktop > Show activity tips**. The switch saves immediately,
+independently of the sync form. Turning it on enables future tips; it does not
+replay an old status. Preference read/write failures are explicit errors, not
+successful opt-outs; retry in settings if saving fails.
 
 Tips use generic operation text, not repository URLs, file paths or raw command
 output. They are application-owned tips, not Windows Notification Center history.

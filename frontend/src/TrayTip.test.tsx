@@ -61,7 +61,7 @@ describe('TrayTip', () => {
     expect(events.emit).toHaveBeenCalledWith('tray-tip:open')
     expect(events.emit).toHaveBeenCalledWith('tray-tip:dismiss')
     view.unmount()
-    expect(events.unsubscribe).toHaveBeenCalledOnce()
+    expect(events.unsubscribe).toHaveBeenCalledTimes(2)
   })
 
   it('ignores stale progress without hiding the current error', () => {
@@ -80,5 +80,22 @@ describe('TrayTip', () => {
     events.emit.mockRejectedValueOnce(new Error('Desktop connection is unavailable'))
     await userEvent.click(screen.getByRole('button', { name: 'Open SyncHub for Agents' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Desktop connection is unavailable')
+  })
+
+  it('allows permanent opt-out in the tip without opening the app', async () => {
+    render(<TrayTip />)
+    send('pulling', 1, 'Pulling')
+    await userEvent.click(screen.getByRole('button', { name: "Don't show again" }))
+    expect(events.emit).toHaveBeenCalledWith('tray-tip:disable')
+    expect(events.emit).not.toHaveBeenCalledWith('tray-tip:open')
+  })
+
+  it('surfaces backend preference-save failures in the popup', () => {
+    render(<TrayTip />)
+    send('pulling', 1, 'Pulling')
+    act(() => events.handlers.get('tray-tip:preference-error')?.({
+      data: 'Could not save. Try again in Settings.',
+    }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save. Try again in Settings.')
   })
 })
