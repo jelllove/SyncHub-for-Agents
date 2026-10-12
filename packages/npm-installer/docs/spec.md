@@ -9,8 +9,9 @@ The package must not require Go, Wails, a C compiler or frontend compilation.
 
 ## Scope
 
-Wrapper version 0.1.1 selects the published desktop release v0.3.7, including
-settings tabs, startup preferences, updater retries and tray activity feedback.
+Wrapper version 0.1.2 selects the published desktop release v0.3.8, including
+settings tabs, startup preferences, updater retries and compact tray tips with
+persistent popup opt-out and bounded automatic hiding.
 The manifest uses exact sizes and hashes verified from the final release assets.
 Updating the wrapper does not authorize moving a desktop tag or rebuilding its
 published packages.
@@ -65,7 +66,7 @@ management must disable desktop automatic updates and update the NPM package.
 - The package packs into an installable `.tgz` with only the documented whitelist.
 - Archive download, verification, extraction, receipt and launcher tests pass.
 - A real downloaded Windows archive installs in an isolated local NPM fixture
-  and its executable reports desktop version 0.3.7 without opening the GUI.
+  and its executable reports desktop version 0.3.8 without opening the GUI.
 - Traversal, links, wrong hashes, unsupported platforms, tampered installed
   binaries, network failures and child launch failures fail deterministically.
 - `npm test` also checks complete spec/architecture/guidance documents and links,

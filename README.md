@@ -217,12 +217,12 @@ as a separately validated package. It pins existing desktop release archives,
 does not compile Go/Wails on the user's machine, and retains native OS prerequisites.
 Public availability must be confirmed after NPM publishing succeeds.
 
-Wrapper 0.1.1 pins Desktop v0.3.7. Until public NPM authentication is available,
-download `synchub-for-agents-0.1.1.tgz` from the release and install that local
+Wrapper 0.1.2 pins Desktop v0.3.8. Until public NPM authentication is available,
+download `synchub-for-agents-0.1.2.tgz` from the release and install that local
 tarball:
 
 ```text
-npm install -g ./synchub-for-agents-0.1.1.tgz --registry=https://registry.npmjs.org/
+npm install -g ./synchub-for-agents-0.1.2.tgz --registry=https://registry.npmjs.org/
 ```
 
 This installs Desktop, not the headless `synchub` CLI; it does not launch the app

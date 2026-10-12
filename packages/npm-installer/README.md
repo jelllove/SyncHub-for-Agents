@@ -1,8 +1,8 @@
 # SyncHub for Agents NPM installer
 
 A lightweight installer and launcher for the prebuilt SyncHub desktop app.
-Wrapper 0.1.1 installs desktop **v0.3.7**, including settings tabs, startup
-preferences, updater retries and tray activity feedback.
+Wrapper 0.1.2 installs desktop **v0.3.8**, including settings tabs, startup
+preferences, updater retries and compact tray tips with persistent popup opt-out.
 Public registry availability must be confirmed after publishing.
 
 ## Install and run
@@ -31,7 +31,7 @@ synchub-for-agents --install
 
 Windows supports x64 and needs Microsoft Edge WebView2 Runtime. macOS supports
 Intel x64 and Apple Silicon using a Universal app, minimum build target macOS 12.
-The v0.3.7 macOS binary is ad-hoc signed, not Developer ID signed or notarized;
+The v0.3.8 macOS binary is ad-hoc signed, not Developer ID signed or notarized;
 do not disable Gatekeeper or other system security to run an untrusted download.
 Linux supports x64 and needs Git, GTK4 and WebKitGTK 6.0. Ubuntu 24.04 x64 is the
 verified startup target; other distributions are not guaranteed.
@@ -75,10 +75,10 @@ See the [specification](docs/spec.md), [architecture](docs/arch.md), and
 [project guidance](AGENTS.md) for scope, constraints and acceptance criteria.
 
 Public NPM publishing remains authentication-dependent. The GitHub release also
-provides `synchub-for-agents-0.1.1.tgz` for local-tarball installation:
+provides `synchub-for-agents-0.1.2.tgz` for local-tarball installation:
 
 ```text
-npm install -g ./synchub-for-agents-0.1.1.tgz --registry=https://registry.npmjs.org/
+npm install -g ./synchub-for-agents-0.1.2.tgz --registry=https://registry.npmjs.org/
 synchub-for-agents --version
 ```
 
