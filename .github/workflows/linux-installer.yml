@@ -76,6 +76,7 @@ jobs:
         run: |
           gh release view "$RELEASE_TAG" --json assets > "$RUNNER_TEMP/release-assets.json"
           mode="$(node tooling/scripts/release/linux-evidence.mjs published-mode "$RUNNER_TEMP/release-assets.json")"
+          echo "TAR_PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
           if [[ "$mode" == build ]]; then
             echo "PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
             echo "RPM_PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
@@ -83,14 +84,19 @@ jobs:
             directory="$RUNNER_TEMP/published-linux"
             gh release download "$RELEASE_TAG" --dir "$directory" \
               --pattern SyncHub-x86_64.AppImage --pattern SyncHub.deb --pattern SHA256SUMS-Linux.txt
-            if [[ "$mode" == complete ]]; then
+            if [[ "$mode" == complete || "$mode" == archives ]]; then
               gh release download "$RELEASE_TAG" --dir "$directory" --pattern SyncHub.rpm
               echo "RPM_PACKAGE_ORIGIN=published" >> "$GITHUB_ENV"
             else
               echo "RPM_PACKAGE_ORIGIN=build" >> "$GITHUB_ENV"
             fi
+            if [[ "$mode" == archives ]]; then
+              gh release download "$RELEASE_TAG" --dir "$directory" --pattern SyncHub-linux-x64.tar.gz
+              cp "$directory/SyncHub-linux-x64.tar.gz" app-source/bin/
+              echo "TAR_PACKAGE_ORIGIN=published" >> "$GITHUB_ENV"
+            fi
             node tooling/scripts/release/linux-evidence.mjs verify "$directory" "$mode"
-            if [[ "$mode" == complete ]]; then
+            if [[ "$mode" == complete || "$mode" == archives ]]; then
               cp "$directory/SyncHub.rpm" app-source/bin/
             fi
             cp "$directory/SyncHub-x86_64.AppImage" "$directory/SyncHub.deb" app-source/bin/
@@ -110,6 +116,17 @@ jobs:
           test "$(dpkg-deb --field "${debs[0]}" Architecture)" = amd64
           dpkg-deb --info "${debs[0]}" > "$evidence/deb-info.txt"
           dpkg-deb --extract "${debs[0]}" "$evidence/deb"
+          if [[ "$TAR_PACKAGE_ORIGIN" == build ]]; then
+            cp "$evidence/deb/usr/bin/SyncHub" bin/SyncHub
+            bash "$GITHUB_WORKSPACE/tooling/scripts/release/linux-archive.sh" "$PWD" SyncHub
+          fi
+          mkdir -p "$evidence/tar"
+          tar -xzf bin/SyncHub-linux-x64.tar.gz -C "$evidence/tar"
+          cmp "$evidence/tar/SyncHub/SyncHub" "$evidence/deb/usr/bin/SyncHub"
+          test -x "$evidence/tar/SyncHub/SyncHub"
+          for entry in LICENSE SyncHub.png SyncHub.desktop INSTALL.md; do
+            test -s "$evidence/tar/SyncHub/$entry"
+          done
           rpm_package="$PWD/bin/SyncHub.rpm"
           test "$(rpm -qp --queryformat '%{NAME}' "$rpm_package")" = synchub
           test "$(rpm -qp --queryformat '%{VERSION}-%{RELEASE}' "$rpm_package")" = "$(node "$GITHUB_WORKSPACE/tooling/scripts/release/linux-evidence.mjs" version "$RELEASE_TAG" rpm)"
@@ -174,16 +191,16 @@ jobs:
             trap - EXIT
           done
           mkdir -p "$RUNNER_TEMP/linux-package"
-          cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$rpm_package" "$RUNNER_TEMP/linux-package/"
+          cp bin/SyncHub-x86_64.AppImage "${debs[0]}" "$rpm_package" bin/SyncHub-linux-x64.tar.gz "$RUNNER_TEMP/linux-package/"
           cd "$RUNNER_TEMP/linux-package"
-          sha256sum SyncHub-x86_64.AppImage SyncHub.deb SyncHub.rpm > SHA256SUMS-Linux.txt
-          node "$GITHUB_WORKSPACE/tooling/scripts/release/linux-evidence.mjs" verify "$RUNNER_TEMP/linux-package" complete
+          sha256sum SyncHub-x86_64.AppImage SyncHub.deb SyncHub.rpm SyncHub-linux-x64.tar.gz > SHA256SUMS-Linux.txt
+          node "$GITHUB_WORKSPACE/tooling/scripts/release/linux-evidence.mjs" verify "$RUNNER_TEMP/linux-package" archives
           jq -n --arg tag "$RELEASE_TAG" --arg commit "$(git -C "$GITHUB_WORKSPACE/app-source" rev-parse HEAD)" \
             --arg origin "$PACKAGE_ORIGIN" \
             --arg rpmOrigin "$RPM_PACKAGE_ORIGIN" \
             '{tag:$tag,sourceCommit:$commit,packageOrigin:$origin,rpmPackageOrigin:$rpmOrigin,architecture:"amd64",os:"Ubuntu 24.04",
               appimageLaunchPassed:true,debLaunchPassed:true,rpmLaunchPassed:true,visibleWindowsVerified:true,isolatedHome:true,
-              testAppUserNamespaceAllowance:true}' > build-receipt.json
+              tarArchiveVerified:true,testAppUserNamespaceAllowance:true}' > build-receipt.json
       - name: Retain exact packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

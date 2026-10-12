@@ -49,6 +49,8 @@ vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wa
   SetStartAtLogin: vi.fn(),
   Snapshot: () => api.snapshot(),
   StartAtLogin: () => api.startAtLogin(),
+  TrayTipsEnabled: vi.fn().mockResolvedValue(true),
+  SetTrayTipsEnabled: vi.fn().mockResolvedValue(undefined),
   TriggerSync: () => api.triggerSync(),
   UpdateStatus: () => api.updateStatus(),
   CheckForUpdates: vi.fn(),
@@ -534,6 +536,7 @@ describe('App settings preview', () => {
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Open settings' }))
     await screen.findByText(/Last refreshed/)
+    await user.click(screen.getByRole('tab', { name: 'Advanced' }))
     await user.click(screen.getByRole('button', { name: 'Reset and start over' }))
     await screen.findByText('C:\\synthetic\\repo')
     await user.type(screen.getByRole('textbox', { name: 'Type RESET to confirm' }), 'RESET')

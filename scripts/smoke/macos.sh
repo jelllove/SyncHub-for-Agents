@@ -19,6 +19,15 @@ trap cleanup EXIT
 test -x "$binary"
 plutil -lint "$app_path/Contents/Info.plist"
 codesign --verify --deep --strict "$app_path"
+lipo "$binary" -verify_arch "$(uname -m)"
+hdiutil verify "$root_dir/bin/SyncHub.dmg"
+arch="$(uname -m)"
+if [[ "$arch" == "x86_64" ]]; then arch=amd64; fi
+archive="${2:-"$root_dir/bin/SyncHub-macos-$arch.zip"}"
+test -s "$archive"
+ditto -x -k "$archive" "$smoke_home/archive"
+codesign --verify --deep --strict "$smoke_home/archive/SyncHub.app"
+cmp "$binary" "$smoke_home/archive/SyncHub.app/Contents/MacOS/SyncHub"
 
 HOME="$smoke_home" "$binary" --hidden &
 pid=$!

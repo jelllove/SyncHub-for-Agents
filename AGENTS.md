@@ -17,6 +17,21 @@ through a user-owned private Git repository.
 - Follow [backend guidance](internal/AGENTS.md) for `internal/` and
   [frontend guidance](frontend/AGENTS.md) for `frontend/`.
 
+## Release authoring
+
+- Before preparing tags, publishing/supplementing releases, changing packaging or
+  mirroring assets, read and follow the
+  [cross-platform release-authoring skill](.agents/skills/synchub-release-authoring/SKILL.md).
+- Every completed desktop release must include Windows x64 EXE/ZIP, macOS
+  Universal ARM64/Intel DMG/ZIP, and Linux x64 DEB/AppImage/tar.gz from the same
+  immutable tag/commit, plus a complete SHA-256 manifest. Preserve and validate
+  RPM when produced by the current workflows.
+- Require native evidence for that version and independently verify downloaded
+  final release assets. A green Windows-only workflow, skipped OS jobs or an NPM
+  wrapper does not satisfy this gate. Report missing packages/evidence as blocked,
+  not a completed release.
+- Releases, tags and mirrors still require explicit maintainer authorization.
+
 ## Map
 
 - `main.go`, `app.go`: desktop composition and lifecycle; `cmd/`: CLI entry points.

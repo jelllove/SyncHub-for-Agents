@@ -120,8 +120,9 @@ try {
         if ([Diagnostics.FileVersionInfo]::GetVersionInfo($installer).ProductVersion -ne $release.Display) {
             throw 'Installer version resource did not match the release.'
         }
-        $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-        "$hash  SyncHub-for-Agents-Setup-x64.exe" | Set-Content "$bin\SHA256SUMS.txt" -Encoding ascii
+        $portable = Join-Path $bin 'SyncHub-for-Agents-Windows-x64.zip'
+        Write-WindowsPortableBundle -Executable $exe -License "$root\LICENSE" -Output $portable
+        Write-ReleaseChecksums -Files @($installer, $portable) -Output "$bin\SHA256SUMS.txt"
         $notice = if ($mode -eq 'signed') {
             'Windows x64: the application and installer are Authenticode signed.'
         } else {
@@ -130,6 +131,7 @@ try {
         if (-not $env:GITHUB_OAUTH_CLIENT_ID) { $notice += "`n`nGitHub OAuth is not configured in this build; SSH authentication remains available." }
         $notice | Set-Content "$bin\WINDOWS-RELEASE-NOTES.txt" -Encoding utf8NoBOM
         Write-Host "Installer: $installer"
+        Write-Host "Portable archive: $portable"
         Write-Host "Checksums: $bin\SHA256SUMS.txt"
     }
 } finally {

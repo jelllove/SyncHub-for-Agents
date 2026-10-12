@@ -110,7 +110,7 @@ function fixture() {
   for (const name of ["dev.mjs", "dev-lib.mjs", "validation.mjs", "maintenance.mjs", "source-snapshot.mjs", "reporting.mjs", "repair-container.mjs", "doc-drift.mjs"]) {
     put(root, `scripts/${name}`, readFileSync(path.join(scripts, name)));
   }
-  put(root, ".gitignore", ".artifacts/\nfrontend/node_modules/\n");
+  put(root, ".gitignore", ".artifacts/\nfrontend/node_modules/\npackages/npm-installer/node_modules/\n");
   put(root, ".node-version", "24.17.0\n");
   put(root, "local-wails/go.mod", "module github.com/wailsapp/wails/v3\n\ngo 1.26.6\n");
   put(root, "go.mod", "module example.test/repair\n\ngo 1.26.6\nrequire (\n github.com/wailsapp/wails/v3 v3.0.0\n)\nreplace github.com/wailsapp/wails/v3 => ./local-wails\n");
@@ -122,6 +122,14 @@ function fixture() {
   put(root, "frontend/package-lock.json", JSON.stringify({
     name: "repair-fixture", version: "1.0.0", lockfileVersion: 3, requires: true,
     packages: { "": { name: "repair-fixture", version: "1.0.0" } },
+  }));
+  put(root, "packages/npm-installer/package.json", JSON.stringify({
+    name: "installer-repair-fixture", version: "1.0.0",
+    scripts: { test: 'node -e "process.exit(0)"' },
+  }));
+  put(root, "packages/npm-installer/package-lock.json", JSON.stringify({
+    name: "installer-repair-fixture", version: "1.0.0", lockfileVersion: 3, requires: true,
+    packages: { "": { name: "installer-repair-fixture", version: "1.0.0" } },
   }));
   put(root, "docs/development.md", `${referenceStart}\n${referenceEnd}\n`);
   evidenceFixture(root);

@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/startup"
+	"github.com/qinqingxu/synchub-for-agents/internal/tray"
 	"github.com/qinqingxu/synchub-for-agents/internal/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -31,6 +33,7 @@ type WailsService struct {
 	done                 chan error
 	unsubscribeProgress  func()
 	updates              *updater.Manager
+	trayTips             *tray.TipPreferences
 	quitForUpdate        func()
 	onboardingOperations sync.Mutex
 }
@@ -156,13 +159,19 @@ func (s *WailsService) RetryConflictBatch(id string) error {
 }
 
 func (s *WailsService) SetStartAtLogin(enabled bool) error {
-	if enabled {
-		return s.startup.Enable()
+	if s.startup == nil {
+		return errors.New("startup manager is not initialized")
 	}
-	return s.startup.Disable()
+	return s.startup.SetEnabled(enabled)
 }
 
 func (s *WailsService) StartAtLogin() (bool, error) {
+	if s.startup == nil {
+		return false, errors.New("startup manager is not initialized")
+	}
+	if err := s.startup.InitializeDefault(); err != nil {
+		return false, err
+	}
 	return s.startup.IsEnabled()
 }
 

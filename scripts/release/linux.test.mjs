@@ -55,6 +55,7 @@ test('published Linux asset detection accepts none, legacy DEB set, or complete 
   assert.equal(publishedPackageMode(assets(['windows.exe'])), 'build')
   assert.equal(publishedPackageMode(assets(legacy)), 'legacy')
   assert.equal(publishedPackageMode(assets([...legacy, 'SyncHub.rpm'])), 'complete')
+  assert.equal(publishedPackageMode(assets([...legacy, 'SyncHub.rpm', 'SyncHub-linux-x64.tar.gz'])), 'archives')
   for (const names of [['SyncHub.rpm'], legacy.slice(0, 2), [...legacy, 'SyncHub.rpm', 'SyncHub.rpm']]) {
     assert.throws(() => publishedPackageMode(assets(names)), /Linux release asset set/)
   }
@@ -64,7 +65,7 @@ test('Linux checksum verification rejects missing RPM, duplicate names, traversa
   const { verifyPackageManifest } = await import('./linux-evidence.mjs')
   const directory = mkdtempSync(join(tmpdir(), 'synchub-linux-packages-'))
   try {
-    const names = ['SyncHub-x86_64.AppImage', 'SyncHub.deb', 'SyncHub.rpm']
+    const names = ['SyncHub-x86_64.AppImage', 'SyncHub.deb', 'SyncHub.rpm', 'SyncHub-linux-x64.tar.gz']
     const lines = names.map((name) => {
       const bytes = Buffer.from(`synthetic ${name}`)
       writeFileSync(join(directory, name), bytes)
@@ -74,7 +75,10 @@ test('Linux checksum verification rejects missing RPM, duplicate names, traversa
     const manifest = join(directory, 'SHA256SUMS-Linux.txt')
     const write = (entries) => writeFileSync(manifest, entries.join('\n') + '\n')
     write(lines)
+    assert.doesNotThrow(() => verifyPackageManifest(directory, 'archives'))
+    write(lines.slice(0, 3))
     assert.doesNotThrow(() => verifyPackageManifest(directory, 'complete'))
+    assert.throws(() => verifyPackageManifest(directory, 'archives'), /package set/)
     write(lines.slice(0, 2))
     assert.doesNotThrow(() => verifyPackageManifest(directory, 'legacy'))
     assert.throws(() => verifyPackageManifest(directory, 'complete'), /package set/)
@@ -90,6 +94,14 @@ test('Linux checksum verification rejects missing RPM, duplicate names, traversa
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test('native Linux workflow retains and verifies the tar archive of the same executable', () => {
+  const workflow = read('.github/workflows/linux-installer.yml')
+  assert.match(workflow, /SyncHub-linux-x64\.tar\.gz/)
+  assert.match(workflow, /tar -xzf bin\/SyncHub-linux-x64\.tar\.gz/)
+  assert.match(workflow, /cmp "\$evidence\/tar\/SyncHub\/SyncHub" "\$evidence\/deb\/usr\/bin\/SyncHub"/)
+  assert.match(workflow, /tarArchiveVerified:true/)
 })
 
 test('Linux package metadata versions follow nFPM stable and prerelease ordering', async () => {

@@ -3,6 +3,20 @@
 Use the repository-local validation guidance in
 `.agents/skills/synchub-validation/SKILL.md` before changing SyncHub.
 
+## Release authoring
+
+- Before preparing release tags, publishing or supplementing releases, changing
+  packaging or mirroring assets, read and follow the
+  [cross-platform release-authoring skill](../.agents/skills/synchub-release-authoring/SKILL.md).
+- Do not declare a desktop release complete without Windows x64 EXE/ZIP, macOS
+  Universal ARM64/Intel DMG/ZIP, Linux x64 DEB/AppImage/tar.gz, RPM when produced
+  by the current workflows, and checksums covering all final packages.
+- All packages must resolve to the same immutable tag/commit and have successful
+  native evidence for that version. Download and verify the final release bytes.
+  Skipped platform jobs and a green Windows-only workflow are not sufficient.
+- Keep release/tag/mirror operations explicitly authorized; report missing
+  packages or evidence as blocked rather than silently dropping an OS.
+
 ## Setup and validation
 
 - Run `node scripts/dev.mjs setup` before full validation in a fresh checkout.

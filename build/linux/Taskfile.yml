@@ -110,7 +110,17 @@ tasks:
     cmds:
       - task: create:appimage
       - task: create:deb
+      - task: create:tar
       - task: create:rpm
+
+  create:tar:
+    summary: Archives the Linux x64 binary, desktop entry, icon, license and install guide
+    platforms: [linux]
+    preconditions:
+      - sh: '[ "{{.ARCH | default ARCH}}" = "amd64" ]'
+        msg: "Linux release archives currently support amd64 only."
+    cmds:
+      - bash scripts/release/linux-archive.sh "{{.ROOT_DIR}}" "{{.APP_NAME}}"
 
   create:appimage:
     summary: Creates an AppImage

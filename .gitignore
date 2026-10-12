@@ -6,6 +6,10 @@
 /bin/
 /frontend/node_modules/
 /frontend/dist/
+/packages/npm-installer/node_modules/
+/packages/npm-installer/native/
+/packages/npm-installer/.install-*
+/packages/npm-installer/*.tgz
 /.agents/skills/codeblend-ai-composite/
 /skills-lock.json
 /build/linux/appimage/build/

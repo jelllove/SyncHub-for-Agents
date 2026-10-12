@@ -450,20 +450,6 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		}
 	}
 
-	e.publish(Progress{
-		Stage:            StageUploading,
-		Label:            "Uploading synchronized changes",
-		Percentage:       85,
-		CompletedActions: len(actions),
-		TotalActions:     len(actions),
-		BlockedFiles:     len(result.Blocked),
-		Restored:         result.Restored,
-		Reinstalled:      result.Reinstalled,
-		Skipped:          result.Skipped,
-		Conflicts:        result.Conflicts,
-		PendingInstalls:  result.PendingInstalls,
-		NeedsAttention:   len(result.Issues) > 0 || result.Conflicts > 0,
-	})
 	if err := e.Git.AddAll(); err != nil {
 		return Result{}, fmt.Errorf("git add: %w", err)
 	}
@@ -475,6 +461,20 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		if err := e.Git.Commit("sync: reconcile agent files"); err != nil {
 			return Result{}, fmt.Errorf("commit: %w", err)
 		}
+		e.publish(Progress{
+			Stage:            StageUploading,
+			Label:            "Uploading synchronized changes",
+			Percentage:       85,
+			CompletedActions: len(actions),
+			TotalActions:     len(actions),
+			BlockedFiles:     len(result.Blocked),
+			Restored:         result.Restored,
+			Reinstalled:      result.Reinstalled,
+			Skipped:          result.Skipped,
+			Conflicts:        result.Conflicts,
+			PendingInstalls:  result.PendingInstalls,
+			NeedsAttention:   len(result.Issues) > 0 || result.Conflicts > 0,
+		})
 		if err := e.Git.Push(); err != nil {
 			if attempts <= 1 {
 				return Result{}, fmt.Errorf("push: %w", err)
