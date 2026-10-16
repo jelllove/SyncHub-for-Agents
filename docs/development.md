@@ -260,12 +260,32 @@ behavior. Isolated preference fixtures cover restart persistence and explicit
 save failures. Regenerate Wails bindings after changing the preference APIs;
 never edit generated files by hand.
 
-The Windows adapter uses the public `NativeWindow()` handle and UI-thread
-dispatch to show the tip with `SW_SHOWNOACTIVATE`. The pinned Wails `Show()` uses
-`SW_SHOW`, which activated the popup in a native smoke test despite the
-`WS_EX_NOACTIVATE` style. Keep the non-activating show path isolated in the
-Windows adapter, and retain native regression evidence against a known-focused
-fixture window rather than inferring focus behavior only from option flags.
+The Windows adapter first uses the public `NativeWindow()` handle and UI-thread
+dispatch to show the tip with `SW_SHOWNOACTIVATE`, then calls Wails `Show()` on
+the already-visible window to restore the WebView2 controller. Native showing
+alone leaves the browser hidden after Wails `Hide()`, producing a blank card.
+The order matters: Wails `Show()` on a hidden window uses `SW_SHOW` and activates
+the popup despite `WS_EX_NOACTIVATE`; on an already-visible window it restores
+the browser without activating the popup. Keep this path isolated in the
+Windows adapter and verify against a known-active fixture window, not flags alone.
+
+After building frontend assets, opt into the native Windows regression:
+
+```powershell
+$env:SYNCHUB_NATIVE_TRAY_TEST = '1'
+try {
+    go test ./internal/tray/desktop -run TestNativeTipReshowKeepsContentAndFocus -count=1 -v
+    if ($LASTEXITCODE -ne 0) { throw 'Native tray regression failed' }
+} finally {
+    Remove-Item Env:SYNCHUB_NATIVE_TRAY_TEST
+}
+```
+
+This test runs the built frontend in a separate WebView2 fixture process and
+checks three hide/show cycles: scanning, attention and completion. Each requires
+visible browser content, a nonempty title, all three controls and unchanged
+activation of the fixture sentinel. Its temporary browser profile is removed
+after the fixture process exits; ordinary unit runs skip this opt-in UI test.
 Native smoke checks must use a separate fixture application with an isolated
 WebView2 profile and no desktop sync/startup services. Browser checks can validate
 icons, text, controls and fit, but cannot establish Windows popup placement or

@@ -26,6 +26,11 @@ func showTipWindow(window *application.WebviewWindow) error {
 		// Wails Show uses SW_SHOW, which activates even a WS_EX_NOACTIVATE window.
 		// ShowWindow returns previous visibility, not a success/error indicator.
 		showWindow.Call(handle, 4) // SW_SHOWNOACTIVATE
+		if window.IsVisible() {
+			// Showing an already-visible HWND does not activate it. Let Wails
+			// restore the WebView2 controller too, including after Hide().
+			window.Show()
+		}
 	})
 	if !window.IsVisible() {
 		return errors.New("activity tip did not become visible")
