@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from './i18n'
+import { LocalizedError, localizedErrorMessage } from './localizedError'
 
 export type FirstSyncStrategy = 'use-cloud' | 'merge-cloud-local' | 'use-local'
 
@@ -27,10 +29,17 @@ export function FirstSyncDialog({ busy, paused, repositoryUrl, confirm, dismiss 
   confirm: (strategy: FirstSyncStrategy) => Promise<void>
   dismiss: () => void
 }) {
+  const { t } = useI18n()
+  const strategyText: Record<FirstSyncStrategy, [string, string]> = {
+    'use-cloud': ['使用云端', '两端存在差异时优先使用云端数据。本地文件可能被替换或删除。'],
+    'merge-cloud-local': ['合并云端和本地', '合并两端内容。任何冲突都必须先经审查和解决，才能应用。'],
+    'use-local': ['使用本地', '两端存在差异时优先使用此电脑的数据。云端文件可能被替换或删除。'],
+  }
   const dialog = useRef<HTMLDialogElement>(null)
   const laterButton = useRef<HTMLButtonElement>(null)
   const [selected, setSelected] = useState<FirstSyncStrategy>()
-  const [error, setError] = useState('')
+  const [error, setError] = useState<string | LocalizedError>('')
+  const [missingStrategy, setMissingStrategy] = useState(false)
 
   useEffect(() => {
     const element = dialog.current!
@@ -46,14 +55,15 @@ export function FirstSyncDialog({ busy, paused, repositoryUrl, confirm, dismiss 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!selected) {
-      setError('Choose a strategy before starting your first sync.')
+      setMissingStrategy(true)
       return
     }
     setError('')
+    setMissingStrategy(false)
     try {
       await confirm(selected)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
+      setError(cause instanceof LocalizedError ? cause : cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -68,13 +78,13 @@ export function FirstSyncDialog({ busy, paused, repositoryUrl, confirm, dismiss 
         if (!busy) dismiss()
       }}
     >
-      <span className="eyebrow">FIRST SYNCHRONIZATION</span>
-      <h2 id="first-sync-title">Choose first sync strategy</h2>
-      <p id="first-sync-description">Before syncing, choose how to handle differences between this computer and your cloud repository. Nothing starts until you confirm.</p>
+      <span className="eyebrow">{t('FIRST SYNCHRONIZATION', '首次同步')}</span>
+      <h2 id="first-sync-title">{t('Choose first sync strategy', '选择首次同步策略')}</h2>
+      <p id="first-sync-description">{t('Before syncing, choose how to handle differences between this computer and your cloud repository. Nothing starts until you confirm.', '同步前，请选择如何处理此电脑与云端仓库之间的差异。确认之前不会开始任何操作。')}</p>
       <code className="first-sync-repository">{repositoryUrl}</code>
       <form onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy} className="first-sync-options">
-          <legend>How should the first sync handle your data?</legend>
+          <legend>{t('How should the first sync handle your data?', '首次同步应如何处理您的数据？')}</legend>
           {strategies.map((strategy) => (
             <label className={`first-sync-option${selected === strategy.value ? ' selected' : ''}`} key={strategy.value}>
               <input
@@ -84,17 +94,18 @@ export function FirstSyncDialog({ busy, paused, repositoryUrl, confirm, dismiss 
                 onChange={() => setSelected(strategy.value)}
               />
               <span>
-                <strong>{strategy.label}</strong>
-                <small>{strategy.description}</small>
+                <strong>{t(strategy.label, strategyText[strategy.value][0])}</strong>
+                <small>{t(strategy.description, strategyText[strategy.value][1])}</small>
               </span>
             </label>
           ))}
         </fieldset>
-        {paused && <p className="first-sync-paused">Synchronization is paused. Starting your first sync will also resume synchronization.</p>}
-        {error && <div className="inline-error" role="alert">{error}</div>}
+        {paused && <p className="first-sync-paused">{t('Synchronization is paused. Starting your first sync will also resume synchronization.', '同步已暂停。开始首次同步也将恢复同步。')}</p>}
+        {missingStrategy && <div className="inline-error" role="alert">{t('Choose a strategy before starting your first sync.', '开始首次同步前请选择策略。')}</div>}
+        {error && <div className="inline-error" role="alert">{localizedErrorMessage(error, t)}</div>}
         <div className="first-sync-actions">
-          <button ref={laterButton} className="secondary" type="button" disabled={busy} onClick={dismiss}>Choose later</button>
-          <button className="primary" type="submit" disabled={busy || !selected}>{busy ? 'Starting first sync...' : 'Start first sync'}</button>
+          <button ref={laterButton} className="secondary" type="button" disabled={busy} onClick={dismiss}>{t('Choose later', '稍后选择')}</button>
+          <button className="primary" type="submit" disabled={busy || !selected}>{busy ? t('Starting first sync...', '正在开始首次同步…') : t('Start first sync', '开始首次同步')}</button>
         </div>
       </form>
     </dialog>

@@ -149,6 +149,7 @@ func newRootCommand() *cobra.Command {
 	root.AddCommand(
 		initCommand(options), statusCommand(options), planCommand(options),
 		doctorCommand(options), syncCommand(options), daemonCommand(options),
+		libraryCommand(options),
 		&cobra.Command{
 			Use: "version", Short: "Print the CLI version", Args: noArgs,
 			RunE: func(cmd *cobra.Command, _ []string) error {

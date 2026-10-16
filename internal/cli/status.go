@@ -13,6 +13,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
 	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
+	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
@@ -77,6 +78,13 @@ func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
 		return Inspection{}, fmt.Errorf("create status stage parent: %w", err)
 	}
+	remote, err := syncengine.SnapshotRepo(repoDir)
+	if err != nil {
+		return Inspection{}, err
+	}
+	if err := sharedlibrary.ProtectRemoteSpecs(resources, remote, userHome); err != nil {
+		return Inspection{}, err
+	}
 	specList := make([]resource.Spec, 0, len(resources))
 	for _, spec := range resources {
 		specList = append(specList, spec)
@@ -96,10 +104,6 @@ func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr
 		retErr = errors.Join(retErr, collected.Close())
 	}()
 
-	remote, err := syncengine.SnapshotRepo(repoDir)
-	if err != nil {
-		return Inspection{}, err
-	}
 	remoteOwned, _, ownershipBlocked := syncengine.SplitRemoteSnapshot(remote, resources)
 	validRemote, validationBlocked := syncengine.ValidateRemoteResources(
 		repoDir,

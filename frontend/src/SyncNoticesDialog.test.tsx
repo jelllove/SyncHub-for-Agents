@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SyncNoticesDialog } from './SyncNoticesDialog'
+import { setLocale } from './i18n'
 
 const notices = {
   version: 1, fingerprint: 'exact-set', finishedAt: '2026-10-03T10:00:00Z',
@@ -15,6 +16,25 @@ const notices = {
 }
 
 describe('SyncNoticesDialog', () => {
+  afterEach(() => act(() => setLocale('en')))
+
+  it('retains filtered diagnostics and explicit acknowledgement when translated', async () => {
+    const acknowledge = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<SyncNoticesDialog notices={notices} initialFilter="blocked" acknowledge={acknowledge} dismiss={vi.fn()} />)
+    act(() => setLocale('zh-CN'))
+    expect(screen.getByRole('dialog', { name: '同步诊断日志' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: '显示问题' })).toHaveValue('blocked')
+    expect(screen.getByText('secret-detected')).toBeVisible()
+    expect(screen.getByText('Credential content')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '审阅安全提示' }))
+    expect(acknowledge).not.toHaveBeenCalled()
+    act(() => setLocale('en'))
+    expect(screen.getByRole('button', { name: 'Confirm acknowledgement' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Confirm acknowledgement' }))
+    expect(acknowledge).toHaveBeenCalledExactlyOnceWith('exact-set')
+  })
+
   it('retains duplicates and exposes exact resource, path, reason and code with filters', async () => {
     const user = userEvent.setup()
     render(<SyncNoticesDialog notices={notices} initialFilter="skipped" acknowledge={vi.fn()} dismiss={vi.fn()} />)

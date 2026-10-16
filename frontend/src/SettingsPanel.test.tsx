@@ -1,11 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Snapshot } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import { SettingsPanel } from './SettingsPanel'
 import { normalizeSnapshot } from './desktopState'
+import { setLocale } from './i18n'
 
 const startAtLogin = vi.fn()
+const librarySnapshot = vi.fn()
 const updates = vi.hoisted(() => ({
   status: vi.fn(),
   check: vi.fn(),
@@ -20,6 +22,7 @@ vi.mock('@wailsio/runtime', () => ({
 vi.mock('../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice', () => ({
   PreviewCustomResource: vi.fn(),
   StartAtLogin: () => startAtLogin(),
+  LibrarySnapshot: () => librarySnapshot(),
   TrayTipsEnabled: vi.fn().mockResolvedValue(true),
   SetTrayTipsEnabled: vi.fn().mockResolvedValue(undefined),
   UpdateStatus: () => updates.status(),
@@ -98,9 +101,11 @@ function snapshot(generatedAt: string, files: number): Snapshot {
 }
 
 describe('SettingsPanel', () => {
+  afterEach(() => act(() => setLocale('en')))
   beforeEach(() => {
     startAtLogin.mockReset()
     startAtLogin.mockResolvedValue(false)
+    librarySnapshot.mockReset().mockResolvedValue({ root: '/test/.agents/library', entries: [] })
     updates.status.mockReset().mockResolvedValue(updateStatus())
     updates.check.mockReset().mockResolvedValue(updateStatus(false))
     updates.automatic.mockReset().mockImplementation((enabled: boolean) => Promise.resolve(updateStatus(enabled)))
@@ -255,12 +260,36 @@ describe('SettingsPanel', () => {
     return save
   }
 
-  it('groups controls into five accessible categories without resetting drafts', async () => {
+  it('explains each category with a labeled engineering diagram', async () => {
+    renderSettings()
+    const user = userEvent.setup()
+    for (const tab of ['Repository', 'Sync', 'Resources', 'Library', 'Desktop', 'Advanced']) {
+      await user.click(screen.getByRole('tab', { name: tab }))
+      expect(within(screen.getByRole('tabpanel', { name: tab })).getByRole('img')).toBeVisible()
+    }
+  })
+
+  it('switches language without resetting drafts or refetching startup settings', async () => {
+    const save = renderSettings()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Repository' }))
+    const repository = screen.getByRole('textbox', { name: /Private Git repository/ })
+    await user.clear(repository)
+    await user.type(repository, 'git@github.com:owner/bilingual.git')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language / 语言' }), 'zh-CN')
+    expect(screen.getByRole('tab', { name: '同步仓库' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('textbox', { name: /私有 Git 仓库/ })).toHaveValue('git@github.com:owner/bilingual.git')
+    await user.click(screen.getByRole('button', { name: '保存设置' }))
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ repositoryUrl: 'git@github.com:owner/bilingual.git' }), false, false)
+    expect(startAtLogin).toHaveBeenCalledTimes(1)
+  })
+
+  it('groups controls into six accessible categories without resetting drafts', async () => {
     startAtLogin.mockResolvedValue(true)
     const save = renderSettings()
     const user = userEvent.setup()
     expect(screen.getByRole('tablist', { name: 'Settings categories' })).toBeVisible()
-    expect(screen.getAllByRole('tab')).toHaveLength(5)
+    expect(screen.getAllByRole('tab')).toHaveLength(6)
     expect(screen.getByRole('tab', { name: 'Sync' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('textbox', { name: /Private Git repository/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Repository' }))
@@ -290,6 +319,9 @@ describe('SettingsPanel', () => {
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('tab', { name: 'Resources' })).toHaveFocus()
     expect(screen.getByRole('tabpanel', { name: 'Resources' })).toBeVisible()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Library' })).toHaveFocus()
+    expect(screen.getByRole('tabpanel', { name: 'Library' })).toBeVisible()
     await user.keyboard('{End}')
     expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Reset and start over' })).toBeVisible()
@@ -299,6 +331,47 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveFocus()
     expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveAttribute('tabindex', '0')
     expect(screen.getByRole('tab', { name: 'Repository' })).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('uses a vertical category sidebar with up and down keyboard navigation', async () => {
+    renderSettings()
+    const user = userEvent.setup()
+    expect(screen.getByRole('tablist')).toHaveAttribute('aria-orientation', 'vertical')
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('tab', { name: 'Resources' })).toHaveFocus()
+    await user.keyboard('{ArrowUp}')
+    expect(screen.getByRole('tab', { name: 'Sync' })).toHaveFocus()
+  })
+
+  it('does not present Save settings as the way to confirm a library operation', async () => {
+    const save = renderSettings()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Library' }))
+    expect(screen.queryByRole('button', { name: 'Save settings' })).not.toBeInTheDocument()
+    expect(screen.getByText('Library changes use their own preview and confirmation.')).toBeVisible()
+    const form = screen.getByRole('tabpanel', { name: 'Library' }).closest('form')
+    if (!form) throw new Error('Missing settings form')
+    fireEvent.submit(form)
+    expect(save).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeVisible()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('scans the library only while its tab is mounted and rescans on return', async () => {
+    const save = renderSettings()
+    expect(librarySnapshot).not.toHaveBeenCalled()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Library' }))
+    await screen.findByRole('button', { name: 'Refresh library' })
+    expect(librarySnapshot).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('tab', { name: 'Sync' }))
+    expect(screen.queryByRole('heading', { name: 'Shared library' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Library' }))
+    await waitFor(() => expect(librarySnapshot).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: 'Refresh library' }))
+    expect(save).not.toHaveBeenCalled()
   })
 
   it('reveals and focuses invalid settings from another tab rather than silently blocking save', async () => {

@@ -17,6 +17,7 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/portablemerge"
 	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
+	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
@@ -534,6 +535,9 @@ func (e *Engine) loadRemote(codecs *portableconfig.Registry) (remoteView, error)
 	snapshot, err := SnapshotRepo(e.RepoDir)
 	if err != nil {
 		return remoteView{}, fmt.Errorf("snapshot repo: %w", err)
+	}
+	if err := sharedlibrary.ProtectRemoteSpecs(e.Resources, snapshot, e.UserHome); err != nil {
+		return remoteView{}, fmt.Errorf("protect remote library sources: %w", err)
 	}
 	owned, _, ownershipBlocked := SplitRemoteSnapshot(snapshot, e.Resources)
 	valid, validationBlocked := ValidateRemoteResources(

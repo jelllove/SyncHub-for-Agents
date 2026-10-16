@@ -44,9 +44,14 @@ func TestBuiltinsLoaded(t *testing.T) {
 			}
 			seenIDs[declaration.ID] = struct{}{}
 			seenCategories[declaration.Category] = struct{}{}
-			if declaration.Category == resource.CategorySkills &&
-				declaration.SharedAs != "common-skills" {
-				t.Errorf("%s skill %q shared_as = %q", name, declaration.ID, declaration.SharedAs)
+			if declaration.Category == resource.CategorySkills {
+				expected := "common-skills"
+				if name == "common" && declaration.ID == "library-skills" {
+					expected = ""
+				}
+				if declaration.SharedAs != expected {
+					t.Errorf("%s skill %q shared_as = %q, want %q", name, declaration.ID, declaration.SharedAs, expected)
+				}
 			}
 			for _, include := range declaration.Include {
 				lower := strings.ToLower(include)

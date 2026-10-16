@@ -135,8 +135,16 @@ func (c *Collector) coalesce(
 			spec.Key = key
 			spec.Provider = "common"
 		}
+		if spec.ValidateRoot != nil {
+			if err := spec.ValidateRoot(spec.Root); err != nil {
+				return nil, nil, err
+			}
+		}
 		root, err := ResolveRoot(spec.Root)
 		if err != nil {
+			if spec.OptionalRoot && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			issues = append(issues, resource.Issue{
 				ResourceKey: spec.Key,
 				Path:        spec.Root,
@@ -268,6 +276,14 @@ func (c *Collector) walkDirectory(
 		}
 		physicalPath := filepath.Join(physicalDir, entry.Name())
 		logicalPath := path.Join(logicalDir, entry.Name())
+		if !spec.Owns(logicalPath) {
+			continue
+		}
+		if spec.ValidateRoot != nil {
+			if err := spec.ValidateRoot(physicalPath); err != nil {
+				return err
+			}
+		}
 		if entry.Type()&os.ModeSymlink != 0 {
 			if c.skipDirectoryPath(spec, logicalPath, scanner, result) {
 				continue
@@ -451,6 +467,12 @@ func (c *Collector) collectFile(
 			Bytes:       int64(len(data)),
 		})
 		return nil
+	}
+	if spec.ValidateContent != nil {
+		if err := spec.ValidateContent(rel, data); err != nil {
+			result.Blocked = append(result.Blocked, issue(spec, rel, "content-policy", err))
+			return nil
+		}
 	}
 	blocked, err := scanner.Scan(rel, data)
 	if err != nil {

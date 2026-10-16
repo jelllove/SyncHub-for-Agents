@@ -116,6 +116,12 @@ func ValidateRemoteResources(
 			continue
 		}
 		scanner := secret.NewScanner(spec.Exclude, spec.KeyPatterns)
+		if spec.ValidateContent != nil {
+			if err := spec.ValidateContent(ref.Relative, data); err != nil {
+				blocked = append(blocked, remoteIssue(spec.Key, repoRel, "remote-content-policy", err))
+				continue
+			}
+		}
 		detected, err := scanner.Scan(ref.Relative, data)
 		if err != nil {
 			blocked = append(blocked, remoteIssue(spec.Key, repoRel, "remote-scan-failed", err))
@@ -296,7 +302,7 @@ func specForRef(specs map[string]resource.Spec, ref resource.RepoRef) (resource.
 }
 
 func refMatchesSpec(ref resource.RepoRef, spec resource.Spec) bool {
-	return ref.Category == spec.Category &&
+	return spec.Owns(ref.Relative) && ref.Category == spec.Category &&
 		ref.Portable == (spec.Layout == resource.LayoutPortable)
 }
 
@@ -485,6 +491,11 @@ func ConflictScanner(specs map[string]resource.Spec) conflict.Scanner {
 		spec, ok := specForRef(specs, ref)
 		if !ok || !refMatchesSpec(ref, spec) {
 			return scanInternalData(path.Join("conflict", variant, ref.Relative), data)
+		}
+		if spec.ValidateContent != nil {
+			if err := spec.ValidateContent(ref.Relative, data); err != nil {
+				return err
+			}
 		}
 		scanner := secret.NewScanner(spec.Exclude, spec.KeyPatterns)
 		blocked, err := scanner.Scan(path.Join("conflict", variant, ref.Relative), data)

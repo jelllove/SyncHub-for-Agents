@@ -12,6 +12,8 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/conflict"
 	"github.com/qinqingxu/synchub-for-agents/internal/installplan"
 	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
+	"github.com/qinqingxu/synchub-for-agents/internal/resource"
+	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
@@ -37,7 +39,12 @@ func RunSyncWithProgress(
 func runSyncWithUserHome(
 	home, goos, userHome string,
 	onProgress ...func(syncengine.Progress),
-) (syncengine.Result, error) {
+) (result syncengine.Result, err error) {
+	lock, err := sharedlibrary.Lock(userHome)
+	if err != nil {
+		return result, err
+	}
+	defer func() { err = errors.Join(err, lock.Close()) }()
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
 		return syncengine.Result{}, err
@@ -93,7 +100,7 @@ func runSyncWithUserHome(
 	if len(onProgress) > 0 {
 		eng.OnProgress = onProgress[0]
 	}
-	result, err := eng.SyncOnce()
+	result, err = eng.SyncOnce()
 	if err != nil {
 		return syncengine.Result{}, err
 	}
@@ -101,6 +108,12 @@ func runSyncWithUserHome(
 		cfg.FirstSync.Completed = true
 		if err := config.Save(ConfigPath(home), cfg); err != nil {
 			return syncengine.Result{}, fmt.Errorf("mark first sync completed: %w", err)
+		}
+	}
+	manager := sharedlibrary.Manager{Home: home, UserHome: userHome}
+	if !result.NeedsAttention {
+		if err := manager.Refresh(cfg.CategoryEnabled("common", resource.CategorySkills), cfg.CategoryEnabled("common", resource.CategoryInstructions)); err != nil {
+			return result, fmt.Errorf("shared library needs attention: %w", err)
 		}
 	}
 	return result, nil

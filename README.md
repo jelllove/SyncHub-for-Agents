@@ -19,6 +19,18 @@ It uses a private Git repository you control as the synchronization bridge, with
 - Resolve conflicts with local/remote/merged choices and batch apply.
 - Review and approve plugin/skill install operations before execution, with explicit retry for failed operations.
 - Select which agents and resource categories are included, plus custom resource directories.
+- Switch the desktop interface between **English** and **简体中文**, including
+  first-run setup, settings, resource review, and activity-tip controls. The
+  **Language / 语言** selector in settings (also available during first-run setup)
+  applies immediately and remembers the choice on
+  this device; it does not change CLI output, resource contents, or diagnostics.
+- Understand settings through compact resource-flow illustrations. Empty shared
+  libraries start at adding local resources, with separate previews and approvals
+  before using them in compatible tools.
+- Manage a personal [shared resource library](docs/shared-library.md) from
+  **Settings > Library** or `synchub library`: preview imports, apply skills to
+  Claude or the native common directory, and recover or detach managed outputs
+  without silently overwriting local edits.
 - Start automatically at login, enabled by default in Windows releases with an opt-out.
 - Check GitHub Releases automatically and securely download Windows x64 updates
   for installation when you quit the app.

@@ -44,7 +44,7 @@ func requestedJSON(args []string) bool {
 			break
 		}
 		switch arg {
-		case "--home", "--repo", "--first-sync", "--agents":
+		case "--home", "--repo", "--first-sync", "--agents", "--kind", "--name", "--harness", "--approve":
 			index++
 		case "--json":
 			enabled = true

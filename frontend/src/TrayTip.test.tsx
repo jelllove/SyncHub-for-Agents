@@ -1,7 +1,8 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TrayTip } from './TrayTip'
+import { setLocale } from './i18n'
 
 const events = vi.hoisted(() => ({
   on: vi.fn(),
@@ -30,6 +31,23 @@ function send(kind: string, revision = 1, title = kind) {
 }
 
 describe('TrayTip', () => {
+  afterEach(() => act(() => setLocale('en')))
+
+  it('translates known activity text live, preserves unknown diagnostics and does not reconnect', () => {
+    render(<TrayTip />)
+    act(() => events.handlers.get('tray-tip:status')?.({
+      data: { kind: 'pulling', revision: 1, title: 'Pulling', message: 'Retrieving the latest changes from your sync repository.' },
+    }))
+    act(() => setLocale('zh-CN'))
+    expect(screen.getByRole('heading', { name: '正在拉取' })).toBeVisible()
+    expect(screen.getByText('正在从同步仓库获取最新更改。')).toBeVisible()
+    send('error', 2, 'Raw diagnostic: Pulling my-file')
+    expect(screen.getByRole('heading', { name: 'Raw diagnostic: Pulling my-file' })).toBeVisible()
+    expect(screen.getByText('Synthetic synchronization status.')).toBeVisible()
+    expect(events.emit).toHaveBeenCalledTimes(1)
+    expect(events.on).toHaveBeenCalledTimes(2)
+  })
+
   beforeEach(() => {
     events.handlers.clear()
     events.on.mockReset()

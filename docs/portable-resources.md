@@ -18,6 +18,13 @@ machine-specific state on the computer where they were created.
 - **Common resources** represent shared instructions or Skills restored to
   multiple supported agents.
 
+The opt-in [shared library](shared-library.md) adds canonical sources under
+`~/.agents/library` with previewed, per-target adoption. Its managed names are
+reserved from legacy alias restore/collection; local backups and target approval
+remain on each computer. Enable common Skills/Instructions to synchronize the
+corresponding sources. This is distinct from automatically sharing whole skill
+directories.
+
 You can disable an entire agent or an individual category in **Sync settings**.
 Use the restore preview to review source paths, restore targets, file counts,
 excluded content, and total portable data before saving changes.

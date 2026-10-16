@@ -13,7 +13,7 @@ All package names below are under `internal/` unless stated otherwise.
 | --- | --- | --- |
 | Foundations | `resource`, `config`, `secret`, `state`, `pathresolver` | Resource models and filtering; persisted user settings; path/content exclusion; sync snapshots and merge bases; filesystem path resolution and containment. `secret` filters resource content, while authentication credentials belong to `auth`. |
 | Resource preparation | `provider`, `resourcecollect`, `portableconfig` | Load provider/resource definitions, discover and stage safe resources, and project portable configuration fields through codecs/policies. |
-| Reconciliation and application | `portablemerge`, `conflict`, `installplan`, `syncengine` | Merge portable content, persist/resolve conflicts, require explicit installation approval, and execute synchronization, restore, deletion, and trash cleanup. |
+| Reconciliation and application | `portablemerge`, `conflict`, `installplan`, `sharedlibrary`, `syncengine` | Merge portable content, persist/resolve conflicts, require explicit installation approval, manage approved shared-source projections, and execute synchronization, restore, deletion, and trash cleanup. |
 | Repository access | `gitclient`, `repository` | Run Git operations and validate/prepare the configured synchronization repository. |
 | Application composition | `cli`, `daemon`, `desktop`, `settings`, `tray` | Assemble backend dependencies and resource specifications; wire scheduled sync/cleanup; expose Wails services/UI models, HTTP settings, and the native tray. `cli` is shared application orchestration, not just command-line argument parsing. |
 | Other support | `auth`, `onboarding`, `scheduler`, `processattr`, `autostart`, `startup`, `updater`, `sshprobe`, `appversion` | Authentication/onboarding, reusable scheduling, process/platform integration, startup/update behavior, SSH probing, and version metadata. These packages are not classified by the two guards below. |
@@ -65,6 +65,33 @@ event and can only request opening the main window or dismissing the tip. The
 adapter validates the sending window name, cleans up events/timers at shutdown,
 and does not expose raw repository/file/error data in the popup.
 
+## Desktop interface and language
+
+[The language store](../frontend/src/i18n.ts) uses React's external-store
+subscription API so English/Simplified Chinese changes update mounted views
+without resetting forms, approved previews, or onboarding state. Explicit
+bilingual UI strings remain adjacent to their controls; both translations are
+required by the typed translator. Backend request identifiers and user-provided
+content are never translated. Known status codes have presentation-only labels.
+
+[The language selector](../frontend/src/LanguageSwitcher.tsx) persists the
+`en` or `zh-CN` preference under the WebView-local `synchub.ui.language` key.
+It defaults to Simplified Chinese for Chinese browser/system languages and to
+English otherwise. Storage events update other same-origin WebViews when their
+host supports these events. Storage read/write failures are logged and displayed
+with an explicit retry; a failed save still permits session-only use.
+This preference is not part of Git synchronization or the CLI configuration.
+Native tray menus, OS dialogs, and backend diagnostics retain their original
+language; the React desktop views and Windows activity-tip controls are bilingual.
+
+[Settings illustrations](../frontend/src/SettingsDiagram.tsx) are local SVG/CSS
+diagrams with translated text alternatives, not remote images or live progress.
+[The shared-library panel](../frontend/src/SharedLibraryPanel.tsx) separates adding
+sources from using them in compatible destinations and reveals recovery controls
+only when managed outputs exist. Its existing generation counter and exact
+preview-ID approval remain the authority for preventing stale UI writes.
+Language changes do not issue backend calls or alter approval validity.
+
 ## Two enforced directions
 
 [The architecture guard](../tools/archcheck/boundaries_test.go) groups the current
@@ -74,9 +101,9 @@ allowed dependency.
 1. **`foundations-below-sync-domain`**: `config`, `pathresolver`, `resource`,
    `secret`, and `state` must not import `conflict`, `gitclient`, `installplan`,
    `portableconfig`, `portablemerge`, `provider`, `repository`, `resourcecollect`,
-   or `syncengine`. Resource/settings/snapshot abstractions should not acquire
+   `sharedlibrary`, or `syncengine`. Resource/settings/snapshot abstractions should not acquire
    the workflows that consume them.
-2. **`core-independent-of-composition`**: those five foundations and nine
+2. **`core-independent-of-composition`**: those five foundations and ten
    sync-domain/repository packages must not import `cli`, `daemon`, `desktop`,
    `settings`, or `tray`. Synchronization and safety policies should remain
    reusable without depending on an application host or its wiring.
@@ -103,6 +130,14 @@ For runtime safety requirements, see the
 [portable-resource rules](portable-resources.md) and
 [backend guidance](../internal/AGENTS.md). An import check does not verify those
 behavioral invariants.
+
+The [shared library](shared-library.md) keeps canonical sources separate from
+Harness output directories. Local ownership receipts and backups never enter
+Git. A user-home OS lock serializes explicit library operations and sync; source
+sync uses the existing engine, followed by drift-checked refresh of approved
+outputs after clean cycles. Reserved resource paths are excluded from both
+collection and remote ownership/application, including legacy instruction paths.
+Whole-directory alias creation is disabled for the affected common skills pool.
 
 ## Planning versus execution
 

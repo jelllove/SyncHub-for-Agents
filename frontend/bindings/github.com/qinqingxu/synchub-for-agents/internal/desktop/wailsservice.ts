@@ -15,6 +15,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as onboarding$0 from "../onboarding/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as sharedlibrary$0 from "../sharedlibrary/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as updater$0 from "../updater/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -23,6 +26,10 @@ import * as $models from "./models.js";
 
 export function AcknowledgeSyncNotices(fingerprint: string): $CancellablePromise<$models.Snapshot> {
     return $Call.ByID(992847316, fingerprint);
+}
+
+export function ApplyLibrary(request: sharedlibrary$0.Request, id: string): $CancellablePromise<void> {
+    return $Call.ByID(2488671263, request, id);
 }
 
 export function ApproveInstallPlan(id: string): $CancellablePromise<void> {
@@ -41,6 +48,10 @@ export function CompleteOnboarding(enabled: { [_ in string]?: boolean } | null):
     return $Call.ByID(367143950, enabled);
 }
 
+export function LibrarySnapshot(): $CancellablePromise<sharedlibrary$0.Snapshot> {
+    return $Call.ByID(1389623019);
+}
+
 export function NeedsOnboarding(): $CancellablePromise<boolean> {
     return $Call.ByID(2131389736);
 }
@@ -55,6 +66,10 @@ export function Pause(): $CancellablePromise<void> {
 
 export function PreviewCustomResource(input: $models.CustomResourceInput): $CancellablePromise<$models.ResourcePreview> {
     return $Call.ByID(3594254427, input);
+}
+
+export function PreviewLibrary(request: sharedlibrary$0.Request): $CancellablePromise<sharedlibrary$0.Plan> {
+    return $Call.ByID(2107425007, request);
 }
 
 export function QueueConflictBatch(selections: $models.ConflictSelection[] | null): $CancellablePromise<void> {

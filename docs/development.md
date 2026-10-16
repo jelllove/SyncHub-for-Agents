@@ -11,6 +11,18 @@ node scripts/dev.mjs setup
 node scripts/dev.mjs verify
 ```
 
+On a memory-constrained or shared development host, limit Vitest workers rather
+than increasing test timeouts or skipping checks. In PowerShell:
+
+```powershell
+$env:VITEST_MAX_WORKERS = '2'
+node scripts/dev.mjs verify
+```
+
+This retains the complete verification suite and its existing timeout limits;
+only frontend test concurrency changes. Keep any earlier failed validation
+artifacts when retrying with this setting.
+
 Setup restores Go modules and the npm lockfile and builds frontend assets required
 by Go's embed directive. It does not install global tools, change Git configuration,
 start a daemon, or access a user's synchronization repository.

@@ -1,11 +1,12 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ResourcePreview,
   Snapshot,
 } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import App from './App'
+import { setLocale } from './i18n'
 
 const api = vi.hoisted(() => ({
   needsOnboarding: vi.fn(),
@@ -144,6 +145,7 @@ function deferredSnapshot() {
 }
 
 describe('App settings preview', () => {
+  afterEach(() => act(() => setLocale('en')))
   beforeEach(() => {
     api.needsOnboarding.mockReset()
     api.resourcePreview.mockReset()
@@ -168,6 +170,66 @@ describe('App settings preview', () => {
       error: '',
       lastChecked: '',
     })
+  })
+
+  it('switches first-run setup between English and Chinese without restarting onboarding', async () => {
+    api.needsOnboarding.mockResolvedValue(true)
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Get started' })).toBeVisible()
+    const language = screen.getByRole('combobox', { name: /Language|语言/ })
+    await user.selectOptions(language, 'zh-CN')
+    expect(screen.getByRole('button', { name: '开始使用' })).toBeVisible()
+    expect(screen.getByText('凭据仅保存在操作系统密钥环中。')).toBeVisible()
+    await user.selectOptions(language, 'en')
+    expect(screen.getByRole('button', { name: 'Get started' })).toBeVisible()
+    expect(api.needsOnboarding).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers language switching only inside settings after setup and preserves the choice when closed', async () => {
+    api.resourcePreview.mockResolvedValue(configuredSnapshot().preview)
+    const user = userEvent.setup()
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Ready' })).toBeVisible()
+    act(() => api.events.get('desktop:progress')?.({ data: {
+      ...configuredSnapshot().progress, stage: 'complete', revision: 1,
+    } }))
+    expect(screen.queryByRole('combobox', { name: /Language|语言/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Open settings' }))
+    const settings = screen.getByRole('dialog', { name: 'Sync settings' })
+    expect(screen.getAllByRole('combobox', { name: /Language|语言/ })).toHaveLength(1)
+    await user.selectOptions(within(settings).getByRole('combobox', { name: /Language|语言/ }), 'zh-CN')
+    expect(localStorage.getItem('synchub.ui.language')).toBe('zh-CN')
+    await user.click(screen.getByRole('button', { name: '关闭设置' }))
+    expect(screen.queryByRole('combobox', { name: /Language|语言/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '就绪' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '立即同步' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent('同步完成；无需更改')
+    expect(screen.getByText('每 10 分钟')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '打开设置' }))
+    const language = within(screen.getByRole('dialog', { name: '同步设置' })).getByRole('combobox', { name: /Language|语言/ })
+    expect(language).toHaveValue('zh-CN')
+    await user.selectOptions(language, 'en')
+    await user.click(screen.getByRole('button', { name: 'Close settings' }))
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeVisible()
+    expect(api.snapshot).toHaveBeenCalledTimes(1)
+    expect(api.triggerSync).not.toHaveBeenCalled()
+  })
+
+  it('translates a retained local acknowledgement error without translating service diagnostics', async () => {
+    const initial = diagnosticSnapshot()
+    api.snapshot.mockResolvedValue(initial)
+    api.acknowledgeSyncNotices.mockResolvedValue({ ...initial, syncNotices: { ...initial.syncNotices, fingerprint: 'new-set' } })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Review notices' }))
+    await user.click(screen.getByRole('button', { name: 'Review safety notices' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm acknowledgement' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sync notice set changed while saving')
+    act(() => setLocale('zh-CN'))
+    expect(screen.getByRole('alert')).toHaveTextContent('保存时同步提示集已更改；请关闭并重新打开日志以审阅当前记录。')
+    expect(screen.getByText('Credential content')).toBeVisible()
+    expect(api.acknowledgeSyncNotices).toHaveBeenCalledTimes(1)
   })
 
   it('opens exact cycle diagnostics from clickable Skipped and keyboard Blocked counters without syncing or scanning', async () => {

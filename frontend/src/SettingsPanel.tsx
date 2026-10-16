@@ -12,13 +12,18 @@ import { RestorePreview } from './resources/RestorePreview'
 import { UpdatePanel } from './UpdatePanel'
 import { ResetPanel } from './ResetPanel'
 import { TrayTipSettings } from './TrayTipSettings'
+import { SharedLibraryPanel } from './SharedLibraryPanel'
+import { SettingsCategoryIcon, SettingsDiagram } from './SettingsDiagram'
+import { LanguageSwitcher } from './LanguageSwitcher'
+import { useI18n, type Locale, type Translator } from './i18n'
 
 const settingsTabs = [
-  { id: 'repository', label: 'Repository' },
-  { id: 'sync', label: 'Sync' },
-  { id: 'resources', label: 'Resources' },
-  { id: 'desktop', label: 'Desktop' },
-  { id: 'advanced', label: 'Advanced' },
+  { id: 'repository', label: 'Repository', chinese: '同步仓库' },
+  { id: 'sync', label: 'Sync', chinese: '同步与恢复' },
+  { id: 'resources', label: 'Resources', chinese: '同步内容' },
+  { id: 'library', label: 'Library', chinese: '共享资源' },
+  { id: 'desktop', label: 'Desktop', chinese: '启动与通知' },
+  { id: 'advanced', label: 'Advanced', chinese: '高级设置' },
 ] as const
 
 type SettingsTab = typeof settingsTabs[number]['id']
@@ -43,12 +48,13 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function previewTimestamp(value: string) {
-  if (!hasGeneratedPreview(value)) return 'No preview generated yet'
-  return `Last refreshed ${new Intl.DateTimeFormat(undefined, {
+function previewTimestamp(value: string, locale: Locale, t: Translator) {
+  if (!hasGeneratedPreview(value)) return t('No preview generated yet', '尚未生成预览')
+  const timestamp = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(value))}`
+  }).format(new Date(value))
+  return t(`Last refreshed ${timestamp}`, `上次刷新：${timestamp}`)
 }
 
 export function SettingsPanel({
@@ -62,6 +68,7 @@ export function SettingsPanel({
   resetBusyChanged,
   save,
 }: SettingsPanelProps) {
+  const { t, locale } = useI18n()
   const [repositoryUrl, setRepositoryUrl] = useState(snapshot.repositoryUrl)
   const [intervalMinutes, setIntervalMinutes] = useState(snapshot.intervalMinutes)
   const [trashGraceDays, setTrashGraceDays] = useState(snapshot.trashGraceDays)
@@ -86,6 +93,7 @@ export function SettingsPanel({
   const settingsId = useId()
   const formId = `${settingsId}-form`
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])
+  const content = useRef<HTMLDivElement>(null)
   const invalidSetting = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -105,6 +113,7 @@ export function SettingsPanel({
   }, [startupRevision])
 
   useEffect(() => {
+    if (content.current) content.current.scrollTop = 0
     if (invalidSetting.current) {
       invalidSetting.current.focus()
       invalidSetting.current.reportValidity()
@@ -115,7 +124,9 @@ export function SettingsPanel({
   const navigateTab = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     let next: number
     switch (event.key) {
+      case 'ArrowDown':
       case 'ArrowRight': next = (index + 1) % settingsTabs.length; break
+      case 'ArrowUp':
       case 'ArrowLeft': next = (index - 1 + settingsTabs.length) % settingsTabs.length; break
       case 'Home': next = 0; break
       case 'End': next = settingsTabs.length - 1; break
@@ -128,6 +139,7 @@ export function SettingsPanel({
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (activeTab === 'library' || activeTab === 'advanced') return
     const invalid = event.currentTarget.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
       'input:invalid, select:invalid, textarea:invalid',
     )
@@ -160,10 +172,11 @@ export function SettingsPanel({
     if (saved) close()
   }
 
-  const title = snapshot.configured ? 'Sync settings' : 'Connect your repository'
+  const title = snapshot.configured ? t('Sync settings', '同步设置') : t('Connect your repository', '连接你的仓库')
+  const separateConfirmation = activeTab === 'library' || activeTab === 'advanced'
 
   return (
-    <div className="drawer-backdrop" onMouseDown={close}>
+    <div className="drawer-backdrop settings-backdrop" onMouseDown={close}>
       <aside
         aria-labelledby="settings-title"
         aria-modal="true"
@@ -173,17 +186,20 @@ export function SettingsPanel({
       >
         <div className="drawer-title">
           <div>
-            <span className="eyebrow">{snapshot.configured ? 'PREFERENCES' : 'GET STARTED'}</span>
+            <span className="eyebrow">{snapshot.configured ? t('PREFERENCES', '偏好设置') : t('GET STARTED', '开始使用')}</span>
             <h2 id="settings-title">{title}</h2>
           </div>
-          <button className="icon-button" onClick={close} aria-label="Close settings">×</button>
+          <div className="settings-heading-actions">
+            <LanguageSwitcher />
+            <button type="button" className="icon-button" onClick={close} aria-label={t('Close settings', '关闭设置')}>×</button>
+          </div>
         </div>
-        <div className="settings-tabs" role="tablist" aria-label="Settings categories">
+        <div className="settings-tabs" role="tablist" aria-orientation="vertical" aria-label={t('Settings categories', '设置分类')}>
           {settingsTabs.map((tab, index) => (
             <button
               aria-controls={`${settingsId}-${tab.id}-panel`}
-              aria-description={tab.id === 'desktop' && startAtLoginError ? 'Startup needs attention' : undefined}
-              aria-label={tab.label}
+              aria-description={tab.id === 'desktop' && startAtLoginError ? t('Startup needs attention', '启动设置需要处理') : undefined}
+              aria-label={t(tab.label, tab.chinese)}
               aria-selected={activeTab === tab.id}
               id={`${settingsId}-${tab.id}-tab`}
               key={tab.id}
@@ -194,12 +210,13 @@ export function SettingsPanel({
               tabIndex={activeTab === tab.id ? 0 : -1}
               type="button"
             >
-              {tab.label}
-              {tab.id === 'desktop' && startAtLoginError && <span className="settings-tab-error" aria-label="Startup needs attention">!</span>}
+              <SettingsCategoryIcon kind={tab.id} />
+              <span>{t(tab.label, tab.chinese)}</span>
+              {tab.id === 'desktop' && startAtLoginError && <span className="settings-tab-error" aria-label={t('Startup needs attention', '启动设置需要处理')}>!</span>}
             </button>
           ))}
         </div>
-        <div className="settings-content">
+        <div className="settings-content" ref={content}>
         <form id={formId} noValidate onSubmit={(event) => void submit(event)}>
           <section
             aria-labelledby={`${settingsId}-repository-tab`}
@@ -210,31 +227,32 @@ export function SettingsPanel({
             role="tabpanel"
             tabIndex={0}
           >
+          <SettingsDiagram kind="repository" />
           <label>
-            Private Git repository
+            {t('Private Git repository', '私有 Git 仓库')}
             <input
               required
               value={repositoryUrl}
               onChange={(event) => setRepositoryUrl(event.target.value)}
               placeholder="git@github.com:your-name/agent-sync.git"
             />
-            <small>SSH and HTTPS repositories are supported.</small>
+            <small>{t('SSH and HTTPS repositories are supported.', '支持 SSH 和 HTTPS 仓库。')}</small>
           </label>
           <label>
-            Local repository directory
+            {t('Local repository directory', '本机仓库副本目录')}
             <input
               required
               value={repositoryDir}
               onChange={(event) => setRepositoryDir(event.target.value)}
               placeholder={snapshot.repoPath}
             />
-            <small>Where SyncHub keeps the local clone.</small>
+            <small>{t('Where SyncHub keeps the local clone.', 'SyncHub 存放本地仓库副本的位置，不是工具的技能目录。')}</small>
           </label>
           <fieldset>
-            <legend>When directory changes</legend>
+            <legend>{t('When directory changes', '更换目录时')}</legend>
             <label className="toggle-row">
               <span>
-                <strong>Keep old folder, clone into new</strong>
+                <strong>{t('Keep old folder, clone into new', '保留旧目录，重新克隆到新目录')}</strong>
               </span>
               <input
                 type="radio"
@@ -244,7 +262,7 @@ export function SettingsPanel({
             </label>
             <label className="toggle-row">
               <span>
-                <strong>Move existing repo to new folder</strong>
+                <strong>{t('Move existing repo to new folder', '将现有仓库迁移到新目录')}</strong>
               </span>
               <input
                 type="radio"
@@ -263,9 +281,10 @@ export function SettingsPanel({
             role="tabpanel"
             tabIndex={0}
           >
+          <SettingsDiagram kind="sync" />
           <div className="field-grid">
             <label>
-              Sync frequency (minutes)
+              {t('Sync frequency (minutes)', '自动同步间隔（分钟）')}
               <input
                 required
                 type="number"
@@ -275,10 +294,10 @@ export function SettingsPanel({
                 value={intervalMinutes}
                 onChange={(event) => setIntervalMinutes(Number(event.target.value))}
               />
-              <small>Runs every 1–1440 minutes.</small>
+              <small>{t('Runs every 1–1440 minutes.', '可设置为每 1–1440 分钟运行一次。')}</small>
             </label>
             <label>
-              Archive retention (days)
+              {t('Archive retention (days)', '删除后的恢复窗口（天）')}
               <input
                 required
                 type="number"
@@ -288,13 +307,13 @@ export function SettingsPanel({
                 value={trashGraceDays}
                 onChange={(event) => setTrashGraceDays(Number(event.target.value))}
               />
-              <small>Deleted files remain recoverable for 1–365 days.</small>
+              <small>{t('Deleted files remain recoverable for 1–365 days.', '已删除文件可保留 1–365 天用于恢复。')}</small>
             </label>
           </div>
           <section className="preview-refresh">
             <div>
-              <strong>Synchronization</strong>
-              <small>Run an immediate one-time synchronization now.</small>
+              <strong>{t('Synchronization', '立即同步')}</strong>
+              <small>{t('Run an immediate one-time synchronization now.', '立即运行一次同步，不改变自动同步间隔。')}</small>
             </div>
             <button
               className="secondary"
@@ -302,7 +321,7 @@ export function SettingsPanel({
               onClick={() => void runSyncNow()}
               type="button"
             >
-              Run sync now
+              {t('Run sync now', '立即同步一次')}
             </button>
           </section>
           </section>
@@ -315,13 +334,14 @@ export function SettingsPanel({
             role="tabpanel"
             tabIndex={0}
           >
+          <SettingsDiagram kind="resources" />
           <fieldset>
-            <legend>Agents to synchronize</legend>
+            <legend>{t('Agents to synchronize', '需要同步的工具')}</legend>
             {snapshot.agents.map((agent) => (
               <label className="toggle-row" key={agent.name}>
                 <span>
                   <strong>{agent.name}</strong>
-                  <small>{agent.exclude.length} safety exclusions</small>
+                  <small>{t(`${agent.exclude.length} safety exclusions`, `${agent.exclude.length} 条安全排除规则`)}</small>
                 </span>
                 <input
                   type="checkbox"
@@ -332,13 +352,13 @@ export function SettingsPanel({
             ))}
           </fieldset>
           <fieldset>
-            <legend>Resource categories</legend>
+            <legend>{t('Resource categories', '资源类型')}</legend>
             <ResourceSettings agents={snapshot.agents} categories={categories} onChange={setCategories} />
           </fieldset>
           <section className="preview-refresh" aria-live="polite">
             <div>
-              <strong>Resource preview</strong>
-              <small>{previewTimestamp(snapshot.preview.generatedAt)}</small>
+              <strong>{t('Resource preview', '资源预览')}</strong>
+              <small>{previewTimestamp(snapshot.preview.generatedAt, locale, t)}</small>
             </div>
             <button
               className="secondary"
@@ -346,7 +366,7 @@ export function SettingsPanel({
               onClick={() => void refreshPreview()}
               type="button"
             >
-              {previewLoading ? 'Refreshing…' : 'Refresh preview'}
+              {previewLoading ? t('Refreshing…', '正在刷新…') : t('Refresh preview', '刷新预览')}
             </button>
           </section>
           <RestorePreview preview={snapshot.preview} />
@@ -355,6 +375,17 @@ export function SettingsPanel({
             resources={customResources}
             onChange={setCustomResources}
           />
+          </section>
+          <section
+            aria-labelledby={`${settingsId}-library-tab`}
+            className="settings-panel"
+            data-settings-tab="library"
+            hidden={activeTab !== 'library'}
+            id={`${settingsId}-library-panel`}
+            role="tabpanel"
+            tabIndex={0}
+          >
+            {activeTab === 'library' && <SharedLibraryPanel busy={busy || snapshot.state === 'updating'} />}
           </section>
         </form>
         <section
@@ -365,15 +396,16 @@ export function SettingsPanel({
           role="tabpanel"
           tabIndex={0}
         >
+          <SettingsDiagram kind="desktop" />
           <fieldset>
-            <legend>Desktop application</legend>
+            <legend>{t('Desktop application', '桌面应用')}</legend>
             <label className="toggle-row">
               <span>
-                <strong>{snapshot.platform === 'windows' ? 'Start with Windows' : 'Start at login'}</strong>
+                <strong>{snapshot.platform === 'windows' ? t('Start with Windows', '登录 Windows 时启动') : t('Start at login', '登录系统时启动')}</strong>
                 <small>
                   {snapshot.platform === 'windows'
-                    ? 'Enabled by default in Windows release builds. Starts in the tray when you sign in; you can turn it off here.'
-                    : 'Starts SyncHub for Agents the next time you sign in. It does not restart the app now.'}
+                    ? t('Enabled by default in Windows release builds. Starts in the tray when you sign in; you can turn it off here.', 'Windows 发布版默认启用，登录后在托盘启动，可在此关闭。')
+                    : t('Starts SyncHub for Agents the next time you sign in. It does not restart the app now.', '下次登录系统时启动 SyncHub for Agents，不会立即重启应用。')}
                 </small>
               </span>
               <input
@@ -383,12 +415,12 @@ export function SettingsPanel({
                 onChange={(event) => setStartAtLogin(event.target.checked)}
               />
             </label>
-            {startAtLoginLoading && <small role="status">Checking startup registration…</small>}
+            {startAtLoginLoading && <small role="status">{t('Checking startup registration…', '正在检查自动启动设置…')}</small>}
             {startAtLoginError && (
               <>
                 <div className="inline-error" role="alert">{startAtLoginError}</div>
                 <button className="secondary" onClick={() => setStartupRevision((revision) => revision + 1)} type="button">
-                  Retry startup status
+                  {t('Retry startup status', '重新检查启动状态')}
                 </button>
               </>
             )}
@@ -404,14 +436,18 @@ export function SettingsPanel({
           role="tabpanel"
           tabIndex={0}
         >
+          <SettingsDiagram kind="advanced" />
           <ResetPanel busy={busy || previewLoading || snapshot.state === 'updating'} complete={resetComplete ?? close} workingChanged={resetBusyChanged} />
         </section>
         </div>
         <div className="form-actions settings-actions">
-          <button type="button" className="secondary" onClick={close}>Cancel</button>
-          <button type="submit" form={formId} className="primary" disabled={busy}>
-            {snapshot.configured ? 'Save settings' : 'Continue'}
-          </button>
+          {separateConfirmation && <small className="settings-action-note">{activeTab === 'library'
+            ? t('Library changes use their own preview and confirmation.', '共享资源通过各自的预览和确认生效。')
+            : t('Reset requires a separate confirmation.', '重置需要单独确认。')}</small>}
+          <button type="button" className="secondary" onClick={close}>{separateConfirmation ? t('Close', '关闭') : t('Cancel', '取消')}</button>
+          {!separateConfirmation && <button type="submit" form={formId} className="primary" disabled={busy}>
+            {snapshot.configured ? t('Save settings', '保存设置') : t('Continue', '继续')}
+          </button>}
         </div>
       </aside>
     </div>

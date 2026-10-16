@@ -73,6 +73,25 @@ The intended executable is `synchub` (`synchub.exe` on Windows). Commands are:
 - `sync`: run one synchronization using existing safety and approval rules.
 - `daemon`: run headlessly until interrupted, retaining existing scheduled
   synchronization and trash-retention behavior.
+- `library status`: discover canonical skills/instructions, import candidates
+  and managed target drift without requiring repository setup.
+- `library import|apply|restore|detach --kind skills|instructions --name <name>
+  --harness claude|common|copilot`: preview a library operation. Repeat with
+  `--approve <preview-id>` to execute exactly that preview. `copilot` is
+  import-only; instructions use `--name global --harness claude`.
+
+For example, preview adoption without writing agent files:
+
+```text
+synchub library status --json
+synchub library import --kind skills --name review --harness claude --json
+synchub library apply --kind skills --name review --harness common --json
+```
+
+Import and apply are separate approvals; approve the import before previewing
+apply if the canonical source does not exist. The
+[shared library guide](shared-library.md) describes paths, backup/recovery,
+native discovery restrictions and per-machine approval.
 
 Finite commands support `--json` with a versioned result/error envelope and
 documented nonzero exit codes. `--home` selects an explicit SyncHub profile;
@@ -99,8 +118,10 @@ Successful finite commands emit one JSON object:
 ```
 
 Errors emit `ok:false` and an `error` with `code` and `message`. Attention-required
-results also retain their summary in `data`. Output never includes synchronized
-file bodies or raw engine result objects. It can include repository URLs,
+results also retain their summary in `data`. Ordinary sync/inspection output
+never includes synchronized file bodies or raw engine result objects.
+**Library previews intentionally include before/after source text** for informed
+approval. Treat those previews as private content. Output can include repository URLs,
 resource paths and diagnostic messages; review/redact those before sharing logs.
 
 | Exit | Meaning | Error code |
@@ -130,8 +151,9 @@ Do not delete a lock file to bypass ownership. Locks do not retroactively protec
 older versions of SyncHub that do not participate in this protocol.
 
 Resource credential exclusion, path containment, conflict persistence and
-explicit installation approval stay in the existing backend. JSON output must
-not contain file contents, credentials or full internal synchronization results.
+explicit installation approval stay in the existing backend. Except for explicit
+library content previews, JSON output must not contain file contents; no command
+should expose credentials or full internal synchronization results.
 Planning may create and clean isolated temporary staging, but cannot change
 configuration, agent resources or synchronization state.
 
