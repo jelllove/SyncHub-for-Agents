@@ -85,7 +85,9 @@ Native tray menus, OS dialogs, and backend diagnostics retain their original
 language; the React desktop views and Windows activity-tip controls are bilingual.
 
 [Settings illustrations](../frontend/src/SettingsDiagram.tsx) are local SVG/CSS
-diagrams with translated text alternatives, not remote images or live progress.
+category icons with translated text alternatives, not remote images or live
+progress. Each category has one illustration beside its title and description;
+this presentation layer does not replace or filter the real resource controls.
 [The shared-library panel](../frontend/src/SharedLibraryPanel.tsx) separates adding
 sources from using them in compatible destinations and reveals recovery controls
 only when managed outputs exist. Its existing generation counter and exact

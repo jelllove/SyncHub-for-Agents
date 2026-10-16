@@ -238,15 +238,17 @@ export function SharedLibraryPanel({ busy = false }: { busy?: boolean }) {
   return (
     <div className="settings-panel shared-library-panel">
       <section className="preview-refresh">
-        <div>
-          <h2>{t('Shared library', '共享资源')}</h2>
-          <small>{t('Add a local resource, then choose which tools can use it.', '加入本机已有资源，再选择让哪些工具使用。')}</small>
+        <div className="settings-category-heading">
+          <SettingsDiagram kind="library" compact />
+          <div>
+            <h2>{t('Shared library', '共享资源')}</h2>
+            <small>{t('Maintain one source for skills or instructions, then choose where to use it.', '维护一份技能或指令，再选择哪些兼容工具使用。')}</small>
+          </div>
         </div>
         <button className="secondary" type="button" disabled={locked} onClick={() => void refresh()}>
           {t('Refresh library', '重新扫描')}
         </button>
       </section>
-      <SettingsDiagram kind="library" compact />
       {working && <p role="status">{working === 'scan' ? t('Scanning library…', '正在扫描资源…') : working === 'preview' ? t('Preparing preview…', '正在准备预览…') : t('Applying approved changes…', '正在应用已确认的变更…')}</p>}
       {error && <div className="inline-error" role="alert">{error}<br />{t('Refresh the library or retry the preview; no force overwrite is available.', '请重新扫描或重试预览，不会强制覆盖文件。')}</div>}
       {notice && <p className="library-notice" role="status">{actionLabels[notice].done}</p>}

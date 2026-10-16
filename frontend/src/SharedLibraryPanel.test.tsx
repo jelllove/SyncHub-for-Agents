@@ -72,7 +72,7 @@ describe('SharedLibraryPanel', () => {
     expect(within(candidates).getByRole('radio', { name: 'review · Skill · Claude Code' })).toHaveAttribute('aria-description', '/test/claude/skills/review')
     await user.click(screen.getByText('Manage existing copies'))
     expect(within(screen.getByRole('region', { name: 'Managed outputs' })).getByText('/test/claude/skills/review')).toBeVisible()
-    expect(screen.getByText(/Maintain the source here/)).toBeVisible()
+    expect(screen.getByText(/Maintain one source for skills or instructions/)).toBeVisible()
   })
 
   it('requires a preview and explicit confirmation with actual content and deletion counts', async () => {

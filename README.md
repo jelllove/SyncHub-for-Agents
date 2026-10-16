@@ -24,7 +24,7 @@ It uses a private Git repository you control as the synchronization bridge, with
   **Language / 语言** selector in settings (also available during first-run setup)
   applies immediately and remembers the choice on
   this device; it does not change CLI output, resource contents, or diagnostics.
-- Understand settings through compact resource-flow illustrations. Empty shared
+- Understand each settings category through one compact illustration and a short explanation. Empty shared
   libraries start at adding local resources, with separate previews and approvals
   before using them in compatible tools.
 - Manage a personal [shared resource library](docs/shared-library.md) from

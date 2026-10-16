@@ -146,17 +146,22 @@ do not run them concurrently against managed directories.
 
 ### Settings UX and language delivery
 
-The approved settings redesign uses compact, accessible flow diagrams for
+The approved settings redesign uses one compact, accessible illustration for
 repository connections, sync/recovery, resource filtering, the shared library,
-desktop startup/notifications, and reset. Diagrams explain relationships, not
-live progress, and never replace the underlying approval or risk disclosure.
+desktop startup/notifications, and reset. Each category starts with a small
+illustration, a title and one sentence about its purpose, not three flow cards.
+Illustrations never replace the underlying approval or risk disclosure.
 Existing settings drafts and keyboard-operable category tabs remain intact.
+The Resources category retains the complete backend-provided tool list,
+per-tool resource category controls, source/restore paths, file counts, exclusions,
+unsupported reasons, detailed preview and custom-resource editor.
 
 Settings use a centered workspace with a persistent left category sidebar.
 Up/Down, Left/Right, Home and End navigate the categories; changing categories
 starts at the top without clearing drafts. The sidebar remains vertical at
 narrow widths, with compact labeled icons rather than hiding category names.
-The Library page has one heading and a compact flow diagram. Resource paths
+The Library page has one heading with a shared-folder illustration. Its actual
+add/select/confirm operation steps remain separate from that illustration. Resource paths
 and supplementary safety details are expandable; compatibility warnings,
 blocked reasons and actual change previews remain available. Recovery controls
 follow the normal resource task instead of interrupting first use.

@@ -118,24 +118,16 @@ main { max-width: 1180px; margin: 0 auto; padding: 40px 42px 54px; }
 .shared-library-panel .preview-refresh h2 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.02em; }
 .shared-library-panel .preview-refresh small { margin: 0; line-height: 1.5; }
 .shared-library-panel > p { margin: 0; }
-.settings-explainer h3 { margin: 0 0 6px; font-size: 20px; letter-spacing: -.02em; line-height: 1.4; }
-.settings-explainer > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.settings-flow { margin: 14px 0 8px; padding: 10px; border: 1px solid #d8e3d6; border-radius: 12px; background: #f1f6ee; }
-.settings-explainer.compact .settings-flow { margin: 0; }
-.settings-flow-nodes { display: flex; gap: 8px; }
-.settings-flow-step { display: flex; flex: 1; align-items: center; min-width: 0; gap: 8px; }
-.settings-flow-step:first-child { flex: .85; }
-.settings-flow-node { flex: 1; min-width: 0; padding: 9px 7px; text-align: center; align-self: stretch; border: 1px solid #d8e3d6; border-radius: 8px; background: #fff; }
-.settings-flow-node.source { border-color: #6a997b; background: #eaf3e5; }
-.settings-flow-node svg { display: block; width: 28px; height: 25px; margin: 0 auto 6px; fill: none; stroke: #48755c; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.settings-explainer.compact .settings-flow-node { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 7px; align-content: center; text-align: left; }
-.settings-explainer.compact .settings-flow-node svg { grid-row: 1 / 3; align-self: center; margin: 0; }
-.settings-explainer.compact .settings-flow-node small { grid-column: 2; margin-top: 3px; }
-.settings-flow-node strong { display: block; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
-.settings-flow-node small { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
-.settings-flow-arrow { flex: 0 0 auto; color: #62836b; }
-.settings-explainer .settings-flow-caption { margin-bottom: 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
-.settings-flow-help summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.settings-category-heading { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.settings-category-heading > div:last-child { min-width: 0; }
+.settings-category-illustration { display: grid; place-items: center; flex: 0 0 64px; width: 64px; height: 64px; border-radius: 16px; color: #357753; background: #edf5ed; }
+.settings-category-illustration svg { width: 44px; height: 40px; fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+.settings-explainer h3 { margin: 0 0 7px; font-size: 22px; letter-spacing: -.025em; line-height: 1.3; }
+.settings-category-heading p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.shared-library-panel .settings-category-heading { flex: 1; }
+.settings-explainer-help { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.settings-explainer-help summary { cursor: pointer; }
+.settings-explainer-help p { margin: 8px 0 0; line-height: 1.6; }
 .library-tasks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .library-tasks button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 13px; }
 .library-tasks button[aria-pressed=true] { border-color: var(--green); background: #edf5e9; }
@@ -187,13 +179,11 @@ main { max-width: 1180px; margin: 0 auto; padding: 40px 42px 54px; }
   .settings-content { padding: 16px 12px; scrollbar-gutter: auto; }
   .settings-drawer .settings-actions { padding: 10px 12px; }
   .settings-drawer .settings-actions button { min-height: 36px; padding: 0 12px; font-size: 12px; }
-  .settings-flow { padding: 10px 7px; }
-  .settings-flow-nodes, .settings-flow-step { gap: 4px; }
-  .settings-flow-node { padding: 10px 4px; }
-  .settings-flow-node strong { font-size: 11px; }
-  .settings-flow-node small { font-size: 10px; }
-  .settings-explainer.compact .settings-flow-node { display: block; text-align: center; }
-  .settings-explainer.compact .settings-flow-node svg { margin: 0 auto 5px; }
+  .settings-category-heading { align-items: flex-start; gap: 11px; }
+  .settings-category-illustration { flex-basis: 44px; width: 44px; height: 44px; border-radius: 12px; }
+  .settings-category-illustration svg { width: 33px; height: 30px; }
+  .settings-explainer h3 { font-size: 20px; }
+  .settings-category-heading p { font-size: 12px; }
   .library-tasks { gap: 6px; }
   .library-tasks button { padding: 9px 7px; flex-wrap: wrap; }
   .library-tasks button strong { font-size: 12px; }

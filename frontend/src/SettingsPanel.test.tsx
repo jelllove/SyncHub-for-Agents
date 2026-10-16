@@ -260,13 +260,67 @@ describe('SettingsPanel', () => {
     return save
   }
 
-  it('explains each category with a labeled engineering diagram', async () => {
+  it('introduces each category with one labeled illustration rather than three flow cards', async () => {
     renderSettings()
     const user = userEvent.setup()
     for (const tab of ['Repository', 'Sync', 'Resources', 'Library', 'Desktop', 'Advanced']) {
       await user.click(screen.getByRole('tab', { name: tab }))
-      expect(within(screen.getByRole('tabpanel', { name: tab })).getByRole('img')).toBeVisible()
+      const panel = screen.getByRole('tabpanel', { name: tab })
+      const illustration = within(panel).getByRole('img')
+      expect(illustration).toBeVisible()
+      expect(illustration).toHaveAccessibleName()
+      expect(illustration.querySelectorAll('svg')).toHaveLength(1)
+      expect(panel.querySelectorAll('.settings-flow-node')).toHaveLength(0)
     }
+  })
+
+  it('retains complete resource controls, safety details and saved selections below the illustration', async () => {
+    const resource = {
+      provider: 'common', id: 'skills', category: 'skills', enabled: true, supported: true,
+      source: 'C:\\Synthetic\\skills', target: 'C:\\Synthetic\\restore',
+      fileCount: 7, bytes: 70, excludedFiles: 1, excludedBytes: 12, status: 'available',
+    }
+    const data = snapshot('2026-08-18T09:00:00Z', 7)
+    data.agents = [
+      { name: 'common', enabled: true, exclude: ['credentials'], resources: [resource] },
+      { name: 'claude', enabled: true, exclude: [], resources: [
+        { ...resource, provider: 'claude', id: 'plugins', category: 'plugins', supported: false, reason: 'Synthetic unsupported resource' },
+      ] },
+      { name: 'copilot', enabled: false, exclude: [], resources: [] },
+    ]
+    data.preview.resources = [resource]
+    data.preview.issues = [{ resourceKey: 'common/skills', path: 'secret.json', code: 'secret-detected', message: 'Synthetic safety exclusion', bytes: 12 }]
+    const save = vi.fn().mockResolvedValue(false)
+    const refreshPreview = vi.fn().mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<SettingsPanel snapshot={normalizeSnapshot(data)} busy={false} previewLoading={false}
+      close={vi.fn()} refreshPreview={refreshPreview} runSyncNow={vi.fn().mockResolvedValue(undefined)} save={save} />)
+    await user.click(screen.getByRole('tab', { name: 'Resources' }))
+    const tools = screen.getByRole('group', { name: 'Agents to synchronize' })
+    expect(within(tools).getAllByRole('checkbox')).toHaveLength(3)
+    const categories = screen.getByRole('group', { name: 'Resource categories' })
+    await user.click(within(categories).getByRole('checkbox', { name: /^skills/i }))
+    await user.click(within(categories).getByText('claude', { exact: true }))
+    expect(within(categories).getByRole('checkbox', { name: /Synthetic unsupported resource/ })).toBeDisabled()
+    for (const count of within(categories).getAllByText(/7 files/)) expect(count).toBeVisible()
+    await user.click(screen.getByText('Review source and restore paths'))
+    const preview = screen.getByRole('region', { name: 'Synchronization preview' })
+    expect(within(preview).getByText(resource.source)).toBeVisible()
+    expect(within(preview).getByText(resource.target)).toBeVisible()
+    await user.click(screen.getByText('1 safety notice'))
+    expect(within(preview).getByText('Synthetic safety exclusion')).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Stable ID' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Source on this computer' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Restore target' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Add resource' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Refresh preview' }))
+    expect(refreshPreview).toHaveBeenCalledTimes(1)
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language / 语言' }), 'zh-CN')
+    expect(screen.getByRole('textbox', { name: '稳定 ID' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '保存设置' }))
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      categories: expect.objectContaining({ common: expect.objectContaining({ skills: false }) }),
+    }), false, false)
   })
 
   it('switches language without resetting drafts or refetching startup settings', async () => {
