@@ -55,7 +55,7 @@ func Root(userHome string) string {
 
 func Lock(userHome string) (*instance.Lock, error) {
 	root := filepath.Join(userHome, ".synchub", "library-owner")
-	if err := noLinks(root); err != nil {
+	if err := noLinks(userHome, root); err != nil {
 		return nil, err
 	}
 	return instance.Acquire(root)

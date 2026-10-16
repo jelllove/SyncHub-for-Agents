@@ -51,28 +51,54 @@ func digest(value any) string {
 }
 
 // Go exposes some Windows reparse points as ModeIrregular rather than symlinks.
-// Neither is a safe ancestor for library-owned files.
-func noLinks(name string) error {
+// Neither is allowed at or below the caller's user-home boundary. Ancestors
+// above that boundary may be OS aliases, such as macOS /var -> /private/var.
+func noLinks(userHome, name string) error {
+	home, err := filepath.Abs(userHome)
+	if err != nil {
+		return err
+	}
+	homeInfo, err := noLinkInfo(home)
+	if err != nil {
+		return err
+	}
 	absolute, err := filepath.Abs(name)
 	if err != nil {
 		return err
 	}
 	for p := absolute; ; p = filepath.Dir(p) {
-		info, err := os.Lstat(p)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		info, err := noLinkInfo(p)
+		if err != nil {
 			return err
 		}
-		if err == nil && info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
-			return fmt.Errorf("library path is a symbolic link: %s; replace the alias with a reviewed real directory first", p)
+		rel, err := filepath.Rel(home, p)
+		// Collection uses physical paths; SameFile also handles Windows short
+		// names without resolving and accidentally accepting resource aliases.
+		if (err == nil && rel == ".") || (homeInfo != nil && info != nil && os.SameFile(homeInfo, info)) {
+			return nil
 		}
 		if filepath.Dir(p) == p {
-			return nil
+			return fmt.Errorf("library path is outside user home: %s", name)
 		}
 	}
 }
 
-func readTree(root string, directory bool) (tree, error) {
-	if err := noLinks(root); err != nil {
+func noLinkInfo(name string) (fs.FileInfo, error) {
+	info, err := os.Lstat(name)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+		return nil, fmt.Errorf("library path is a symbolic link: %s; replace the alias with a reviewed real directory first", name)
+	}
+	return info, nil
+}
+
+func readTree(userHome, root string, directory bool) (tree, error) {
+	if err := noLinks(userHome, root); err != nil {
 		return nil, err
 	}
 	result := tree{}
@@ -142,8 +168,8 @@ func readTree(root string, directory bool) (tree, error) {
 	return result, err
 }
 
-func atomicWrite(name string, data []byte, mode fs.FileMode) (err error) {
-	if err := noLinks(name); err != nil {
+func atomicWrite(userHome, name string, data []byte, mode fs.FileMode) (err error) {
+	if err := noLinks(userHome, name); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(name), 0o700); err != nil {
@@ -179,12 +205,12 @@ func filePath(root, rel string, directory bool) string {
 	return filepath.Join(root, filepath.FromSlash(rel))
 }
 
-func writeTree(root string, directory bool, before, after tree) error {
+func writeTree(userHome, root string, directory bool, before, after tree) error {
 	for rel, value := range after {
 		if digest(before[rel]) == digest(value) {
 			continue
 		}
-		if err := atomicWrite(filePath(root, rel, directory), value.Data, value.Mode); err != nil {
+		if err := atomicWrite(userHome, filePath(root, rel, directory), value.Data, value.Mode); err != nil {
 			return err
 		}
 	}
@@ -193,7 +219,7 @@ func writeTree(root string, directory bool, before, after tree) error {
 			continue
 		}
 		name := filePath(root, rel, directory)
-		if err := noLinks(name); err != nil {
+		if err := noLinks(userHome, name); err != nil {
 			return err
 		}
 		if err := os.Remove(name); err != nil {

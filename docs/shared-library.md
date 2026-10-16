@@ -136,9 +136,13 @@ do not run them concurrently against managed directories.
   secret-looking content are rejected, not silently omitted.
 - The canonical source policy also runs before Git staging, remote validation
   and restoration, not only when applying a target.
-- Links and linked ancestors are rejected. Existing legacy aliases appear as
-  blocked; convert them to reviewed real directories before adoption. SyncHub
-  does not automatically unlink or migrate an existing alias.
+- Links and linked ancestors at or below the caller's user-home directory are
+  rejected, including that directory itself, library sources, targets, and
+  local ownership files. Ancestors above this boundary may be OS aliases
+  (for example macOS `/var`); library validation still rejects paths outside the
+  user home. Existing legacy aliases appear as blocked; convert them to reviewed
+  real directories before adoption. SyncHub does not automatically unlink or
+  migrate an existing alias.
 - Safety scanning is conservative, not a guarantee that arbitrary prose cannot
   contain a secret. Review both import and application previews.
 

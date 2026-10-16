@@ -14,7 +14,7 @@ import (
 // removed. A managed source deletion requires explicit restore/detach, not an
 // automatic destructive cascade through the legacy alias synchronizer.
 func ProtectSpecs(specs map[string]resource.Spec, userHome string) error {
-	configureSources(specs)
+	configureSources(specs, userHome)
 	names, err := SkillNames(userHome)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func ProtectSpecs(specs map[string]resource.Spec, userHome string) error {
 // ProtectRemoteSpecs runs before collection as well as restore planning. A new
 // computer must not restore historical aliases while first receiving sources.
 func ProtectRemoteSpecs(specs map[string]resource.Spec, remote state.Snapshot, userHome string) error {
-	configureSources(specs)
+	configureSources(specs, userHome)
 	var names []string
 	seen := map[string]bool{}
 	instructions := false
@@ -72,7 +72,7 @@ func ProtectRemoteSpecs(specs map[string]resource.Spec, remote state.Snapshot, u
 	return protect(specs, userHome, names, instructions)
 }
 
-func configureSources(specs map[string]resource.Spec) {
+func configureSources(specs map[string]resource.Spec, userHome string) {
 	for _, key := range []string{"common/library-skills", "common/library-instructions"} {
 		spec, exists := specs[key]
 		if !exists {
@@ -80,7 +80,7 @@ func configureSources(specs map[string]resource.Spec) {
 		}
 		spec.OptionalRoot = true
 		spec.CopyOnly = true
-		spec.ValidateRoot = noLinks
+		spec.ValidateRoot = func(root string) error { return noLinks(userHome, root) }
 		spec.ValidateContent = validateContent
 		specs[key] = spec
 	}

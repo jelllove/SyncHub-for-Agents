@@ -29,7 +29,7 @@ func (m Manager) statePath() string {
 
 func (m Manager) load() (ownership, error) {
 	state := ownership{Version: 1, Records: map[string]record{}}
-	if err := noLinks(m.statePath()); err != nil {
+	if err := noLinks(m.UserHome, m.statePath()); err != nil {
 		return state, err
 	}
 	data, err := os.ReadFile(m.statePath())
@@ -65,7 +65,7 @@ func (m Manager) save(state ownership) error {
 	if err != nil {
 		return err
 	}
-	return atomicWrite(m.statePath(), data, 0o600)
+	return atomicWrite(m.UserHome, m.statePath(), data, 0o600)
 }
 
 type prepared struct {
@@ -91,7 +91,7 @@ func (m Manager) prepare(r Request) (prepared, error) {
 		p.root = source
 	}
 	if r.Action != "detach" {
-		p.before, err = readTree(p.root, p.directory)
+		p.before, err = readTree(m.UserHome, p.root, p.directory)
 		if err != nil {
 			return p, err
 		}
@@ -99,7 +99,7 @@ func (m Manager) prepare(r Request) (prepared, error) {
 	rec, owned := state.Records[key(r)]
 	switch r.Action {
 	case "import":
-		p.after, err = readTree(target, p.directory)
+		p.after, err = readTree(m.UserHome, target, p.directory)
 	case "apply":
 		if r.Kind == "skills" && r.Harness == "common" {
 			duplicate := filepath.Join(m.UserHome, ".copilot", "skills", r.Name)
@@ -112,7 +112,7 @@ func (m Manager) prepare(r Request) (prepared, error) {
 		if owned && (rec.Pending || digest(p.before) != digest(rec.Applied)) {
 			return p, fmt.Errorf("target was modified or an operation is incomplete; import changes, detach, or restore before applying")
 		}
-		p.after, err = readTree(source, p.directory)
+		p.after, err = readTree(m.UserHome, source, p.directory)
 	case "restore":
 		if !owned {
 			return p, fmt.Errorf("target is not managed")
@@ -215,17 +215,17 @@ func (m Manager) Apply(r Request, id string) error {
 		if err != nil {
 			return err
 		}
-		if err := atomicWrite(filepath.Join(m.UserHome, ".synchub", "library-import-backups", p.ID+".json"), backup, 0o600); err != nil {
+		if err := atomicWrite(m.UserHome, filepath.Join(m.UserHome, ".synchub", "library-import-backups", p.ID+".json"), backup, 0o600); err != nil {
 			return fmt.Errorf("save canonical import backup: %w", err)
 		}
 		// Imports do not take ownership of the source Harness. Roll back partial
 		// canonical writes if a write fails; never change the import source.
-		if err := writeTree(p.root, p.directory, p.before, p.after); err != nil {
-			current, readErr := readTree(p.root, p.directory)
+		if err := writeTree(m.UserHome, p.root, p.directory, p.before, p.after); err != nil {
+			current, readErr := readTree(m.UserHome, p.root, p.directory)
 			if readErr != nil {
 				return errors.Join(err, readErr)
 			}
-			return errors.Join(err, writeTree(p.root, p.directory, current, p.before))
+			return errors.Join(err, writeTree(m.UserHome, p.root, p.directory, current, p.before))
 		}
 		return nil
 	}
@@ -242,7 +242,7 @@ func (m Manager) Apply(r Request, id string) error {
 	if err := m.save(p.state); err != nil {
 		return err
 	}
-	if err := writeTree(p.root, p.directory, p.before, p.after); err != nil {
+	if err := writeTree(m.UserHome, p.root, p.directory, p.before, p.after); err != nil {
 		return fmt.Errorf("library operation incomplete; preview restore to recover: %w", err)
 	}
 	rec.Pending, rec.Previous = false, nil

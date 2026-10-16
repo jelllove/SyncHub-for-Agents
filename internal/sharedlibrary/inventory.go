@@ -9,11 +9,11 @@ import (
 )
 
 func SkillNames(userHome string) ([]string, error) {
-	return skillNames(filepath.Join(Root(userHome), "skills"))
+	return skillNames(userHome, filepath.Join(Root(userHome), "skills"))
 }
 
-func skillNames(root string) ([]string, error) {
-	if err := noLinks(root); err != nil {
+func skillNames(userHome, root string) ([]string, error) {
+	if err := noLinks(userHome, root); err != nil {
 		return nil, err
 	}
 	items, err := os.ReadDir(root)
@@ -49,7 +49,7 @@ func (m Manager) Snapshot() (Snapshot, error) {
 		{"copilot", filepath.Join(m.UserHome, ".copilot", "skills")},
 	}
 	for _, root := range roots {
-		names, err := skillNames(root.path)
+		names, err := skillNames(m.UserHome, root.path)
 		if err != nil {
 			result.Entries = append(result.Entries, Entry{Kind: "skills", Harness: root.harness,
 				Path: root.path, Status: "blocked: " + err.Error()})
@@ -76,7 +76,7 @@ func (m Manager) Snapshot() (Snapshot, error) {
 		if err != nil {
 			return result, err
 		}
-		current, err := readTree(target, r.Kind == "skills")
+		current, err := readTree(m.UserHome, target, r.Kind == "skills")
 		status := "managed"
 		if err != nil || digest(current) != digest(rec.Applied) {
 			status = "modified"

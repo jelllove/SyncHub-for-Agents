@@ -46,7 +46,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Test headless commands and native cross-process locks
-        run: go test ./cmd/synchub ./internal/instance ./internal/cli ./tools/clipack
+        run: go test ./cmd/synchub ./internal/instance ./internal/sharedlibrary ./internal/cli ./tools/clipack
       - name: Build and smoke native CLI archive without GUI libraries
         env:
           CLI_VERSION: ${{ inputs.version }}
