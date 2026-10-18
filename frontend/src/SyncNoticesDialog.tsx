@@ -66,8 +66,7 @@ export function SyncNoticesDialog({ notices, initialFilter, acknowledge, dismiss
       </div>
       <div className="sync-notices-content">
       <p id="sync-notices-description">
-        {t(`Skipped: ${notices.skipped}. Blocked: ${notices.blocked}.`, `已跳过：${notices.skipped}。已拦截：${notices.blocked}。`)}
-        {' '}{t('Exact original counts and per-resource records are retained, including duplicates. Blocked counts can differ from the number of records because the cycle counts protected paths. Opening or reviewing this log never starts synchronization.', '保留精确的原始计数和每项资源的记录，包括重复记录。拦截计数按受保护路径统计，因此可能与记录数不同。打开或审阅此日志不会启动同步。')}
+        {t('Only issues that may need your attention are shown. Normal policy exclusions are handled automatically and retained in local diagnostic history. Opening or reviewing this log never starts synchronization.', '这里只显示可能需要处理的问题。正常规则排除会自动处理，并保留在本地诊断历史中。打开或审阅此日志不会启动同步。')}
       </p>
       {notices.finishedAt && !notices.finishedAt.startsWith('0001-') && (
         <p>{t('Cycle finished: ', '周期完成时间：')}<time dateTime={notices.finishedAt}>{Number.isNaN(Date.parse(notices.finishedAt)) ? notices.finishedAt : new Date(notices.finishedAt).toLocaleString(locale)}</time></p>
@@ -87,7 +86,7 @@ export function SyncNoticesDialog({ notices, initialFilter, acknowledge, dismiss
               }}
             >
               <option value="all">{t('All issues', '所有问题')}</option>
-              <option value="skipped">{t('Skipped', '已跳过')}</option>
+              <option value="skipped">{t('Collection issues', '资源读取问题')}</option>
               <option value="blocked">{t('Blocked', '已拦截')}</option>
               <option value="error">{t('Operational issues', '操作问题')}</option>
             </select>
@@ -97,7 +96,7 @@ export function SyncNoticesDialog({ notices, initialFilter, acknowledge, dismiss
               <li key={index}>
                 <strong>{issue.resourceKey || t('(unattributed resource)', '（未归属资源）')}</strong>
                 <code>{issue.path || t('(resource-level issue; no relative file path)', '（资源级问题；无相对文件路径）')}</code>
-                <span>{statusName(issue.kind, t)} · <code>{issue.code}</code></span>
+                <span>{issue.kind === 'skipped' ? t('Collection issue', '资源读取问题') : statusName(issue.kind, t)} · <code>{issue.code}</code></span>
                 <p>{issue.message}</p>
                 {!issue.reviewable && <small>{t('Operational issue; acknowledgement does not clear it.', '操作问题；确认提示不会清除此问题。')}</small>}
               </li>

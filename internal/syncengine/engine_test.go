@@ -259,6 +259,7 @@ func TestSyncOnceDoesNotAdvanceUnavailableResourceBase(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+
 	bare := newBareRemote(t)
 	repoA := filepath.Join(t.TempDir(), "repoA")
 	rootA := t.TempDir()
@@ -297,6 +298,20 @@ func TestSyncOnceDoesNotAdvanceUnavailableResourceBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertFileContent(t, filepath.Join(rootB, "settings.json"), "remote")
+}
+
+func TestSyncOnceMissingUnusedRootIsAnAutomaticExclusion(t *testing.T) {
+	bare := newBareRemote(t)
+	repo := filepath.Join(t.TempDir(), "repo")
+	root := filepath.Join(t.TempDir(), "not-created")
+	engine := engineFor(cloneWorkspace(t, bare, repo), repo, filepath.Join(t.TempDir(), "state.json"), root)
+	result, err := engine.SyncOnce()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.SkippedIssues) != 1 || result.SkippedIssues[0].Code != "root-missing" {
+		t.Fatalf("unused missing root diagnostic = %#v", result.SkippedIssues)
+	}
 }
 
 func TestSyncOnceMergesIndependentStructuredEdits(t *testing.T) {

@@ -145,10 +145,14 @@ func (c *Collector) coalesce(
 			if spec.OptionalRoot && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
+			code := "root-unavailable"
+			if errors.Is(err, os.ErrNotExist) {
+				code = "root-missing"
+			}
 			issues = append(issues, resource.Issue{
 				ResourceKey: spec.Key,
 				Path:        spec.Root,
-				Code:        "root-unavailable",
+				Code:        code,
 				Message:     err.Error(),
 			})
 			continue

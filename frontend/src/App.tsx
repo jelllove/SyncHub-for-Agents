@@ -338,7 +338,7 @@ function App() {
     ? `${activityMessage(progress.label, t) || t('Preparing synchronization', '正在准备同步')}${progress.totalActions > 0 ? t(` · ${progress.completedActions} of ${progress.totalActions} changes`, ` · ${progress.completedActions} / ${progress.totalActions} 项更改`) : ''}`
     : progress.stage === 'complete'
       ? snapshot.syncNotices.reviewed && !progress.needsAttention
-        ? t('Notices acknowledged. Skipped and blocked files remain excluded.', '已确认提示。跳过和拦截的文件仍会被排除。')
+        ? t('Safety notices reviewed. Protection rules remain active.', '已审阅安全提示。保护规则继续生效。')
         : completionMessage(progress, t)
       : t(`${enabledAgents} agents are protected across your connected computers.`, `已在连接的电脑间保护 ${enabledAgents} 个智能体。`)
 

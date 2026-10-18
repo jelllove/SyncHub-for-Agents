@@ -211,6 +211,26 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		}
 	}
 
+	// A missing unused source is normal; an existing synchronized resource
+	// cannot be restored safely until its source root is available.
+	for i, issue := range collected.Skipped {
+		if issue.Code != "root-missing" {
+			continue
+		}
+		prefix := resourceRepoPrefix(e.Resources[issue.ResourceKey])
+		if prefix == "" {
+			collected.Skipped[i].Code = "root-unavailable"
+			continue
+		}
+		for _, snapshot := range []state.Snapshot{baseSnapshot, remote.owned} {
+			for repoRel := range snapshot {
+				if pathHasPrefix(repoRel, prefix) {
+					collected.Skipped[i].Code = "root-unavailable"
+				}
+			}
+		}
+	}
+
 	result.Issues = append(result.Issues, collected.Blocked...)
 	result.Issues = append(result.Issues, collected.Skipped...)
 	result.SkippedIssues = append([]resource.Issue(nil), collected.Skipped...)

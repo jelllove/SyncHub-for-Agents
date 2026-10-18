@@ -131,8 +131,8 @@ function diagnosticSnapshot(): Snapshot {
     version: 1, fingerprint: 'exact-set', finishedAt: '2026-10-03T10:00:00Z',
     skipped: 2, blocked: 1, detailsAvailable: true, reviewed: false,
     issues: [
-      { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'generated-content', message: 'Excluded by policy', bytes: 12, reviewable: true },
-      { kind: 'blocked', resourceKey: 'demo/config', path: 'secret.json', code: 'secret-detected', message: 'Credential content', bytes: 20, reviewable: true },
+      { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'unapproved-link', message: 'Link needs approval', bytes: 12, reviewable: true },
+      { kind: 'blocked', resourceKey: 'demo/config', path: 'secret.json', code: 'invalid-path', message: 'Unsafe destination', bytes: 20, reviewable: true },
     ],
   }
   return initial
@@ -228,11 +228,27 @@ describe('App settings preview', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Sync notice set changed while saving')
     act(() => setLocale('zh-CN'))
     expect(screen.getByRole('alert')).toHaveTextContent('保存时同步提示集已更改；请关闭并重新打开日志以审阅当前记录。')
-    expect(screen.getByText('Credential content')).toBeVisible()
+    expect(screen.getByText('Unsafe destination')).toBeVisible()
     expect(api.acknowledgeSyncNotices).toHaveBeenCalledTimes(1)
   })
 
-  it('opens exact cycle diagnostics from clickable Skipped and keyboard Blocked counters without syncing or scanning', async () => {
+  it('does not prompt for skips when the backend reports only normal exclusions', async () => {
+    const initial = configuredSnapshot()
+    initial.progress = { ...initial.progress, stage: 'complete', skipped: 250 }
+    initial.syncNotices = {
+      version: 1, fingerprint: 'normal', finishedAt: '', skipped: 0, blocked: 0,
+      detailsAvailable: true, reviewed: false, issues: [],
+    }
+    api.snapshot.mockResolvedValue(initial)
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Ready' })).toBeVisible()
+    expect(screen.queryByText('Skipped')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review notices' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Open sync diagnostics log/ })).not.toBeInTheDocument()
+    expect(api.acknowledgeSyncNotices).not.toHaveBeenCalled()
+  })
+
+  it('opens actionable diagnostics by mouse and keyboard without syncing or scanning', async () => {
     const initial = diagnosticSnapshot()
     api.snapshot.mockResolvedValue(initial)
     api.acknowledgeSyncNotices.mockResolvedValue({
@@ -241,10 +257,10 @@ describe('App settings preview', () => {
     })
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await screen.findByRole('button', { name: 'Skipped: 2. Open sync diagnostics log' }))
+    await user.click(await screen.findByRole('button', { name: 'Issues: 2. Open sync diagnostics log' }))
     expect(screen.getByText('cache.tmp')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Close log' }))
-    const blocked = screen.getByRole('button', { name: 'Blocked: 1. Open sync diagnostics log' })
+    const blocked = screen.getByRole('button', { name: 'Issues: 2. Open sync diagnostics log' })
     blocked.focus()
     await user.keyboard('{Enter}')
     expect(screen.getByText('secret.json')).toBeVisible()
@@ -254,7 +270,7 @@ describe('App settings preview', () => {
     expect(screen.getByRole('heading', { name: 'Ready' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Close log' }))
     expect(blocked).toHaveFocus()
-    expect(screen.getByRole('button', { name: 'Blocked: 1. Open sync diagnostics log' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Issues: 2. Open sync diagnostics log' })).toBeVisible()
     expect(api.triggerSync).not.toHaveBeenCalled()
     expect(api.resourcePreview).not.toHaveBeenCalled()
   })
@@ -277,8 +293,8 @@ describe('App settings preview', () => {
     expect(screen.getByRole('heading', { name: 'Sync complete' })).toBeVisible()
     expect(screen.queryByRole('heading', { name: 'Needs attention' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review notices' })).not.toBeInTheDocument()
-    expect(screen.getByText('Notices acknowledged. Skipped and blocked files remain excluded.')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Blocked: 1. Open sync diagnostics log' })).toBeVisible()
+    expect(screen.getByText('Safety notices reviewed. Protection rules remain active.')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Issues: 2. Open sync diagnostics log' })).toBeVisible()
     expect(api.triggerSync).not.toHaveBeenCalled()
   })
 
@@ -301,7 +317,7 @@ describe('App settings preview', () => {
     api.acknowledgeSyncNotices.mockRejectedValue(new Error('Sync notice set changed; reopen the log'))
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await screen.findByRole('button', { name: 'Skipped: 2. Open sync diagnostics log' }))
+    await user.click(await screen.findByRole('button', { name: 'Issues: 2. Open sync diagnostics log' }))
     act(() => api.events.get('desktop:snapshot')?.({
       data: {
         ...initial, syncNotices: {
@@ -318,7 +334,7 @@ describe('App settings preview', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Sync notice set changed')
     expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Close log' }))
-    const skipped = screen.getByRole('button', { name: 'Skipped: 3. Open sync diagnostics log' })
+    const skipped = screen.getByRole('button', { name: 'Issues: 1. Open sync diagnostics log' })
     skipped.focus()
     await user.keyboard(' ')
     expect(screen.getByText('new.tmp')).toBeVisible()
@@ -336,7 +352,7 @@ describe('App settings preview', () => {
     })
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await screen.findByRole('button', { name: 'Blocked: 1. Open sync diagnostics log' }))
+    await user.click(await screen.findByRole('button', { name: 'Issues: 2. Open sync diagnostics log' }))
     await user.click(screen.getByRole('button', { name: 'Review safety notices' }))
     await user.click(screen.getByRole('button', { name: 'Confirm acknowledgement' }))
     expect(await screen.findByText('Safety notices reviewed')).toBeVisible()
@@ -367,7 +383,7 @@ describe('App settings preview', () => {
     api.acknowledgeSyncNotices.mockReturnValue(response.promise)
     const user = userEvent.setup()
     render(<App />)
-    await user.click(await screen.findByRole('button', { name: 'Skipped: 2. Open sync diagnostics log' }))
+    await user.click(await screen.findByRole('button', { name: 'Issues: 2. Open sync diagnostics log' }))
     await user.click(screen.getByRole('button', { name: 'Review safety notices' }))
     await user.click(screen.getByRole('button', { name: 'Confirm acknowledgement' }))
     act(() => api.events.get('desktop:snapshot')?.({ data: newer }))
@@ -375,14 +391,14 @@ describe('App settings preview', () => {
     act(() => api.events.get('desktop:snapshot')?.({ data: acknowledged }))
     expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeVisible()
     expect(screen.getByText('New cycle failed')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Skipped: 3. Open sync diagnostics log' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Issues: 1. Open sync diagnostics log' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Approve and synchronize' })).toBeVisible()
     expect(screen.getByRole('heading', { name: 'Resolve synchronized conflicts' })).toBeVisible()
     expect(screen.getByText('cache.tmp')).toBeVisible()
     expect(screen.queryByText('new.tmp')).not.toBeInTheDocument()
     expect(screen.getByText('Safety notices reviewed')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Close log' }))
-    await user.click(screen.getByRole('button', { name: 'Skipped: 3. Open sync diagnostics log' }))
+    await user.click(screen.getByRole('button', { name: 'Issues: 1. Open sync diagnostics log' }))
     expect(screen.getByText('new.tmp')).toBeVisible()
     expect(screen.queryByText('Safety notices reviewed')).not.toBeInTheDocument()
     expect(api.acknowledgeSyncNotices).toHaveBeenCalledExactlyOnceWith('exact-set')

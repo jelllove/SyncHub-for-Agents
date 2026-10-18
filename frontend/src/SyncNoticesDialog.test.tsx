@@ -8,9 +8,9 @@ const notices = {
   version: 1, fingerprint: 'exact-set', finishedAt: '2026-10-03T10:00:00Z',
   skipped: 2, blocked: 1, detailsAvailable: true, reviewed: false,
   issues: [
-    { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'generated-content', message: 'Excluded by policy', bytes: 12, reviewable: true },
-    { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'generated-content', message: 'Excluded by policy', bytes: 12, reviewable: true },
-    { kind: 'blocked', resourceKey: 'demo/config', path: 'secret.json', code: 'secret-detected', message: 'Credential content', bytes: 20, reviewable: true },
+    { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'unapproved-link', message: 'Link needs approval', bytes: 12, reviewable: true },
+    { kind: 'skipped', resourceKey: 'demo/source', path: 'cache.tmp', code: 'unapproved-link', message: 'Link needs approval', bytes: 12, reviewable: true },
+    { kind: 'blocked', resourceKey: 'demo/config', path: 'secret.json', code: 'invalid-path', message: 'Unsafe destination', bytes: 20, reviewable: true },
     { kind: 'error', resourceKey: 'demo/config', path: 'settings.json', code: 'restore-failed', message: 'Write failed', bytes: 0, reviewable: false },
   ],
 }
@@ -25,8 +25,8 @@ describe('SyncNoticesDialog', () => {
     act(() => setLocale('zh-CN'))
     expect(screen.getByRole('dialog', { name: '同步诊断日志' })).toBeVisible()
     expect(screen.getByRole('combobox', { name: '显示问题' })).toHaveValue('blocked')
-    expect(screen.getByText('secret-detected')).toBeVisible()
-    expect(screen.getByText('Credential content')).toBeVisible()
+    expect(screen.getByText('invalid-path')).toBeVisible()
+    expect(screen.getByText('Unsafe destination')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '审阅安全提示' }))
     expect(acknowledge).not.toHaveBeenCalled()
     act(() => setLocale('en'))
@@ -41,12 +41,12 @@ describe('SyncNoticesDialog', () => {
     const dialog = screen.getByRole('dialog', { name: 'Sync diagnostics log' })
     expect(within(dialog).getAllByText('cache.tmp')).toHaveLength(2)
     expect(within(dialog).getAllByText('demo/source')).toHaveLength(2)
-    expect(within(dialog).getAllByText('generated-content')).toHaveLength(2)
-    expect(within(dialog).getAllByText('Excluded by policy')).toHaveLength(2)
+    expect(within(dialog).getAllByText('unapproved-link')).toHaveLength(2)
+    expect(within(dialog).getAllByText('Link needs approval')).toHaveLength(2)
     expect(within(dialog).queryByText('secret.json')).not.toBeInTheDocument()
     await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Show issues' }), 'blocked')
     expect(within(dialog).getByText('secret.json')).toBeVisible()
-    expect(within(dialog).getByText('secret-detected')).toBeVisible()
+    expect(within(dialog).getByText('invalid-path')).toBeVisible()
     await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Show issues' }), 'all')
     expect(within(dialog).getByText('restore-failed')).toBeVisible()
     expect(within(dialog).getByText(/Operational issue; acknowledgement does not clear it/)).toBeVisible()
