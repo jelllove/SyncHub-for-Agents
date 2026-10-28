@@ -1,10 +1,16 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render as renderComponent, screen, waitFor, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Snapshot } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/models'
 import { SettingsPanel } from './SettingsPanel'
 import { normalizeSnapshot } from './desktopState'
 import { setLocale } from './i18n'
+import { UpdateProvider } from './updates'
+
+function render(ui: ReactNode) {
+  return renderComponent(ui, { wrapper: UpdateProvider })
+}
 
 const startAtLogin = vi.fn()
 const librarySnapshot = vi.fn()

@@ -244,12 +244,20 @@ Starting with v0.3.0, release builds check
 [GitHub Releases](https://github.com/jelllove/SyncHub-for-Agents/releases/latest)
 at startup and every six hours. Windows x64 automatically downloads the latest
 stable installer and verifies its SHA-256 checksum before staging it.
-The installer runs after you select **Quit** from the tray, without restarting
-the app; alternatively, use **Restart to update** in settings.
+While a new release downloads, the top-right button shows **Downloading…**.
+Once verified, it becomes **Update**: click it to install and restart without
+opening settings. The button waits for synchronization or settings changes to
+finish before allowing a restart. **Restart to update** remains in settings.
+Alternatively, selecting **Quit** from the tray installs without reopening the app.
+On Windows, **Update** shares the title-bar row with the minimize, maximize and
+close controls. Drag the title area to move the window; closing still hides it
+in the tray rather than quitting.
 
 Settings also provide **Check for updates** and an automatic-update switch.
 Closing the window only hides it in the tray and does not install an update.
-macOS, Linux, and Windows ARM64 show a link for manual installation instead.
+macOS, Linux, and Windows ARM64 show **Download update** in the top-right corner
+for manual installation instead. Update errors stay visible with a settings
+shortcut for recovery.
 Development builds do not update themselves. Users on v0.2.3 and earlier must
 install v0.3.0 or later manually once to enable this feature.
 

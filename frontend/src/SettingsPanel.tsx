@@ -29,6 +29,7 @@ const settingsTabs = [
 type SettingsTab = typeof settingsTabs[number]['id']
 
 export type SettingsPanelProps = {
+  initialTab?: SettingsTab
   snapshot: AppSnapshot
   busy: boolean
   previewLoading: boolean
@@ -58,6 +59,7 @@ function previewTimestamp(value: string, locale: Locale, t: Translator) {
 }
 
 export function SettingsPanel({
+  initialTab,
   snapshot,
   busy,
   previewLoading,
@@ -89,7 +91,7 @@ export function SettingsPanel({
   const [startAtLoginError, setStartAtLoginError] = useState('')
   const [startAtLoginLoading, setStartAtLoginLoading] = useState(true)
   const [startupRevision, setStartupRevision] = useState(0)
-  const [activeTab, setActiveTab] = useState<SettingsTab>(snapshot.configured ? 'sync' : 'repository')
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? (snapshot.configured ? 'sync' : 'repository'))
   const settingsId = useId()
   const formId = `${settingsId}-form`
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([])

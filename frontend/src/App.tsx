@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Browser, Events } from '@wailsio/runtime'
+import { Browser, Events, System } from '@wailsio/runtime'
 import {
   ApproveInstallPlan,
   AcknowledgeSyncNotices,
@@ -40,6 +40,9 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 import { statusName } from './statusNames'
 import { activityMessage } from './activityMessages'
 import { LocalizedError } from './localizedError'
+import { UpdateButton } from './UpdateButton'
+import { UpdateProvider, useUpdates } from './updates'
+import { TitleBar } from './TitleBar'
 
 const stateLabels: Record<string, string> = {
   idle: 'Ready',
@@ -95,13 +98,16 @@ function noticeMessage(notice: string | Progress, t: Translator) {
   return messages[notice] ? t(notice, messages[notice]) : notice
 }
 
-function App() {
+function DesktopApp() {
   const { locale, t } = useI18n()
+  const windows = System.IsWindows()
+  const { error: updateError } = useUpdates()
   const [snapshot, setSnapshot] = useState<AppSnapshot>()
   const latestSnapshot = useRef<AppSnapshot | undefined>(undefined)
   const latestRevision = useRef(0)
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<'desktop'>()
   const [firstSyncDialogOpen, setFirstSyncDialogOpen] = useState(false)
   const [noticeLog, setNoticeLog] = useState<{ notices: AppSyncNotices; filter: SyncNoticeFilter }>()
   const [busy, setBusy] = useState(false)
@@ -258,6 +264,7 @@ function App() {
   const closeSettings = () => {
     cancelPreviewRefresh()
     setSettingsOpen(false)
+    setSettingsTab(undefined)
   }
 
   const runSyncNow = async () => {
@@ -310,24 +317,30 @@ function App() {
     setNotice('Safety notices reviewed; diagnostic records retained')
   }
 
+  const titleBar = windows ? <TitleBar syncBusy={busy || !snapshot || snapshot.state === 'updating'} /> : null
+
   if (needsOnboarding) {
     return (
-      <>
+      <div className={windows ? 'windows-app' : undefined}>
+        {titleBar}
         <div className="onboarding-language-bar"><LanguageSwitcher /></div>
         <Onboarding complete={() => {
           setNeedsOnboarding(false)
           void refresh()
         }} />
-      </>
+      </div>
     )
   }
 
   if (needsOnboarding === undefined || !snapshot) {
     return (
-      <main className="loading">
-        <BrandMark label="SyncHub for Agents" />
-        <p>{error || t('Opening SyncHub for Agents…', '正在打开 SyncHub for Agents…')}</p>
-      </main>
+      <div className={windows ? 'windows-app' : undefined}>
+        {titleBar}
+        <main className="loading">
+          <BrandMark label="SyncHub for Agents" />
+          <p>{error || t('Opening SyncHub for Agents…', '正在打开 SyncHub for Agents…')}</p>
+        </main>
+      </div>
     )
   }
 
@@ -343,7 +356,8 @@ function App() {
       : t(`${enabledAgents} agents are protected across your connected computers.`, `已在连接的电脑间保护 ${enabledAgents} 个智能体。`)
 
   return (
-    <div className="app-shell">
+    <div className={windows ? 'app-shell windows-app' : 'app-shell'}>
+      {titleBar}
       <header>
         <div className="brand">
           <BrandMark label="SyncHub for Agents" />
@@ -352,12 +366,24 @@ function App() {
             <span>{t('Desktop', '桌面端')}</span>
           </div>
         </div>
-        <button className="icon-button settings-button" onClick={() => setSettingsOpen(true)} aria-label={t('Open settings', '打开设置')} title={t('Sync settings', '同步设置')}>
-          <SettingsIcon />
-        </button>
+        <div className="header-actions">
+          {!windows && <UpdateButton syncBusy={busy || state === 'updating'} />}
+          <button className="icon-button settings-button" onClick={() => setSettingsOpen(true)} aria-label={t('Open settings', '打开设置')} title={t('Sync settings', '同步设置')}>
+            <SettingsIcon />
+          </button>
+        </div>
       </header>
 
       <main>
+        {updateError && !settingsOpen && (
+          <div className="inline-error update-notice" role="alert">
+            <span>{updateError}</span>
+            <button className="text-button" onClick={() => {
+              setSettingsTab('desktop')
+              setSettingsOpen(true)
+            }} type="button">{t('Review updates', '查看更新')}</button>
+          </div>
+        )}
         {!snapshot.configured ? (
           <section className="welcome">
             <span className="eyebrow">{t('WELCOME', '欢迎')}</span>
@@ -515,6 +541,7 @@ function App() {
 
       {settingsOpen && (
         <SettingsPanel
+          initialTab={settingsTab}
           snapshot={snapshot}
           busy={busy}
           previewLoading={previewLoading}
@@ -643,4 +670,6 @@ function toFileURL(path: string) {
   return `file://${normalized}`
 }
 
-export default App
+export default function App() {
+  return <UpdateProvider><DesktopApp /></UpdateProvider>
+}

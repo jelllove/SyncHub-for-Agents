@@ -1,9 +1,15 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render as renderComponent, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Status } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/updater/models'
 import { UpdatePanel } from './UpdatePanel'
 import { setLocale } from './i18n'
+import { UpdateProvider } from './updates'
+
+function render(ui: ReactNode) {
+  return renderComponent(ui, { wrapper: UpdateProvider })
+}
 
 const api = vi.hoisted(() => ({
   status: vi.fn(),

@@ -1,19 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { Browser, Events } from '@wailsio/runtime'
+import { Browser } from '@wailsio/runtime'
 import {
   CheckForUpdates,
   RestartToUpdate,
   SetAutomaticUpdates,
-  UpdateStatus,
 } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/desktop/wailsservice'
 import type { Status } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/updater/models'
 import { useI18n, type Translator } from './i18n'
-
-type UpdateAction = 'check' | 'automatic' | 'restart' | 'release'
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
-}
+import { useUpdates } from './updates'
 
 function statusMessage(status: Status | null, t: Translator) {
   const version = status?.latestVersion ? t(`Version ${status.latestVersion}`, `版本 ${status.latestVersion}`) : t('An update', '更新')
@@ -40,69 +33,11 @@ function checkedTime(value: string | undefined, locale: string) {
 
 export function UpdatePanel({ syncBusy }: { syncBusy: boolean }) {
   const { locale, t } = useI18n()
-  const [status, setStatus] = useState<Status | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [pending, setPending] = useState<UpdateAction | null>(null)
-  const [error, setError] = useState('')
-  const mounted = useRef(false)
-  const statusRevision = useRef(0)
-
-  useEffect(() => {
-    mounted.current = true
-    let active = true
-    const revision = statusRevision.current
-    const unsubscribe = Events.On('updater:status', (event) => {
-      if (!active) return
-      statusRevision.current += 1
-      setStatus(event.data as Status)
-      setError('')
-      setLoading(false)
-    })
-    void UpdateStatus().then((latest) => {
-      if (active && statusRevision.current === revision) {
-        setStatus(latest)
-        setError('')
-      }
-    }).catch((cause) => {
-      if (active && statusRevision.current === revision) setError(errorMessage(cause))
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => {
-      active = false
-      mounted.current = false
-      unsubscribe()
-    }
-  }, [])
-
-  const run = async (action: UpdateAction, request: () => Promise<Status | void>) => {
-    if (pending) return
-    setPending(action)
-    setError('')
-    const revision = statusRevision.current
-    try {
-      const latest = await request()
-      if (!mounted.current) return
-      if (latest) {
-        // Live events can advance a download before its initiating request returns.
-        if (statusRevision.current === revision) {
-          setStatus(latest)
-        } else if (action === 'automatic') {
-          setStatus((current) => current ? { ...current, automatic: latest.automatic } : latest)
-        }
-      }
-    } catch (cause) {
-      if (mounted.current) setError(errorMessage(cause))
-    } finally {
-      if (mounted.current) setPending(null)
-    }
-  }
-
+  const { status, loading, pending, error, run } = useUpdates()
   const development = status?.currentVersion === 'dev'
   const updating = status?.phase === 'checking' || status?.phase === 'downloading'
   const ready = status?.phase === 'ready' && status.supported && !development
   const lastChecked = checkedTime(status?.lastChecked, locale)
-  const visibleError = error || status?.error || (status?.phase === 'error' ? t('Please try checking for updates again.', '请重试检查更新。') : '')
 
   return (
     <fieldset className="update-panel">
@@ -144,7 +79,7 @@ export function UpdatePanel({ syncBusy }: { syncBusy: boolean }) {
           </div>
         </>
       )}
-      {visibleError && <div className="inline-error" role="alert">{visibleError}</div>}
+      {error && <div className="inline-error" role="alert">{error}</div>}
       <div className="inline-actions">
         <button
           className="secondary"

@@ -435,10 +435,20 @@ settings show an error and the running application is not replaced.
 HTTPS and the official GitHub repository are the download trust boundary;
 checksums detect corruption but do not replace publisher code signing.
 
-The update is staged while the app keeps running. Choose **Quit** from the
-tray to install it after the process exits, or **Restart to update** in settings
-to install and reopen the app. Restart is refused while a synchronization is
-active. Closing the main window only hides it and does not trigger installation.
+The update is staged while the app keeps running. The top-right corner shows
+**Downloading…** while downloading and verifying a new release, then **Update**
+once it is ready. Click **Update** to install and reopen the app without opening
+settings. The same **Restart to update** action remains available in settings.
+On Windows, the update button is in the title bar immediately before the
+minimize, maximize/restore and close buttons. The title area supports native
+window dragging and resizing; closing the window still hides it in the tray.
+Both restart controls are disabled during synchronization or settings changes.
+Update failures appear in the main window with **Review updates** to open the
+settings error and retry controls.
+
+Alternatively, choose **Quit** from the tray to install after the process exits
+without reopening the app. Closing the main window only hides it and does not
+trigger installation.
 Settings and synchronized files are retained. A custom installation directory
 is reused; a directory requiring administrator access must be updated manually.
 Installation errors are recorded locally and displayed on the next launch.
@@ -450,7 +460,8 @@ The preference is local to this machine, in `~/.synchub/update-settings.json`.
 Development builds (`dev`) never auto-update.
 
 Automatic installation currently supports Windows x64 only. macOS, Linux, and
-Windows ARM64 provide a release-page link for manual installation. Users on
+Windows ARM64 show **Download update** at the top right when a release is
+available; it opens the release page for manual installation. Users on
 v0.2.3 or earlier need to install a newer release manually once: those versions
 cannot discover or install the updater themselves.
 
