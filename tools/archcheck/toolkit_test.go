@@ -14,6 +14,7 @@ func TestNativeTrayToolkitsStayInSeparateExecutables(t *testing.T) {
 	}{
 		{".", "fyne.io/systray"},
 		{"./cmd/synchub", "github.com/wailsapp/wails/v3/pkg/application"},
+		{"./cmd/synchub", "fyne.io/systray"},
 	} {
 		t.Run(tc.target, func(t *testing.T) {
 			command := exec.Command("go", "list", "-deps", tc.target)

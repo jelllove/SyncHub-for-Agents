@@ -69,6 +69,9 @@ func (a *ResourceApplier) Restore(spec resource.Spec, repoRel string) error {
 }
 
 func (a *ResourceApplier) RestoreBytes(spec resource.Spec, relative string, data []byte) error {
+	if !spec.Owns(relative) {
+		return fmt.Errorf("resource path %q is managed by the shared library", relative)
+	}
 	if _, err := safeJoin(".", relative); err != nil {
 		return err
 	}
@@ -80,6 +83,11 @@ func (a *ResourceApplier) RestoreBytes(spec resource.Spec, relative string, data
 }
 
 func (a *ResourceApplier) restoreBytes(spec resource.Spec, repoRel, relative string, remote []byte) error {
+	if spec.ValidateContent != nil {
+		if err := spec.ValidateContent(relative, remote); err != nil {
+			return err
+		}
+	}
 	targets, err := a.materializeTargets(spec)
 	if err != nil {
 		return err
@@ -96,6 +104,11 @@ func (a *ResourceApplier) restoreBytes(spec resource.Spec, repoRel, relative str
 		}
 	}
 	for _, root := range targets {
+		if spec.ValidateRoot != nil {
+			if err := spec.ValidateRoot(filepath.Join(root, filepath.FromSlash(relative))); err != nil {
+				return err
+			}
+		}
 		target, err := safeWritableJoin(root, relative)
 		if err != nil {
 			return err
@@ -136,6 +149,9 @@ func (a *ResourceApplier) targetsForDelete(spec resource.Spec) ([]string, error)
 	if len(spec.Targets) == 0 {
 		return nil, fmt.Errorf("resource %q has no restore targets", spec.Key)
 	}
+	if spec.CopyOnly {
+		return a.copyOnlyTargets(spec)
+	}
 	if spec.SharedAs == "" && spec.Provider != "common" {
 		return append([]string(nil), spec.Targets...), nil
 	}
@@ -174,6 +190,11 @@ func (a *ResourceApplier) Delete(spec resource.Spec, repoRel string) error {
 		return err
 	}
 	for index, root := range targets {
+		if spec.ValidateRoot != nil {
+			if err := spec.ValidateRoot(filepath.Join(root, filepath.FromSlash(ref.Relative))); err != nil {
+				return err
+			}
+		}
 		target, err := safeDeletableJoin(root, ref.Relative)
 		if err != nil {
 			return err
@@ -253,6 +274,9 @@ func (a *ResourceApplier) materializeTargets(spec resource.Spec) ([]string, erro
 		return nil, fmt.Errorf("resource %q has no restore targets", spec.Key)
 	}
 	primary := filepath.Clean(spec.Targets[0])
+	if spec.CopyOnly {
+		return a.copyOnlyTargets(spec)
+	}
 	if spec.SharedAs == "" && spec.Provider != "common" {
 		return append([]string(nil), spec.Targets...), nil
 	}
@@ -274,6 +298,48 @@ func (a *ResourceApplier) materializeTargets(spec resource.Spec) ([]string, erro
 		}
 	}
 	return writeTargets, nil
+}
+
+func (a *ResourceApplier) copyOnlyTargets(spec resource.Spec) ([]string, error) {
+	primary := filepath.Clean(spec.Targets[0])
+	targets := []string{primary}
+	for _, target := range spec.Targets {
+		if spec.ValidateRoot != nil {
+			if err := spec.ValidateRoot(target); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, rawAlias := range spec.Targets[1:] {
+		alias := filepath.Clean(rawAlias)
+		info, err := os.Lstat(alias)
+		if err == nil && info.Mode()&os.ModeSymlink != 0 {
+			resolved, err := filepath.EvalSymlinks(alias)
+			if err != nil {
+				return nil, err
+			}
+			resolved, err = filepath.Abs(resolved)
+			if err != nil {
+				return nil, err
+			}
+			want, err := filepath.Abs(primary)
+			if err != nil {
+				return nil, err
+			}
+			if !samePath(resolved, want) {
+				return nil, fmt.Errorf("shared alias %q points outside canonical target %q", alias, primary)
+			}
+			continue
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		if err == nil && !info.IsDir() {
+			return nil, fmt.Errorf("shared alias %q is not a directory", alias)
+		}
+		targets = append(targets, alias)
+	}
+	return targets, nil
 }
 
 func (a *ResourceApplier) ensureAlias(primary, alias string) (string, error) {

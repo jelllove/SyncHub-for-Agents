@@ -26,10 +26,11 @@ type CommandFactory func(name string, args ...string) *exec.Cmd
 
 // Client operates on a git working directory at Dir.
 type Client struct {
-	Dir        string
-	AuthMode   AuthMode
-	Executable string
-	Command    CommandFactory
+	Dir            string
+	AuthMode       AuthMode
+	Executable     string
+	CredentialHome string
+	Command        CommandFactory
 }
 
 func (c *Client) run(args ...string) (string, error) {
@@ -74,6 +75,12 @@ func (c *Client) command(args ...string) (*exec.Cmd, error) {
 	if oauthNetwork {
 		command.Env = sanitizedGitEnvironment(os.Environ())
 		command.Env = append(command.Env, "GIT_TERMINAL_PROMPT=0")
+		if c.CredentialHome != "" {
+			if !filepath.IsAbs(c.CredentialHome) {
+				return nil, errors.New("OAuth credential profile must be an absolute path")
+			}
+			command.Env = append(command.Env, "SYNCHUB_CREDENTIAL_HOME="+c.CredentialHome)
+		}
 	}
 	return command, nil
 }
@@ -97,7 +104,8 @@ func sanitizedGitEnvironment(environment []string) []string {
 		upper := strings.ToUpper(name)
 		if strings.HasPrefix(upper, "GIT_TRACE") ||
 			upper == "GIT_CURL_VERBOSE" ||
-			upper == "GIT_TERMINAL_PROMPT" {
+			upper == "GIT_TERMINAL_PROMPT" ||
+			upper == "SYNCHUB_CREDENTIAL_HOME" {
 			continue
 		}
 		result = append(result, value)

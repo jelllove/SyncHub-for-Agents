@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -35,6 +35,7 @@ function fixture() {
     version: '0.3.4', architecture: 'arm64', installedFromDMG: true,
     adHocSignatureVerified: true, executableVersionVerified: true,
     isolatedHome: true, originalDMGDigest: 'a'.repeat(64),
+    originalZIPDigest: 'd'.repeat(64), archiveContentsMatch: true,
   }
   return { directory, screenshots, summary, receipt }
 }
@@ -49,7 +50,7 @@ test('publication evidence requires real native test success, installation recei
     ]) {
       assert.throws(() => verifyEvidence(f.directory, bad, f.receipt, 'v0.3.4', 'arm64'), /native tests/)
     }
-    for (const field of ['installedFromDMG', 'adHocSignatureVerified', 'executableVersionVerified', 'isolatedHome']) {
+    for (const field of ['installedFromDMG', 'adHocSignatureVerified', 'executableVersionVerified', 'isolatedHome', 'archiveContentsMatch']) {
       assert.throws(
         () => verifyEvidence(f.directory, f.summary, { ...f.receipt, [field]: false }, 'v0.3.4', 'arm64'),
         /installation receipt/,
@@ -82,10 +83,15 @@ test('publication resolves live lightweight and annotated tags before any remote
     const commit = 'b'.repeat(40)
     const dmg = Buffer.from('synthetic package')
     const digest = createHash('sha256').update(dmg).digest('hex')
+    const zip = Buffer.from('synthetic zip')
+    const zipDigest = createHash('sha256').update(zip).digest('hex')
     writeFileSync(join(f.directory, 'SyncHub-macOS-universal-adhoc.dmg'), dmg)
-    writeFileSync(join(f.directory, 'SHA256SUMS-macOS.txt'), `${digest}  SyncHub-macOS-universal-adhoc.dmg\n`)
+    writeFileSync(join(f.directory, 'SyncHub-macOS-universal-adhoc.zip'), zip)
+    writeFileSync(join(f.directory, 'SHA256SUMS-macOS.txt'),
+      `${digest}  SyncHub-macOS-universal-adhoc.dmg\n${zipDigest}  SyncHub-macOS-universal-adhoc.zip\n`)
     writeFileSync(join(f.directory, 'build-receipt.json'), JSON.stringify({
       tag: 'v0.3.4', sourceCommit: commit, dmgSHA256: digest, signature: 'ad-hoc', notarized: false,
+      zipSHA256: zipDigest,
     }))
     for (const architecture of ['arm64', 'x86_64']) {
       const root = join(f.directory, `macos-native-${architecture}`)
@@ -93,7 +99,7 @@ test('publication resolves live lightweight and annotated tags before any remote
       cpSync(f.screenshots, join(root, 'screenshots'), { recursive: true })
       writeFileSync(join(root, 'test-summary.json'), JSON.stringify(f.summary))
       writeFileSync(join(root, 'installation.json'), JSON.stringify({
-        ...f.receipt, architecture, originalDMGDigest: digest,
+        ...f.receipt, architecture, originalDMGDigest: digest, originalZIPDigest: zipDigest,
       }))
     }
     for (const target of ['matching', 'annotated', 'moved', 'missing', 'tree', 'cycle']) {
@@ -117,14 +123,29 @@ test('publication resolves live lightweight and annotated tags before any remote
       if (target === 'matching' || target === 'annotated') {
         assert.doesNotThrow(publish)
         assert.deepEqual(mutations.map((args) => args[1]), ['upload', 'edit'])
+        assert.ok(mutations[0].includes(join(f.directory, 'SyncHub-macOS-universal-adhoc.zip')))
       } else {
         assert.throws(publish, /tag|commit/)
         assert.equal(mutations.length, 0, `${target} tag must prevent uploads and notes editing`)
       }
     }
+    writeFileSync(join(f.directory, 'SyncHub-macOS-universal-adhoc.zip'), 'corrupted zip')
+    let remoteCalled = false
+    assert.throws(() => publishMacOS(f.directory, f.directory, 'v0.3.4', commit,
+      'https://github.com/jelllove/SyncHub-for-Agents/actions/runs/123', () => { remoteCalled = true }),
+    /Build receipt/)
+    assert.equal(remoteCalled, false, 'corrupt ZIP must block all remote operations')
   } finally {
     rmSync(f.directory, { recursive: true, force: true })
   }
+})
+
+test('ad-hoc archive publication retains ZIP digest checks and same-app native validation', () => {
+  const read = (name) => readFileSync(new URL(name, import.meta.url), 'utf8')
+  assert.match(read('macos-adhoc.sh'), /ditto -c -k --sequesterRsrc --keepParent/)
+  assert.match(read('macos-adhoc.sh'), /zipSHA256/)
+  assert.match(read('../smoke/macos-native.sh'), /diff -qr "\$app" "\$zip_app"/)
+  assert.match(read('../smoke/macos-native.sh'), /originalZIPDigest/)
 })
 
 test('native screenshots are extracted from XCTest attachments without runner filesystem access', () => {

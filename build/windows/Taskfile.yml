@@ -24,7 +24,8 @@ tasks:
       Optional environment: GITHUB_OAUTH_CLIENT_ID, WINDOWS_CERTIFICATE_BASE64,
       WINDOWS_CERTIFICATE_PASSWORD, WINDOWS_SIGN_THUMBPRINT, WINDOWS_TIMESTAMP_SERVER.
       WINDOWS_REQUIRE_SIGNING=true rejects unsigned builds. Configured signing failures are fatal.
-      Produces bin/SyncHub-for-Agents-Setup-x64.exe and bin/SHA256SUMS.txt.
+      Produces bin/SyncHub-for-Agents-Setup-x64.exe,
+      bin/SyncHub-for-Agents-Windows-x64.zip and bin/SHA256SUMS.txt.
     platforms: [windows]
     preconditions:
       - sh: 'test "{{.ARCH | default "amd64"}}" = "amd64"'

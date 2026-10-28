@@ -21,9 +21,11 @@ func TestOAuthNetworkCommandUsesScopedNoninteractiveCredentialHelper(t *testing.
 	t.Setenv("GIT_TRACE", "1")
 	t.Setenv("GIT_CURL_VERBOSE", "1")
 	executable := filepath.Join(t.TempDir(), "SyncHub.exe")
+	credentialHome := t.TempDir()
 	client := &Client{
-		AuthMode:   AuthOAuth,
-		Executable: executable,
+		AuthMode:       AuthOAuth,
+		Executable:     executable,
+		CredentialHome: credentialHome,
 	}
 
 	command, err := client.command("clone", "https://github.com/acme/sync.git", "work")
@@ -44,6 +46,9 @@ func TestOAuthNetworkCommandUsesScopedNoninteractiveCredentialHelper(t *testing.
 	environment := strings.Join(command.Env, "\n")
 	if !strings.Contains(environment, "GIT_TERMINAL_PROMPT=0") {
 		t.Fatalf("environment missing GIT_TERMINAL_PROMPT=0:\n%s", environment)
+	}
+	if !strings.Contains(environment, "SYNCHUB_CREDENTIAL_HOME="+credentialHome) {
+		t.Fatal("credential helper must use the selected SyncHub profile")
 	}
 	if strings.Contains(environment, "GIT_TRACE=") || strings.Contains(environment, "GIT_CURL_VERBOSE=") {
 		t.Fatalf("trace environment leaked to Git:\n%s", environment)

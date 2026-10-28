@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -21,13 +22,16 @@ type Backend interface {
 }
 
 type Manager struct {
-	Backend    Backend
-	Identifier string
-	Arguments  []string
-	GOOS       string
-	HomeDir    func() (string, error)
-	Executable func() (string, error)
-	LookupEnv  func(string) (string, bool)
+	Backend         Backend
+	Identifier      string
+	Arguments       []string
+	GOOS            string
+	HomeDir         func() (string, error)
+	Executable      func() (string, error)
+	LookupEnv       func(string) (string, bool)
+	PreferencesPath string
+	SkipDefault     bool
+	preferencesMu   sync.Mutex
 }
 
 func (manager *Manager) Enable() error {
@@ -181,11 +185,12 @@ func writeFile(path string, contents []byte, mode os.FileMode) error {
 		temp.Close()
 		return fmt.Errorf("write autostart entry: %w", err)
 	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return fmt.Errorf("sync autostart entry: %w", err)
+	}
 	if err := temp.Close(); err != nil {
 		return fmt.Errorf("close autostart entry: %w", err)
-	}
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("replace autostart entry: %w", err)
 	}
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("write autostart entry: %w", err)

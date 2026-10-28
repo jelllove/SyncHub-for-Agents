@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,9 +15,17 @@ func AuthMetadataPath(home string) string {
 }
 
 func RunCredential(operation string, input io.Reader, output io.Writer) error {
-	home, err := Home()
-	if err != nil {
-		return err
+	home := os.Getenv("SYNCHUB_CREDENTIAL_HOME")
+	if home != "" {
+		if !filepath.IsAbs(home) {
+			return fmt.Errorf("credential profile must be an absolute path")
+		}
+	} else {
+		var err error
+		home, err = Home()
+		if err != nil {
+			return err
+		}
 	}
 	return RunCredentialWith(home, operation, input, output, auth.NewSystemStore())
 }

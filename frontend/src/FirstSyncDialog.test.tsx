@@ -1,8 +1,30 @@
 import { useState } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { FirstSyncDialog, type FirstSyncStrategy } from './FirstSyncDialog'
+import { setLocale } from './i18n'
+
+afterEach(() => act(() => setLocale('en')))
+
+it('preserves explicit strategy selection and backend errors across language changes', async () => {
+  const confirm = vi.fn().mockRejectedValue(new Error('synthetic repository failure'))
+  const user = userEvent.setup()
+  render(<FirstSyncDialog busy={false} paused={true} repositoryUrl="git@github.com:synthetic/repo.git" confirm={confirm} dismiss={vi.fn()} />)
+  act(() => setLocale('zh-CN'))
+  expect(screen.getByRole('dialog', { name: '选择首次同步策略' })).toBeVisible()
+  expect(screen.getByRole('button', { name: '开始首次同步' })).toBeDisabled()
+  expect(screen.getByText(/云端文件可能被替换或删除/)).toBeVisible()
+  await user.click(screen.getByRole('radio', { name: /使用本地/ }))
+  act(() => setLocale('en'))
+  expect(screen.getByRole('radio', { name: /Use local/ })).toBeChecked()
+  expect(confirm).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Start first sync' }))
+  expect(confirm).toHaveBeenCalledExactlyOnceWith('use-local')
+  expect(await screen.findByRole('alert')).toHaveTextContent('synthetic repository failure')
+  act(() => setLocale('zh-CN'))
+  expect(screen.getByRole('alert')).toHaveTextContent('synthetic repository failure')
+})
 
 it('focuses the safe dismiss action and restores the opener after cancellation', async () => {
   function Fixture() {

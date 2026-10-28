@@ -52,6 +52,31 @@ try {
     if ($project -notmatch 'File "\.\.\\\.\.\\\.\.\\LICENSE"') {
         throw 'Installer must include LICENSE.'
     }
+    New-Item -ItemType Directory -Force $scratch | Out-Null
+    $fixtureExe = Join-Path $scratch 'SyncHub.exe'
+    [IO.File]::WriteAllBytes($fixtureExe, [byte[]](0, 1, 2, 255))
+    $portable = Join-Path $scratch 'SyncHub-for-Agents-Windows-x64.zip'
+    Write-WindowsPortableBundle -Executable $fixtureExe -License "$root\LICENSE" -Output $portable
+    $archive = [IO.Compression.ZipFile]::OpenRead($portable)
+    try {
+        Assert-Equal (($archive.Entries.FullName | Sort-Object) -join ',') 'LICENSE,SyncHub.exe'
+        $stream = $archive.GetEntry('SyncHub.exe').Open()
+        try {
+            $buffer = [IO.MemoryStream]::new()
+            $stream.CopyTo($buffer)
+            Assert-Equal ([Convert]::ToHexString($buffer.ToArray())) '000102FF'
+        } finally { $stream.Dispose(); $buffer.Dispose() }
+    } finally { $archive.Dispose() }
+    Assert-Fails { Write-WindowsPortableBundle -Executable "$scratch\missing.exe" -License "$root\LICENSE" -Output $portable }
+    Assert-Fails { Write-WindowsPortableBundle -Executable $fixtureExe -License "$scratch\missing-license" -Output $portable }
+    Write-ReleaseChecksums -Files @($fixtureExe, $portable) -Output "$scratch\SHA256SUMS.txt"
+    $checksums = Get-Content "$scratch\SHA256SUMS.txt"
+    Assert-Equal $checksums.Count 2
+    foreach ($file in @($fixtureExe, $portable)) {
+        $expected = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path -Leaf $file)
+        if ($expected -cnotin $checksums) { throw "Missing or incorrect checksum for $file." }
+    }
+    Assert-Fails { Write-ReleaseChecksums -Files @("$scratch\missing.exe") -Output "$scratch\SHA256SUMS.txt" }
     Write-Host 'Windows packaging tests passed (versions, metadata, fail-closed signing, native exits, installer invariants).'
 } finally {
     if (Test-Path $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }

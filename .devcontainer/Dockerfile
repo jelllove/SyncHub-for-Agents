@@ -1,4 +1,4 @@
-FROM docker.io/library/golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS go-toolchain
+FROM docker.io/library/golang:1.26.9-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c AS go-toolchain
 FROM docker.io/library/node:24.17.0-bookworm-slim@sha256:862263c612aa437e3037674b85419622a9d93bff80aa1eee5398dfe686375532 AS node-toolchain
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae
 
@@ -37,7 +37,7 @@ USER vscode
 WORKDIR /workspaces/synchub-for-agents
 
 RUN test "$(id -u)" -ne 0 \
-    && test "$(go env GOVERSION)" = "go1.26.6" \
+    && test "$(go env GOVERSION)" = "go1.26.9" \
     && test "$(node -p process.versions.node)" = "24.17.0" \
     && go version \
     && node --version \
