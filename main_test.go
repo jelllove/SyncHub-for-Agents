@@ -7,13 +7,9 @@ import (
 
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
-	"github.com/qinqingxu/synchub-for-agents/internal/instance"
 )
 
 func TestDefaultDesktopHomeUsesSharedCLIHome(t *testing.T) {
-	userHome := t.TempDir()
-	t.Setenv("HOME", userHome)
-	t.Setenv("USERPROFILE", userHome)
 	want, err := cli.Home()
 	if err != nil {
 		t.Fatal(err)
@@ -30,7 +26,6 @@ func TestDefaultDesktopHomeUsesSharedCLIHome(t *testing.T) {
 func TestDesktopBootstrapCreatesSingleInstanceBeforeService(t *testing.T) {
 	var calls []string
 	serviceErr := errors.New("stop after service factory")
-	home := t.TempDir()
 
 	err := runDesktop(false, desktopBootstrap{
 		newGUI: func() *guiApplication {
@@ -39,16 +34,9 @@ func TestDesktopBootstrapCreatesSingleInstanceBeforeService(t *testing.T) {
 		},
 		home: func() (string, error) {
 			calls = append(calls, "home")
-			return home, nil
+			return "test-home", nil
 		},
 		newService: func(string, string) (*desktop.Service, error) {
-			other, err := instance.Acquire(home)
-			if !errors.Is(err, instance.ErrBusy) {
-				if other != nil {
-					other.Close()
-				}
-				t.Fatalf("Desktop initialized backend without profile ownership: %v", err)
-			}
 			calls = append(calls, "service")
 			return nil, serviceErr
 		},
@@ -59,32 +47,8 @@ func TestDesktopBootstrapCreatesSingleInstanceBeforeService(t *testing.T) {
 	if want := []string{"single-instance", "home", "service"}; !reflect.DeepEqual(calls, want) {
 		t.Fatalf("startup order = %v, want %v", calls, want)
 	}
-	lock, err := instance.Acquire(home)
-	if err != nil {
-		t.Fatalf("startup failure leaked ownership: %v", err)
-	}
-	defer lock.Close()
 }
 
-func TestDesktopDoesNotInitializeServiceWhenProfileIsOwned(t *testing.T) {
-	home := t.TempDir()
-	lock, err := instance.Acquire(home)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer lock.Close()
-	err = runDesktop(false, desktopBootstrap{
-		newGUI: func() *guiApplication { return &guiApplication{} },
-		home:   func() (string, error) { return home, nil },
-		newService: func(string, string) (*desktop.Service, error) {
-			t.Fatal("backend initialized while CLI owns profile")
-			return nil, nil
-		},
-	})
-	if !errors.Is(err, instance.ErrBusy) {
-		t.Fatalf("error = %v, want busy", err)
-	}
-}
 func TestActivationQueuePreservesRequestUntilWindowIsReady(t *testing.T) {
 	var queue activationQueue
 	shows := 0

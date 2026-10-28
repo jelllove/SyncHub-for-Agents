@@ -24,28 +24,6 @@ func writeCollectorFile(t *testing.T, filename string, data []byte) {
 	}
 }
 
-func TestCollectorDistinguishesMissingRootFromInvalidRoot(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		root string
-		code string
-	}{
-		{"missing", filepath.Join(t.TempDir(), "not-created"), "root-missing"},
-		{"invalid", "\x00", "root-unavailable"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			result, err := New(Options{StageParent: t.TempDir()}).Collect([]resource.Spec{{Key: "demo/skills", Root: test.root}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer result.Close()
-			if len(result.Skipped) != 1 || result.Skipped[0].Code != test.code {
-				t.Fatalf("root diagnostic = %#v", result.Skipped)
-			}
-		})
-	}
-}
-
 func TestCollectorStagesExactScannedBytes(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "SKILL.md")

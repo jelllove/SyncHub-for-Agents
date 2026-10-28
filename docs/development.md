@@ -11,25 +11,9 @@ node scripts/dev.mjs setup
 node scripts/dev.mjs verify
 ```
 
-On a memory-constrained or shared development host, limit Vitest workers rather
-than increasing test timeouts or skipping checks. In PowerShell:
-
-```powershell
-$env:VITEST_MAX_WORKERS = '2'
-node scripts/dev.mjs verify
-```
-
-This retains the complete verification suite and its existing timeout limits;
-only frontend test concurrency changes. Keep any earlier failed validation
-artifacts when retrying with this setting.
-
 Setup restores Go modules and the npm lockfile and builds frontend assets required
 by Go's embed directive. It does not install global tools, change Git configuration,
 start a daemon, or access a user's synchronization repository.
-It also restores the [NPM installer](../packages/npm-installer/README.md) lockfile
-with lifecycle scripts disabled so repository setup never installs or launches
-the desktop distribution. Full verification includes `npm-installer-tests`,
-which run the package's installation and deterministic documentation checks.
 For a pinned Linux environment, use the [development container](devcontainer.md).
 
 For desktop development, install the Wails CLI at the version in the generated
@@ -41,86 +25,10 @@ macOS requires Xcode command-line tools. Ubuntu 24.04 needs
 your OS package manager before setup/check. Packaging dependencies are listed in
 [CI](../.github/workflows/ci.yml).
 
-## Native desktop packages
-
-For standalone, GUI-free command-line builds and the four-target CLI archive
-matrix, see the [CLI development and verification guide](cli.md). The reusable
-[CLI workflow](../.github/workflows/cli.yml) is called by CI and release builds;
-it is skipped during read-only maintenance alongside Desktop packaging.
-
-The [installation matrix](install.md#package-matrix-and-validation-scope)
-defines formats, CPU coverage, dependencies and the limits of distribution
-verification. Use native hosts for distribution packaging. After the pinned
-toolchain and `node scripts/dev.mjs setup`, these commands produce the packages:
-
-```text
-# Windows x64: NSIS installer + ZIP + checksums (PowerShell 7 and NSIS required)
-wails3 package GOOS=windows ARCH=amd64 INSTALL_SCOPE=user VERSION=0.3.0
-pwsh -NoProfile -File scripts/release/test-windows.ps1
-
-# macOS: native build, ad-hoc signed DMG + ZIP for one CPU
-wails3 task darwin:package:dmg ARCH=arm64 VERSION=0.3.0
-wails3 task darwin:package:dmg ARCH=amd64 VERSION=0.3.0
-
-# macOS: Universal bundle, then DMG + ZIP containing both CPUs
-wails3 task darwin:package:universal VERSION=0.3.0
-wails3 task darwin:create:dmg
-wails3 task darwin:create:zip ARCH=universal
-
-# Ubuntu 24.04 x64: DEB + AppImage + tar.gz + RPM
-wails3 package GOOS=linux ARCH=amd64 VERSION=0.3.0
-# Optional RPM, using the same CPU and version metadata
-wails3 task linux:create:rpm ARCH=amd64 VERSION=0.3.0
-```
-
-Linux needs the native libraries above, FUSE 2 for AppImage packaging and the
-pinned nFPM tool:
-`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0`.
-On Ubuntu 24.04 the FUSE package is `libfuse2t64` (`libfuse2` is a transitional
-package name used in CI). No Linux ARM64 AppImage is offered.
-
-Windows creates the ZIP from the same executable used by NSIS after optional
-Authenticode signing, and hashes both final assets. The Linux archive script
-stages only the binary, license, icon, desktop entry and install guide in a
-temporary directory; it never installs or runs application synchronization.
-DEB/RPM metadata receives the requested `GOARCH` and `VERSION`.
-
-The [release workflow](../.github/workflows/release.yml) keeps these opt-ins:
-
-| Repository variable | Behavior |
-| --- | --- |
-| `RELEASE_MACOS=true` | Publish Universal DMG and ZIP; requires Developer ID and notarization secrets already used by the workflow. |
-| `RELEASE_LINUX=true` | Publish Ubuntu-built x64 DEB, AppImage, tar.gz and RPM; RPM installation is checked in a Fedora 43 container. |
-
-For macOS releases, signing precedes notarization of the app archive, then the
-stapled app is placed into the final ZIP and DMG. The DMG is also signed,
-notarized and stapled. `lipo` verifies ARM64 and Intel slices before publication.
-The final publish job verifies the Windows checksum receipt and generates a
-single `SHA256SUMS.txt` covering all attached package assets.
-
-`go test ./tools/repocheck -run TestPlatform -count=1` covers workflow wiring,
-Windows ZIP bytes/checksums through synthetic PowerShell fixtures, and Linux
-tar content/executable permissions through synthetic Bash fixtures. On Windows,
-the tar fixture uses Git Bash when installed; otherwise it is explicitly skipped.
-These tests run in the normal full Go suite. Native CI additionally checks both
-macOS CPU hosts and the Ubuntu package smoke scripts. Inspect actual run results
-before describing an OS/distribution as verified; local fixtures are not native
-installer or interactive desktop tests.
-
-For release `v0.3.5` at commit `f84e964`, the
-[Windows release build](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37796905229),
-[macOS ARM64/Intel installed-app validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37796990437),
-and [Ubuntu/Fedora Linux package validation](https://github.com/jelllove/SyncHub-for-Agents/actions/runs/37797776658)
-passed. Windows assets are unsigned; macOS assets use the explicitly labeled
-ad-hoc path, not Developer ID signing or notarization. The combined checksum
-manifest covers all eight package files; platform manifests remain available.
-The [installation guide](install.md#package-matrix-and-validation-scope) records
-the exact tested scope and exclusions.
-
 ## macOS installed-app validation
 
 The [macOS installer workflow](../.github/workflows/macos-installer.yml) builds an
-ad-hoc signed universal DMG and ZIP from an existing immutable release tag. The default
+ad-hoc signed universal DMG from an existing immutable release tag. The default
 is `v0.3.4`; dispatch with `publish=false` to inspect artifacts first. Its
 [packager](../scripts/release/macos-adhoc.sh) uses locked npm dependencies and
 readonly Go modules, sets the bundle/executable version, and verifies both
@@ -139,7 +47,7 @@ onboarding, trigger real synchronization, or approve installs.
 Artifacts `macos-native-arm64` and `macos-native-x86_64` retain three named PNGs
 under `screenshots/`, the `native.xcresult` bundle, installation/signature
 receipts, and `xcodebuild.log`, including failed runs. `macos-adhoc-package`
-retains both archives, their checksum manifest, and immutable source/digest receipt.
+retains the DMG, its checksum manifest, and immutable source/digest receipt.
 Playwright is not used as a proxy: it cannot directly control the production
 Wails WKWebView. Native XCTest drives the actual macOS app.
 Screenshots are exported from XCTest attachments by the host script; the
@@ -147,7 +55,7 @@ sandboxed test runner does not write outside its container. The host also
 checks that invalid input leaves the isolated profile unconfigured.
 
 The publication job requires both native jobs to pass and rechecks the exact
-DMG and ZIP digests, successful test summaries without skips, and all three screenshots
+DMG digest, successful test summaries without skips, and all three screenshots
 for each architecture. It adds explicitly labeled ad-hoc assets to the selected
 published release only on an explicit `publish=true` dispatch. It refuses to
 replace existing assets, does not rewrite tags, and preserves Windows assets.
@@ -155,8 +63,7 @@ Before uploading, it resolves the live tag (including annotated tags) and
 rejects a missing or moved tag that differs from the verified source commit.
 Failed builds, installation, UI assertions, missing screenshots or invalid
 receipts block publication. The release notes link the run and disclose the
-unnotarized status. Each host also extracts the ZIP, verifies its signature,
-and compares the complete app contents with the app installed from the DMG.
+unnotarized status.
 
 These jobs prove isolated copy installation and specific native onboarding
 interactions, not download quarantine/Gatekeeper acceptance, full live sync,
@@ -184,9 +91,6 @@ private D-Bus session with
 isolated HOME/XDG directories and no SSH agent or global Git configuration.
 It checks the actual application process and its visible native window by PID,
 not only the Xvfb wrapper, and leaves onboarding unconfigured.
-The tar.gz contains the same executable as the verified DEB, plus its icon,
-desktop entry, license and install guide. Its content, executable permission and
-checksum are checked and it is retained alongside the native packages.
 Startup does not have to create a `.synchub` directory before user interaction.
 Ubuntu runner AppArmor restrictions otherwise block WebKit's sandbox helper.
 Each test loads a temporary AppArmor profile granting user namespaces only to
@@ -236,85 +140,6 @@ needs Docker running Linux containers and uses
 [linux-rpm-install.sh](../scripts/smoke/linux-rpm-install.sh).
 
 ## Local feedback and cleanup
-
-### Desktop preference and update regressions
-
-Tray activity tests additionally run with:
-
-```text
-go test ./internal/tray/... ./internal/desktop ./tools/archcheck
-go test ./internal/syncengine -run "TestEnginePublishesProgress|TestNoChangeCycleDoesNotReportPushing"
-npm --prefix frontend test -- --run src/TrayTip.test.tsx src/TrayTipSettings.test.tsx src/SettingsPanel.test.tsx src/App.test.tsx
-```
-
-Fake clocks cover stage de-duplication, late renderer readiness, dismissal,
-terminal error priority, review acknowledgements, stale timers and shutdown.
-Windows tests create/destroy native icon handles from the actual Wails icon
-bytes without adding real tray entries. Terminal-cycle observers are tested with
-synthetic homes and errors; unchanged Git cycles use isolated local bare remotes.
-The Windows tip's hidden/tool-window/no-activation flags and fixed 300x132 layout
-are guarded independently of real user configuration.
-Fake clocks assert exact five-second active/completion and ten-second
-error/attention budgets, same-phase timeout de-duplication, opt-out and reenable
-behavior. Isolated preference fixtures cover restart persistence and explicit
-save failures. Regenerate Wails bindings after changing the preference APIs;
-never edit generated files by hand.
-
-The Windows adapter first uses the public `NativeWindow()` handle and UI-thread
-dispatch to show the tip with `SW_SHOWNOACTIVATE`, then calls Wails `Show()` on
-the already-visible window to restore the WebView2 controller. Native showing
-alone leaves the browser hidden after Wails `Hide()`, producing a blank card.
-The order matters: Wails `Show()` on a hidden window uses `SW_SHOW` and activates
-the popup despite `WS_EX_NOACTIVATE`; on an already-visible window it restores
-the browser without activating the popup. Keep this path isolated in the
-Windows adapter and verify against a known-active fixture window, not flags alone.
-
-After building frontend assets, opt into the native Windows regression:
-
-```powershell
-$env:SYNCHUB_NATIVE_TRAY_TEST = '1'
-try {
-    go test ./internal/tray/desktop -run TestNativeTipReshowKeepsContentAndFocus -count=1 -v
-    if ($LASTEXITCODE -ne 0) { throw 'Native tray regression failed' }
-} finally {
-    Remove-Item Env:SYNCHUB_NATIVE_TRAY_TEST
-}
-```
-
-This test runs the built frontend in a separate WebView2 fixture process and
-checks three hide/show cycles: scanning, attention and completion. Each requires
-visible browser content, a nonempty title, all three controls and unchanged
-activation of the fixture sentinel. Its temporary browser profile is removed
-after the fixture process exits; ordinary unit runs skip this opt-in UI test.
-Native smoke checks must use a separate fixture application with an isolated
-WebView2 profile and no desktop sync/startup services. Browser checks can validate
-icons, text, controls and fit, but cannot establish Windows popup placement or
-focus behavior. Keep logs, including platform/framework shutdown diagnostics.
-The legacy Fyne tray must remain isolated from the Wails desktop adapter.
-
-For updater transport, Windows startup defaults and settings categories:
-
-```text
-go test ./internal/updater ./internal/startup ./internal/desktop
-npm --prefix frontend test -- --run src/SettingsPanel.test.tsx src/UpdatePanel.test.tsx src/ResetPanel.test.tsx src/App.test.tsx
-```
-
-Updater tests include an isolated HTTPS server that deliberately stalls its first
-TLS handshake, plus retry limits, cancellation, certificate rejection and HTTP
-error classification. They do not contact live GitHub or weaken production TLS.
-Windows startup tests use fake native backends and temporary preference files,
-not the developer's Run key. The one-time default, explicit opt-out, external
-entry removal, persistence rollback and setup-reset preservation are covered.
-Developer builds skip the automatic registration so temporary development binaries
-do not become login entries. macOS/Linux keep their previous opt-in behavior.
-
-Settings controls remain mounted while inactive categories are hidden. This
-preserves unsaved form/editor state and update subscriptions. Update and reset
-actions remain outside the synchronization form. Required fields in hidden tabs
-are revealed and focused before submission rather than being silently rejected.
-The category bar and save actions remain visible while the body scrolls.
-Browser fixture checks validate keyboard interaction, draft retention and narrow
-layouts, but do not prove native registry writes or Windows login behavior.
 
 The shared check uses gofmt, go vet, ESLint, and TypeScript. It checks
 all repository-owned Go files and all packages, not just the staged diff.
@@ -373,19 +198,6 @@ audit, without maintenance-mode or path filters. Windows verification still owns
 the source-bound receipts; Linux checks add cross-platform coverage rather than
 replacing that runner.
 Use `check` for quick feedback and `docs` for documentation-only changes.
-
-The NPM distribution lives under `packages/npm-installer`, separately from the
-private repository/frontend packages. From that directory, use
-`npm ci --ignore-scripts`, `npm test`, and `npm pack`.
-Root `npm test` also runs its tests. Its actual delivery documents are the
-[specification](../packages/npm-installer/docs/spec.md) and
-[architecture](../packages/npm-installer/docs/arch.md); they are checked for
-required sections, links and unfinished markers in the ordinary package test.
-Publish only a reviewed tarball to `https://registry.npmjs.org/` with the user's
-authenticated account, not the machine's internal default feed. Do not copy an
-NPM token into source, fixtures or the published archive. Initial package assets
-remain pinned to the existing v0.3.5 release; creating another GitHub release is
-a separate maintainer action.
 
 Each verification creates a new `.artifacts/validation/run-*` directory containing
 `validation.json` and one log per check. The JSON records the actual commit,
@@ -590,7 +402,7 @@ Until that is done, a failing workflow alone does not guarantee merges are block
 
 Regenerate with `node scripts/dev.mjs docs:write`; CI rejects stale content.
 
-- Go minimum: `1.26.9` (from `go.mod`).
+- Go minimum: `1.26.6` (from `go.mod`).
 - Node.js: `24.17.0` (from `.node-version`).
 - Wails CLI: `v3.0.0-beta.8` (from `go.mod`).
 

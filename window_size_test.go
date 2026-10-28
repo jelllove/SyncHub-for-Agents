@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"runtime"
 	"testing"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -78,20 +77,6 @@ func TestInitialMainWindowOptionsStayHiddenUntilDisplayReady(t *testing.T) {
 	}
 	if !got.Hidden {
 		t.Fatal("window must remain hidden until display-aware sizing is applied")
-	}
-}
-
-func TestMainWindowUsesCustomTitleBarOnlyOnWindows(t *testing.T) {
-	got := initialMainWindowOptions()
-	wantCustomTitleBar := runtime.GOOS == "windows"
-	if got.Frameless != wantCustomTitleBar {
-		t.Fatalf("Frameless = %t on %s, want %t", got.Frameless, runtime.GOOS, wantCustomTitleBar)
-	}
-	if got.Windows.WebView2CompositionHosting != wantCustomTitleBar {
-		t.Fatalf("native caption hit testing = %t, want %t", got.Windows.WebView2CompositionHosting, wantCustomTitleBar)
-	}
-	if got.DisableResize || got.Windows.DisableFramelessWindowDecorations {
-		t.Fatal("custom title bar must retain resizing, shadows and rounded window corners")
 	}
 }
 

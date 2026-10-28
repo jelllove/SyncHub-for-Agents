@@ -1,16 +1,6 @@
 schema_version: 2
 name: common
 resources:
-  - id: library-skills
-    category: skills
-    paths: {windows: "%USERPROFILE%\\.agents\\library\\skills", darwin: "~/.agents/library/skills", linux: "~/.agents/library/skills"}
-    include: ["**"]
-    strategy: source-tree
-  - id: library-instructions
-    category: instructions
-    paths: {windows: "%USERPROFILE%\\.agents\\library\\instructions", darwin: "~/.agents/library/instructions", linux: "~/.agents/library/instructions"}
-    include: ["AGENTS.md"]
-    strategy: text-tree
   - id: skills
     category: skills
     paths: {windows: "%USERPROFILE%\\.agents\\skills", darwin: "~/.agents/skills", linux: "~/.agents/skills"}

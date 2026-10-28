@@ -5,19 +5,16 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/appversion"
-	"github.com/qinqingxu/synchub-for-agents/internal/daemon"
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/scheduler"
 	"github.com/qinqingxu/synchub-for-agents/internal/startup"
 	"github.com/qinqingxu/synchub-for-agents/internal/tray"
-	traydesktop "github.com/qinqingxu/synchub-for-agents/internal/tray/desktop"
 	"github.com/qinqingxu/synchub-for-agents/internal/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -32,8 +29,6 @@ type guiApplication struct {
 	activation activationQueue
 	isQuitting atomic.Bool
 	updates    *updater.Manager
-	activity   *traydesktop.Notifier
-	trayTips   *tray.TipPreferences
 }
 
 type activationQueue struct {
@@ -100,26 +95,14 @@ func (gui *guiApplication) configure(
 	home string,
 ) error {
 	gui.service = core
-	tipPreferences, err := tray.NewTipPreferences(filepath.Join(home, "tray-settings.json"))
-	if err != nil {
-		return err
-	}
-	gui.trayTips = tipPreferences
 	gui.startup = &startup.Manager{
-		Backend:         gui.app.Autostart,
-		Identifier:      "io.github.qinqingxu.synchub",
-		Arguments:       []string{"--hidden"},
-		GOOS:            runtime.GOOS,
-		PreferencesPath: filepath.Join(home, "startup-settings.json"),
-		SkipDefault:     appversion.Version == "dev" || appversion.Version == "",
+		Backend:    gui.app.Autostart,
+		Identifier: "io.github.qinqingxu.synchub",
+		Arguments:  []string{"--hidden"},
+		GOOS:       runtime.GOOS,
 	}
-	if !gui.startup.SkipDefault {
-		if err := gui.migrateLegacyStartup(); err != nil {
-			return err
-		}
-		if err := gui.startup.InitializeDefault(); err != nil {
-			log.Printf("initialize Windows startup: %v", err)
-		}
+	if err := gui.migrateLegacyStartup(); err != nil {
+		return err
 	}
 	updates, err := updater.New(home, appversion.Version, runtime.GOOS, runtime.GOARCH, func(status updater.Status) {
 		gui.app.Event.Emit(desktop.UpdateEvent, status)
@@ -129,13 +112,10 @@ func (gui *guiApplication) configure(
 	}
 	gui.updates = updates
 	gui.app.RegisterService(application.NewService(desktop.WithUpdates(
-		desktop.WithTrayTips(desktop.NewWailsService(gui.app, core, onboardingService, gui.startup), gui.trayTips),
+		desktop.NewWailsService(gui.app, core, onboardingService, gui.startup),
 		updates,
 		func() {
 			gui.isQuitting.Store(true)
-			if gui.activity != nil {
-				gui.activity.Close()
-			}
 			gui.app.Quit()
 		},
 	)))
@@ -182,9 +162,8 @@ func (g *guiApplication) migrateLegacyStartup() error {
 
 func (g *guiApplication) configureTray() {
 	g.tray = g.app.SystemTray.New()
-	g.tray.SetIcon(tray.PNGIcon(scheduler.StateIdle))
+	g.tray.SetIcon(tray.Icon(scheduler.StateIdle, runtime.GOOS))
 	g.tray.SetTooltip("SyncHub for Agents")
-	g.activity = traydesktop.NewNotifier(g.app, g.tray, g.show, g.trayTips)
 
 	menu := g.app.NewMenu()
 	menu.Add("Open SyncHub for Agents").OnClick(func(*application.Context) {
@@ -210,35 +189,19 @@ func (g *guiApplication) configureTray() {
 	menu.AddSeparator()
 	menu.Add("Quit").OnClick(func(*application.Context) {
 		g.isQuitting.Store(true)
-		g.activity.Close()
 		g.app.Quit()
 	})
 	g.tray.SetMenu(menu)
 	g.tray.OnClick(g.show)
 
-	unsubscribeState := g.service.SubscribeState(func(state scheduler.State) {
-		g.activity.State(state)
+	g.service.SubscribeState(func(state scheduler.State) {
+		g.tray.SetIcon(tray.Icon(state, runtime.GOOS))
 		if state == scheduler.StatePaused {
 			pauseItem.SetLabel("Resume")
 		} else {
 			pauseItem.SetLabel("Pause")
 		}
 		menu.Update()
-	})
-	unsubscribeProgress := g.service.SubscribeProgress(func(progress desktop.Progress) {
-		if progress.Stage == "complete" {
-			g.activity.Reviewed(progress.NeedsAttention)
-			return
-		}
-		g.activity.Progress(progress.Stage)
-	})
-	unsubscribeCycle := g.service.SubscribeCycle(func(result daemon.CycleResult) {
-		g.activity.Finish(result.Error != "", result.NeedsAttention)
-	})
-	g.app.OnShutdown(func() {
-		unsubscribeState()
-		unsubscribeProgress()
-		unsubscribeCycle()
 	})
 }
 

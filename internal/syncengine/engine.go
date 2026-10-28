@@ -17,7 +17,6 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/portablemerge"
 	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
-	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 )
 
@@ -206,26 +205,6 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 				collected = refreshed
 				if closeErr != nil {
 					return Result{}, fmt.Errorf("close pre-resolution resource stage: %w", closeErr)
-				}
-			}
-		}
-	}
-
-	// A missing unused source is normal; an existing synchronized resource
-	// cannot be restored safely until its source root is available.
-	for i, issue := range collected.Skipped {
-		if issue.Code != "root-missing" {
-			continue
-		}
-		prefix := resourceRepoPrefix(e.Resources[issue.ResourceKey])
-		if prefix == "" {
-			collected.Skipped[i].Code = "root-unavailable"
-			continue
-		}
-		for _, snapshot := range []state.Snapshot{baseSnapshot, remote.owned} {
-			for repoRel := range snapshot {
-				if pathHasPrefix(repoRel, prefix) {
-					collected.Skipped[i].Code = "root-unavailable"
 				}
 			}
 		}
@@ -471,6 +450,20 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		}
 	}
 
+	e.publish(Progress{
+		Stage:            StageUploading,
+		Label:            "Uploading synchronized changes",
+		Percentage:       85,
+		CompletedActions: len(actions),
+		TotalActions:     len(actions),
+		BlockedFiles:     len(result.Blocked),
+		Restored:         result.Restored,
+		Reinstalled:      result.Reinstalled,
+		Skipped:          result.Skipped,
+		Conflicts:        result.Conflicts,
+		PendingInstalls:  result.PendingInstalls,
+		NeedsAttention:   len(result.Issues) > 0 || result.Conflicts > 0,
+	})
 	if err := e.Git.AddAll(); err != nil {
 		return Result{}, fmt.Errorf("git add: %w", err)
 	}
@@ -482,20 +475,6 @@ func (e *Engine) syncOnce(attempts int) (result Result, retErr error) {
 		if err := e.Git.Commit("sync: reconcile agent files"); err != nil {
 			return Result{}, fmt.Errorf("commit: %w", err)
 		}
-		e.publish(Progress{
-			Stage:            StageUploading,
-			Label:            "Uploading synchronized changes",
-			Percentage:       85,
-			CompletedActions: len(actions),
-			TotalActions:     len(actions),
-			BlockedFiles:     len(result.Blocked),
-			Restored:         result.Restored,
-			Reinstalled:      result.Reinstalled,
-			Skipped:          result.Skipped,
-			Conflicts:        result.Conflicts,
-			PendingInstalls:  result.PendingInstalls,
-			NeedsAttention:   len(result.Issues) > 0 || result.Conflicts > 0,
-		})
 		if err := e.Git.Push(); err != nil {
 			if attempts <= 1 {
 				return Result{}, fmt.Errorf("push: %w", err)
@@ -555,9 +534,6 @@ func (e *Engine) loadRemote(codecs *portableconfig.Registry) (remoteView, error)
 	snapshot, err := SnapshotRepo(e.RepoDir)
 	if err != nil {
 		return remoteView{}, fmt.Errorf("snapshot repo: %w", err)
-	}
-	if err := sharedlibrary.ProtectRemoteSpecs(e.Resources, snapshot, e.UserHome); err != nil {
-		return remoteView{}, fmt.Errorf("protect remote library sources: %w", err)
 	}
 	owned, _, ownershipBlocked := SplitRemoteSnapshot(snapshot, e.Resources)
 	valid, validationBlocked := ValidateRemoteResources(

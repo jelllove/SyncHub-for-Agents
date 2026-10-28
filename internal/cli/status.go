@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/qinqingxu/synchub-for-agents/internal/config"
@@ -13,33 +12,15 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/portableconfig"
 	"github.com/qinqingxu/synchub-for-agents/internal/resource"
 	"github.com/qinqingxu/synchub-for-agents/internal/resourcecollect"
-	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 	"github.com/qinqingxu/synchub-for-agents/internal/state"
 	"github.com/qinqingxu/synchub-for-agents/internal/syncengine"
 )
 
 type Status struct {
-	RepoURL        string    `json:"repositoryURL"`
-	EnabledAgents  []string  `json:"enabledAgents"`
-	LastSync       time.Time `json:"lastSync"`
-	PendingActions int       `json:"pendingActions"`
-}
-
-type Inspection struct {
-	Status
-	Actions        []syncengine.Action
-	Blocked        []string
-	Skipped        int
-	FirstSync      config.FirstSyncPolicy
-	RequiresChoice bool
-}
-
-func Inspect(home, goos string) (Inspection, error) {
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return Inspection{}, err
-	}
-	return inspectWithUserHome(home, goos, userHome)
+	RepoURL        string
+	EnabledAgents  []string
+	LastSync       time.Time
+	PendingActions int
 }
 
 func RunStatus(home, goos string) (Status, error) {
@@ -50,46 +31,33 @@ func RunStatus(home, goos string) (Status, error) {
 	return runStatusWithUserHome(home, goos, userHome)
 }
 
-func runStatusWithUserHome(home, goos, userHome string) (Status, error) {
-	result, err := inspectWithUserHome(home, goos, userHome)
-	return result.Status, err
-}
-
-func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr error) {
+func runStatusWithUserHome(home, goos, userHome string) (result Status, retErr error) {
 	cfg, err := config.Load(ConfigPath(home))
 	if err != nil {
-		return Inspection{}, err
+		return Status{}, err
 	}
 	providers, err := LoadProviders(home)
 	if err != nil {
-		return Inspection{}, err
+		return Status{}, err
 	}
 	resources, err := BuildResourceSpecs(cfg, providers, goos, userHome)
 	if err != nil {
-		return Inspection{}, err
+		return Status{}, err
 	}
 	repoDir, err := ResolveRepoDir(home, cfg, goos, userHome)
 	if err != nil {
-		return Inspection{}, fmt.Errorf("resolve repository directory: %w", err)
+		return Status{}, fmt.Errorf("resolve repository directory: %w", err)
 	}
 	codecs := portableconfig.BuiltinRegistry()
 	inventory := installplan.NewBuiltinInventory(installplan.CommandRunner{})
 	stageParent := filepath.Join(repoDir, ".git", "synchub-stage")
 	if err := os.MkdirAll(stageParent, 0o700); err != nil {
-		return Inspection{}, fmt.Errorf("create status stage parent: %w", err)
-	}
-	remote, err := syncengine.SnapshotRepo(repoDir)
-	if err != nil {
-		return Inspection{}, err
-	}
-	if err := sharedlibrary.ProtectRemoteSpecs(resources, remote, userHome); err != nil {
-		return Inspection{}, err
+		return Status{}, fmt.Errorf("create status stage parent: %w", err)
 	}
 	specList := make([]resource.Spec, 0, len(resources))
 	for _, spec := range resources {
 		specList = append(specList, spec)
 	}
-	sort.Slice(specList, func(i, j int) bool { return specList[i].Key < specList[j].Key })
 	collected, err := resourcecollect.New(resourcecollect.Options{
 		StageParent: stageParent,
 		GOOS:        goos,
@@ -98,12 +66,16 @@ func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr
 		Inventory:   inventory,
 	}).Collect(specList)
 	if err != nil {
-		return Inspection{}, err
+		return Status{}, err
 	}
 	defer func() {
 		retErr = errors.Join(retErr, collected.Close())
 	}()
 
+	remote, err := syncengine.SnapshotRepo(repoDir)
+	if err != nil {
+		return Status{}, err
+	}
 	remoteOwned, _, ownershipBlocked := syncengine.SplitRemoteSnapshot(remote, resources)
 	validRemote, validationBlocked := syncengine.ValidateRemoteResources(
 		repoDir,
@@ -115,18 +87,14 @@ func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr
 	)
 	base, err := state.Load(StatePath(home))
 	if err != nil {
-		return Inspection{}, err
+		return Status{}, err
 	}
 	blocked := append(append(append(
 		[]resource.Issue{},
 		collected.Blocked...),
 		ownershipBlocked...),
 		validationBlocked...)
-	firstSyncMode := ""
-	if !cfg.FirstSync.Completed {
-		firstSyncMode = cfg.FirstSync.Strategy
-	}
-	actions, blockedPaths := syncengine.PreviewResourceActions(
+	actions, _ := syncengine.PrepareResourceActions(
 		base,
 		collected.Snapshot,
 		remote,
@@ -134,26 +102,16 @@ func inspectWithUserHome(home, goos, userHome string) (result Inspection, retErr
 		resources,
 		collected.Skipped,
 		blocked,
-		firstSyncMode,
 	)
 
 	var last time.Time
 	if info, err := os.Stat(StatePath(home)); err == nil {
 		last = info.ModTime()
-	} else if !os.IsNotExist(err) {
-		return Inspection{}, fmt.Errorf("inspect last synchronization state: %w", err)
 	}
-	enabledAgents := cfg.EnabledAgents()
-	if enabledAgents == nil {
-		enabledAgents = []string{}
-	}
-	return Inspection{
-		Status: Status{
-			RepoURL: cfg.RepoURL, EnabledAgents: enabledAgents,
-			LastSync: last, PendingActions: len(actions),
-		},
-		Actions: actions, Blocked: blockedPaths, Skipped: len(collected.Skipped),
-		FirstSync:      cfg.FirstSync,
-		RequiresChoice: !cfg.FirstSync.Completed && cfg.FirstSync.Strategy == config.FirstSyncStrategyChoose,
+	return Status{
+		RepoURL:        cfg.RepoURL,
+		EnabledAgents:  cfg.EnabledAgents(),
+		LastSync:       last,
+		PendingActions: len(actions),
 	}, nil
 }

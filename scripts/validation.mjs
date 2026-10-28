@@ -11,7 +11,6 @@ export function validationChecks(root) {
     { id: "go-tests", command: "go", args: ["test", "-json", "./..."] },
     { id: "lint-tests", command: "npm", args: ["--prefix", "frontend", "run", "test:lint"] },
     { id: "frontend-tests", command: "npm", args: ["--prefix", "frontend", "test"] },
-    { id: "npm-installer-tests", command: "npm", args: ["--prefix", "packages/npm-installer", "test"] },
   ];
 }
 

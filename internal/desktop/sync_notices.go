@@ -47,23 +47,16 @@ func (s *summaryStore) loadSuccessfulCycle(last daemon.CycleResult) (daemon.Cycl
 	return cycle, nil
 }
 
-func routineNotice(code string) bool {
-	switch code {
-	case "generated-content", "platform-binary", "file-too-large", "root-missing",
-		"secret-detected", "remote-secret-detected", "remote-nonportable-fields":
-		return true
-	default:
-		return false
-	}
-}
-
-// Reviewing safety blocks never dismisses operational failures.
+// Collection exclusions can be reviewed without allowing the excluded files.
+// Operational failures outside the skipped/blocked groups remain actionable.
 func reviewableNotice(code string) bool {
 	switch code {
-	case "invalid-path", "repo-path-invalid",
+	case "secret-detected", "remote-secret-detected", "generated-content",
+		"platform-binary", "file-too-large", "invalid-path", "repo-path-invalid",
 		"unapproved-link", "link-cycle", "remote-path-invalid",
 		"remote-internal-invalid", "remote-resource-unknown", "remote-link-blocked",
-		"remote-install-manifest-invalid":
+		"remote-nonportable-fields", "remote-install-manifest-invalid",
+		"root-unavailable", "link-unavailable", "projection-failed", "remote-projection-invalid":
 		return true
 	default:
 		return false
@@ -86,21 +79,12 @@ func cycleNotices(cycle daemon.CycleResult, review noticeReview) SyncNotices {
 	}
 	appendIssues := func(issues []resource.Issue, kind string) {
 		for _, issue := range issues {
-			remaining[issue]--
-			if kind != "error" && routineNotice(issue.Code) {
-				switch kind {
-				case "skipped":
-					notices.Skipped = max(0, notices.Skipped-1)
-				case "blocked":
-					notices.Blocked = max(0, notices.Blocked-1)
-				}
-				continue
-			}
 			notices.Issues = append(notices.Issues, SyncNoticeIssue{
 				ResourceKey: issue.ResourceKey, Path: issue.Path, Code: issue.Code,
 				Message: issue.Message, Bytes: issue.Bytes, Kind: kind,
 				Reviewable: kind != "error" && reviewableNotice(issue.Code),
 			})
+			remaining[issue]--
 		}
 	}
 	appendIssues(cycle.SkippedIssues, "skipped")
@@ -110,7 +94,8 @@ func cycleNotices(cycle daemon.CycleResult, review noticeReview) SyncNotices {
 			appendIssues([]resource.Issue{issue}, "error")
 		}
 	}
-	// Raw cycle history retains exclusions; only actionable records affect review.
+	// Sort only the fingerprint input: the log retains every original record,
+	// including duplicates. A later cycle's timestamp/order do not invalidate review.
 	records := make([]string, 0, len(notices.Issues))
 	for _, issue := range notices.Issues {
 		// File growth does not create a new exclusion; retain sizes only in the log.
@@ -145,8 +130,7 @@ func cycleNeedsAttention(cycle daemon.CycleResult, review noticeReview) bool {
 		}
 	}
 	if len(notices.Issues) == 0 {
-		return notices.Blocked > 0 || notices.Skipped > 0 ||
-			(cycle.NeedsAttention && len(cycle.Issues)+len(cycle.SkippedIssues)+len(cycle.BlockedIssues) == 0)
+		return cycle.NeedsAttention || cycle.Blocked > 0 || cycle.Skipped > 0
 	}
 	return false
 }

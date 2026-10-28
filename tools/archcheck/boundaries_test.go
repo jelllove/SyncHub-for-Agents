@@ -34,7 +34,6 @@ var syncDomainPackages = []string{
 	"internal/provider",
 	"internal/repository",
 	"internal/resourcecollect",
-	"internal/sharedlibrary",
 	"internal/syncengine",
 }
 

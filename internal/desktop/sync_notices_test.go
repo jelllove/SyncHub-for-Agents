@@ -19,8 +19,8 @@ import (
 )
 
 func noticeCycle() daemon.CycleResult {
-	skipped := resource.Issue{ResourceKey: "demo/source", Path: "cache.tmp", Code: "unapproved-link", Message: "Link needs approval", Bytes: 12}
-	blocked := resource.Issue{ResourceKey: "demo/source", Path: "secret.json", Code: "invalid-path", Message: "Unsafe destination"}
+	skipped := resource.Issue{ResourceKey: "demo/source", Path: "cache.tmp", Code: "generated-content", Message: "Excluded by policy", Bytes: 12}
+	blocked := resource.Issue{ResourceKey: "demo/source", Path: "secret.json", Code: "secret-detected", Message: "Credential content"}
 	return daemon.CycleResult{
 		Skipped: 2, Blocked: 1, NeedsAttention: true, IssueDetailsVersion: 1,
 		Issues:        []resource.Issue{blocked, skipped, skipped},
@@ -36,95 +36,6 @@ func noticeSnapshot(t *testing.T, service *Service) Snapshot {
 		t.Fatal(err)
 	}
 	return snapshot
-}
-
-func TestRoutineExclusionsDoNotRequireAttentionOrReachDesktopNotices(t *testing.T) {
-	for _, code := range []string{"generated-content", "platform-binary", "file-too-large", "root-missing", "secret-detected", "remote-secret-detected", "remote-nonportable-fields"} {
-		t.Run(code, func(t *testing.T) {
-			issue := resource.Issue{Code: code, Path: "synthetic", Message: "Excluded by policy"}
-			cycle := daemon.CycleResult{
-				Skipped: 1, NeedsAttention: true, IssueDetailsVersion: 1,
-				SkippedIssues: []resource.Issue{issue}, Issues: []resource.Issue{issue},
-			}
-			if cycleNeedsAttention(cycle, noticeReview{}) {
-				t.Fatal("normal exclusion requires user attention")
-			}
-			notices := cycleNotices(cycle, noticeReview{})
-			if notices.Skipped != 0 || notices.Blocked != 0 || len(notices.Issues) != 0 {
-				t.Fatalf("normal exclusion exposed to desktop: %#v", notices)
-			}
-			cycle.Skipped, cycle.Blocked = 0, 1
-			cycle.SkippedIssues, cycle.BlockedIssues = nil, []resource.Issue{issue}
-			if cycleNeedsAttention(cycle, noticeReview{}) || len(cycleNotices(cycle, noticeReview{}).Issues) != 0 {
-				t.Fatal("normal blocked exclusion requires attention")
-			}
-			cycle.Issues = append(cycle.Issues, resource.Issue{Code: "read-failed", Message: "access denied"})
-			if !cycleNeedsAttention(cycle, noticeReview{}) {
-				t.Fatal("read failure hidden alongside normal exclusions")
-			}
-		})
-	}
-}
-
-func TestRoutineExclusionsPreserveHistoryButNotDesktopOrTrayAttention(t *testing.T) {
-	service, err := New(configuredHome(t), runtime.GOOS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer service.Close()
-	cycle := noticeCycle()
-	cycle.Blocked, cycle.BlockedIssues = 0, nil
-	for i := range cycle.SkippedIssues {
-		cycle.SkippedIssues[i].Code = "generated-content"
-	}
-	cycle.Issues = append([]resource.Issue(nil), cycle.SkippedIssues...)
-	var observed daemon.CycleResult
-	unsubscribe := service.SubscribeCycle(func(result daemon.CycleResult) { observed = result })
-	defer unsubscribe()
-	service.recordCycle(cycle)
-	snapshot := noticeSnapshot(t, service)
-	if snapshot.State == "error" || snapshot.Progress.NeedsAttention || observed.NeedsAttention || len(snapshot.SyncNotices.Issues) != 0 {
-		t.Fatalf("routine exclusions surfaced: snapshot=%#v, observed=%#v", snapshot, observed)
-	}
-	saved, err := newSummaryStore(service.home).loadSuccessfulCycle(daemon.CycleResult{})
-	if err != nil || !reflect.DeepEqual(saved.SkippedIssues, cycle.SkippedIssues) || saved.Skipped != cycle.Skipped {
-		t.Fatalf("raw diagnostic history lost: %#v, %v", saved, err)
-	}
-	service.recordProgress(syncengine.Progress{Stage: syncengine.StageComplete, NeedsAttention: true})
-	if noticeSnapshot(t, service).Progress.NeedsAttention {
-		t.Fatal("completion restored routine-only attention")
-	}
-}
-
-func TestRoutineExclusionsDoNotInvalidateActionableNoticeReview(t *testing.T) {
-	cycle := noticeCycle()
-	before := cycleNotices(cycle, noticeReview{})
-	exclusion := resource.Issue{Code: "generated-content", Path: "cache"}
-	cycle.Skipped++
-	cycle.SkippedIssues = append(cycle.SkippedIssues, exclusion)
-	cycle.Issues = append(cycle.Issues, exclusion)
-	cycle.NeedsAttention = true
-	review := noticeReview{Version: noticeReviewVersion, Fingerprint: before.Fingerprint}
-	after := cycleNotices(cycle, review)
-	if !after.Reviewed || after.Fingerprint != before.Fingerprint || cycleNeedsAttention(cycle, review) {
-		t.Fatalf("routine exclusion invalidated reviewed actionable records: %#v", after)
-	}
-}
-
-func TestOperationalCollectionFailuresCannotBeDismissedAsExclusions(t *testing.T) {
-	for _, code := range []string{"root-unavailable", "link-unavailable", "read-failed", "walk-failed", "stat-failed", "projection-failed", "remote-projection-invalid", "unknown-future-code"} {
-		t.Run(code, func(t *testing.T) {
-			issue := resource.Issue{Code: code, Message: "operation failed"}
-			cycle := daemon.CycleResult{IssueDetailsVersion: 1, Skipped: 1, SkippedIssues: []resource.Issue{issue}, Issues: []resource.Issue{issue}}
-			notices := cycleNotices(cycle, noticeReview{})
-			if len(notices.Issues) != 1 || notices.Issues[0].Reviewable {
-				t.Fatalf("failure missing or dismissible: %#v", notices)
-			}
-			if !cycleNeedsAttention(cycle, noticeReview{Version: 1, Fingerprint: notices.Fingerprint}) {
-				t.Fatal("acknowledgement hid operational failure")
-			}
-		})
-	}
 }
 
 func TestSyncNoticesPersistExactRecordsAndReviewAcrossRestart(t *testing.T) {
@@ -143,7 +54,7 @@ func TestSyncNoticesPersistExactRecordsAndReviewAcrossRestart(t *testing.T) {
 	if !before.SyncNotices.DetailsAvailable || len(before.SyncNotices.Issues) != 3 || before.SyncNotices.Reviewed {
 		t.Fatalf("notices = %#v", before.SyncNotices)
 	}
-	if before.SyncNotices.Issues[0].Path != "cache.tmp" || before.SyncNotices.Issues[2].Code != "invalid-path" {
+	if before.SyncNotices.Issues[0].Path != "cache.tmp" || before.SyncNotices.Issues[2].Code != "secret-detected" {
 		t.Fatalf("exact grouped issues = %#v", before.SyncNotices.Issues)
 	}
 	wails := NewWailsService(nil, service, nil, nil)
@@ -208,7 +119,7 @@ func TestSyncNoticesRejectStaleReviewAndRequireReviewForChanges(t *testing.T) {
 	}
 }
 
-func TestSyncNoticesReviewDoesNotDismissCollectionFailures(t *testing.T) {
+func TestSyncNoticesCanReviewReportedCollectionExclusions(t *testing.T) {
 	service, err := New(configuredHome(t), runtime.GOOS)
 	if err != nil {
 		t.Fatal(err)
@@ -225,16 +136,16 @@ func TestSyncNoticesReviewDoesNotDismissCollectionFailures(t *testing.T) {
 	service.recordCycle(cycle)
 	before := noticeSnapshot(t, service)
 	for _, issue := range before.SyncNotices.Issues {
-		if (issue.Code == "root-unavailable" || issue.Code == "projection-failed") && issue.Reviewable {
-			t.Fatalf("operational failure can be reviewed away: %#v", issue)
+		if !issue.Reviewable {
+			t.Fatalf("reported exclusion cannot be reviewed: %#v", issue)
 		}
 	}
 	if err := service.AcknowledgeSyncNotices(before.SyncNotices.Fingerprint); err != nil {
 		t.Fatal(err)
 	}
 	reviewed := noticeSnapshot(t, service)
-	if reviewed.State != "error" || !reviewed.Progress.NeedsAttention || !reviewed.SyncNotices.Reviewed {
-		t.Fatalf("review hid collection failures: %#v", reviewed)
+	if reviewed.State == "error" || reviewed.Progress.NeedsAttention || !reviewed.SyncNotices.Reviewed {
+		t.Fatalf("reviewed collection exclusions still require attention: %#v", reviewed)
 	}
 	if !reflect.DeepEqual(before.SyncNotices.Issues, reviewed.SyncNotices.Issues) {
 		t.Fatal("reviewing exclusions removed failure details")

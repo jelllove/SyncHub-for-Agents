@@ -18,13 +18,6 @@ machine-specific state on the computer where they were created.
 - **Common resources** represent shared instructions or Skills restored to
   multiple supported agents.
 
-The opt-in [shared library](shared-library.md) adds canonical sources under
-`~/.agents/library` with previewed, per-target adoption. Its managed names are
-reserved from legacy alias restore/collection; local backups and target approval
-remain on each computer. Enable common Skills/Instructions to synchronize the
-corresponding sources. This is distinct from automatically sharing whole skill
-directories.
-
 You can disable an entire agent or an individual category in **Sync settings**.
 Use the restore preview to review source paths, restore targets, file counts,
 excluded content, and total portable data before saving changes.
@@ -52,58 +45,47 @@ session files, and declarative installation metadata.
 3. Review the restore preview.
 4. Start synchronization.
 
-The first computer publishes its safe portable resources. Policy-excluded files
-remain local without routine skip reminders.
+The first computer publishes its safe portable resources. Blocked and skipped
+files appear as safety notices and remain local.
 
 ## Sync diagnostics and acknowledgement
 
-The dashboard no longer displays **Skipped** or **Blocked** cards. Normal
-exclusions do not produce **Needs attention**, tray warnings, review buttons, or
-diagnostic-dialog entries. This covers generated content, platform binaries,
-oversized files, detected credentials and remote machine-local fields. Missing
-resource roots are automatic exclusions only when that resource has no files
-in the remote or saved synchronization base. Missing roots for previously
-synchronized resources, access failures and invalid configuration remain
-actionable. Older `root-unavailable` records cannot safely distinguish an absent
-directory from an access failure, so they remain visible until a new cycle
-records the precise cause.
-
-When actionable records exist, the keyboard-accessible **Issues** button opens
-the **Sync diagnostics log** for the last successful sync-and-cleanup cycle.
-Filter by collection issues, safety blocks, or operational issues to inspect
-the resource, reported path, reason, and code. File issues use the relative path
-reported by the cycle; resource-level failures may report the source root.
-The displayed count is the number of visible issue records, including
-duplicates, not the number of failed files. Original counts and every record,
-including automatically excluded items, remain in local cycle history and
-daemon logs; filtering the UI does not change collection or synchronization.
-
-A failed later cycle leaves the successful-cycle log available and its current
-error visible. Older summaries saved without details explicitly report that
-historical records are unavailable; they cannot be acknowledged and do not
-invent an issue count. The log never substitutes a newer settings preview for
+The dashboard **Skipped** and **Blocked** counters are keyboard-accessible
+buttons. Open either to view the **Sync diagnostics log** for the last successful
+sync-and-cleanup cycle. Filter by skipped, blocked, or operational issues to
+inspect the exact resource, reported path, reason, and code. File issues use the
+relative path reported by the cycle; resource-level failures may report the
+source root instead. The log never substitutes a newer settings preview for
 historical cycle details.
 
-Choose **Review notices** beside the dashboard status, or open **Issues**.
-Choose **Review safety notices** to show the recorded actionable set, then
+Original counts and all per-resource records, including duplicates, are retained.
+Blocked counts measure protected paths and can differ from the number of issue
+records. A failed later cycle leaves the successful-cycle log available and its
+current error visible. Older summaries saved without details explicitly report
+that the historical records are unavailable; they cannot be acknowledged.
+
+Choose **Review notices** beside the dashboard status, or open a counter's log.
+Choose **Review safety notices** to show the entire recorded issue set, then
 **Confirm acknowledgement**. The log scrolls independently of its header and
 confirmation controls, so the buttons remain visible even with many records.
 Acknowledgement is local to this SyncHub setup and
-persists across restarts. A versioned fingerprint identifies the visible records,
-counts, and reasons, including duplicates. Unchanged safety blocks remain reviewed
+persists across restarts. A versioned fingerprint identifies the exact records,
+counts, and reasons, including duplicates. Unchanged exclusions remain reviewed
 when timestamps, record order, or file sizes change. Updated sizes remain in the
 log; new paths, reasons, codes, or counts require review.
 If the set changes before confirmation, the operation fails visibly: close and
 reopen the log to review the current records. Load and persistence failures are
 reported rather than silently treating notices as reviewed.
 
-Reviewed safety blocks no longer cause **Needs attention** by themselves;
-their records remain available with a reviewed indicator. Missing synchronized
-sources, unavailable links, failed configuration projection, I/O, scanner,
-write and unknown failures cannot be dismissed by acknowledgement. Actual sync
-errors, unresolved conflicts and pending/failed installation plans still
-require attention. Conflicts retain their local/remote/merged-content choices;
-automatic exclusion never chooses a side. Acknowledgement neither approves installation nor
+Reviewed safety/exclusion notices no longer cause **Needs attention** by
+themselves. Their counters and log remain available with a reviewed indicator.
+Reported skipped/blocked exclusions for missing sources, unavailable links, or
+failed portable configuration projection can also be reviewed. Those resources
+remain excluded, and their failure details remain in the log; confirmation does
+not claim that they were synchronized. Operational failures outside these
+recorded exclusion groups (including I/O, scanner, write, and unknown failures),
+actual sync errors, unresolved conflicts, and pending/failed installation plans
+still require attention. Acknowledgement neither approves installation nor
 resolves conflicts. Opening, filtering, or acknowledging the log never triggers
 sync or changes secret, path, symbolic-link, or size protections. **Reset local
 setup** removes both the retained summaries and acknowledgement.
@@ -196,9 +178,8 @@ complete.
 
 ### Synchronization says Needs attention
 
-Open the dashboard **Issues** log and inspect the reason and path.
+Open the dashboard **Skipped** or **Blocked** log and review safety notices.
 After acknowledgement, an otherwise successful cycle no longer needs attention
-for the same reviewed safety blocks. Normal exclusions need no acknowledgement.
-Fix actual sync/operational errors, resolve conflicts,
+for those same notices. Fix actual sync/operational errors, resolve conflicts,
 and review pending installation plans separately; acknowledging notices cannot
 clear these gates.

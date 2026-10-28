@@ -1,10 +1,6 @@
 package main
 
-import (
-	"runtime"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
-)
+import "github.com/wailsapp/wails/v3/pkg/application"
 
 const (
 	preferredWindowWidth  = 1200
@@ -62,10 +58,6 @@ func initialMainWindowOptions() application.WebviewWindowOptions {
 		MinWidth:  size.MinWidth,
 		MinHeight: size.MinHeight,
 		Hidden:    true,
-		Frameless: runtime.GOOS == "windows",
-		Windows: application.WindowsWindow{
-			WebView2CompositionHosting: runtime.GOOS == "windows",
-		},
 	}
 }
 

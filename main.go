@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/cli"
 	"github.com/qinqingxu/synchub-for-agents/internal/desktop"
 	"github.com/qinqingxu/synchub-for-agents/internal/gitclient"
-	"github.com/qinqingxu/synchub-for-agents/internal/instance"
 	"github.com/qinqingxu/synchub-for-agents/internal/onboarding"
 	"github.com/qinqingxu/synchub-for-agents/internal/repository"
 	"github.com/qinqingxu/synchub-for-agents/internal/sshprobe"
@@ -59,17 +57,12 @@ func main() {
 	}
 }
 
-func runDesktop(hidden bool, bootstrap desktopBootstrap) (retErr error) {
+func runDesktop(hidden bool, bootstrap desktopBootstrap) error {
 	gui := bootstrap.newGUI()
 	home, err := bootstrap.home()
 	if err != nil {
 		return fmt.Errorf("resolve SyncHub for Agents home: %w", err)
 	}
-	ownership, err := instance.Acquire(home)
-	if err != nil {
-		return fmt.Errorf("acquire Desktop profile: %w", err)
-	}
-	defer func() { retErr = errors.Join(retErr, ownership.Close()) }()
 	core, err := bootstrap.newService(home, "")
 	if err != nil {
 		return fmt.Errorf("initialize SyncHub for Agents: %w", err)
@@ -127,7 +120,6 @@ func newOnboardingService(home string, core *desktop.Service) (*onboarding.Servi
 			if mode == string(repository.HTTPS) {
 				client.AuthMode = gitclient.AuthOAuth
 				client.Executable = executable
-				client.CredentialHome = home
 			}
 			setup := &repository.Setup{Client: client}
 			return setup.Initialize(remote, dir)

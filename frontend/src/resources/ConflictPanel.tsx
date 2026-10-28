@@ -1,6 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useI18n } from '../i18n'
-import { statusName } from '../statusNames'
 import type {
   ConflictResolutionStatus,
   ConflictSelection,
@@ -32,7 +30,6 @@ export function ConflictPanel({
   applyBatch: (selections: ConflictSelection[]) => Promise<unknown>
   retryBatch: (id: string) => Promise<unknown>
 }) {
-  const { locale, t } = useI18n()
   const [selections, setSelections] = useState<ConflictSelections>({})
 
   const applySelections = useMemo(
@@ -87,12 +84,12 @@ export function ConflictPanel({
     <section className="attention-panel conflict-panel" aria-live="polite">
       <div className="attention-heading">
         <div>
-          <span className="eyebrow">{t('MANUAL REVIEW', '人工审查')}</span>
-          <h2>{t('Resolve synchronized conflicts', '解决同步冲突')}</h2>
+          <span className="eyebrow">MANUAL REVIEW</span>
+          <h2>Resolve synchronized conflicts</h2>
         </div>
         <span className="count-badge">{conflicts.length}</span>
       </div>
-      <p>{t('Choose a decision for every conflict, then apply them together in one transaction.', '为每个冲突选择处理方式，然后在同一事务中统一应用。')}</p>
+      <p>Choose a decision for every conflict, then apply them together in one transaction.</p>
       <div className="inline-actions">
         <button
           className="secondary"
@@ -100,7 +97,7 @@ export function ConflictPanel({
           onClick={() => setAllChoice('local')}
           type="button"
         >
-          {t('Use local for all', '全部使用本地')}
+          Use local for all
         </button>
         <button
           className="secondary"
@@ -108,7 +105,7 @@ export function ConflictPanel({
           onClick={() => setAllChoice('remote')}
           type="button"
         >
-          {t('Use remote for all', '全部使用远程')}
+          Use remote for all
         </button>
         <button
           className="text-button"
@@ -116,13 +113,13 @@ export function ConflictPanel({
           onClick={clearAllChoices}
           type="button"
         >
-          {t('Clear all', '清除全部')}
+          Clear all
         </button>
       </div>
       {resolution && (
         <div className={`resolution-status resolution-${resolution.status}`}>
-          <strong>{t('Batch status: ', '批次状态：')}{statusName(resolution.status, t)}</strong>
-          <span>{t(`${resolution.selected} selections`, `${resolution.selected} 项选择`)}</span>
+          <strong>Batch status: {resolution.status}</strong>
+          <span>{resolution.selected} selections</span>
           {resolution.error && <small className="warning">{resolution.error}</small>}
           {resolution.status === 'failed' && (
             <button
@@ -130,7 +127,7 @@ export function ConflictPanel({
               disabled={busy}
               onClick={() => void retryBatch(resolution.id)}
             >
-              {t('Retry failed batch', '重试失败批次')}
+              Retry failed batch
             </button>
           )}
         </div>
@@ -143,7 +140,7 @@ export function ConflictPanel({
             <article key={conflict.id}>
               <strong>{conflict.resourceKey}</strong>
               <code>{conflict.path}</code>
-              <small>{t('Created ', '创建于 ')}{new Date(conflict.createdAt).toLocaleString(locale)}</small>
+              <small>Created {new Date(conflict.createdAt).toLocaleString()}</small>
               <div className="inline-actions">
                 <button
                   className={selectionClass(selected?.choice === 'local')}
@@ -151,7 +148,7 @@ export function ConflictPanel({
                   onClick={() => setChoice(conflict.id, 'local')}
                   type="button"
                 >
-                  {t('Use local', '使用本地')}
+                  Use local
                 </button>
                 <button
                   className={selectionClass(selected?.choice === 'remote')}
@@ -159,7 +156,7 @@ export function ConflictPanel({
                   onClick={() => setChoice(conflict.id, 'remote')}
                   type="button"
                 >
-                  {t('Use remote', '使用远程')}
+                  Use remote
                 </button>
                 <button
                   className={selected?.choice === 'merged' ? 'text-button active' : 'text-button'}
@@ -167,17 +164,17 @@ export function ConflictPanel({
                   onClick={() => setChoice(conflict.id, 'merged')}
                   type="button"
                 >
-                  {t('Edit merged', '编辑合并内容')}
+                  Edit merged
                 </button>
               </div>
               {merged && (
                 <div className="merge-editor">
                   <label>
-                    {t('Reviewed merged content', '已审查的合并内容')}
+                    Reviewed merged content
                     <textarea
                       value={selected.content}
                       onChange={(event) => setMergedContent(conflict.id, event.target.value)}
-                      placeholder={t('Paste or write the complete merged file', '粘贴或编写完整的合并文件')}
+                      placeholder="Paste or write the complete merged file"
                     />
                   </label>
                 </div>
@@ -192,7 +189,7 @@ export function ConflictPanel({
         onClick={() => void applyBatch(applySelections)}
         type="button"
       >
-        {t('Apply all and synchronize', '全部应用并同步')}
+        Apply all and synchronize
       </button>
     </section>
   )

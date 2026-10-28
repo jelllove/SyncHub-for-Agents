@@ -11,7 +11,6 @@ import (
 	"github.com/qinqingxu/synchub-for-agents/internal/pathresolver"
 	"github.com/qinqingxu/synchub-for-agents/internal/provider"
 	"github.com/qinqingxu/synchub-for-agents/internal/resource"
-	"github.com/qinqingxu/synchub-for-agents/internal/sharedlibrary"
 )
 
 // Home returns the SyncHub home directory (~/.synchub) and migrates legacy
@@ -209,9 +208,6 @@ func BuildResourceSpecs(cfg config.Config, providers []provider.Provider, goos, 
 		specs[spec.Key] = spec
 	}
 
-	if err := sharedlibrary.ProtectSpecs(specs, userHome); err != nil {
-		return nil, err
-	}
 	return specs, nil
 }
 

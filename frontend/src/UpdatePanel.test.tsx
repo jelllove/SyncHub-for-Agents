@@ -1,15 +1,8 @@
-import { act, render as renderComponent, screen, waitFor } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Status } from '../bindings/github.com/qinqingxu/synchub-for-agents/internal/updater/models'
 import { UpdatePanel } from './UpdatePanel'
-import { setLocale } from './i18n'
-import { UpdateProvider } from './updates'
-
-function render(ui: ReactNode) {
-  return renderComponent(ui, { wrapper: UpdateProvider })
-}
 
 const api = vi.hoisted(() => ({
   status: vi.fn(),
@@ -71,7 +64,6 @@ function publish(next: Status) {
 }
 
 describe('UpdatePanel', () => {
-  afterEach(() => act(() => setLocale('en')))
   beforeEach(() => {
     vi.resetAllMocks()
     api.status.mockResolvedValue(status())
@@ -98,21 +90,6 @@ describe('UpdatePanel', () => {
     expect(screen.getByText(/Quit from the tray/)).toHaveTextContent('No forced background restarts.')
     expect(api.check).not.toHaveBeenCalled()
     expect(api.on).toHaveBeenCalledWith('updater:status', expect.any(Function))
-  })
-
-  it('translates update status and dates without checking or restarting on locale changes', async () => {
-    const date = '2026-10-03T10:00:00Z'
-    api.status.mockResolvedValue(ready({ lastChecked: date }))
-    render(<UpdatePanel syncBusy={true} />)
-    expect(await screen.findByText('Version v1.1.0 is ready to install.')).toBeVisible()
-    act(() => setLocale('zh-CN'))
-    expect(screen.getByText('版本 v1.1.0 已准备好安装。')).toBeVisible()
-    expect(screen.getByText(`上次检查 ${new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(date))}`)).toBeVisible()
-    expect(screen.getByRole('button', { name: '重启以更新' })).toBeDisabled()
-    expect(api.status).toHaveBeenCalledTimes(1)
-    expect(api.check).not.toHaveBeenCalled()
-    expect(api.restart).not.toHaveBeenCalled()
-    expect(api.on).toHaveBeenCalledTimes(1)
   })
 
   it.each([

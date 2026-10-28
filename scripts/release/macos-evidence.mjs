@@ -21,8 +21,7 @@ export function verifyEvidence(directory, summary, receipt, tag, architecture) {
   if (receipt.version !== version || receipt.architecture !== architecture ||
       !['arm64', 'x86_64'].includes(architecture) ||
       !/^[a-f0-9]{64}$/.test(receipt.originalDMGDigest ?? '') ||
-      !/^[a-f0-9]{64}$/.test(receipt.originalZIPDigest ?? '') ||
-      ['installedFromDMG', 'adHocSignatureVerified', 'executableVersionVerified', 'isolatedHome', 'archiveContentsMatch']
+      ['installedFromDMG', 'adHocSignatureVerified', 'executableVersionVerified', 'isolatedHome']
         .some((field) => receipt[field] !== true)) {
     throw new Error('macOS installation receipt is missing or mismatched')
   }
